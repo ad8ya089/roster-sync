@@ -22,13 +22,13 @@ One shared `AbstractIntegrationTest` starts a single Postgres container per JVM 
 | `RecordValidatorTest` | phone E.164 ok/bad, email ok/bad, required fields per type, unknown office, inactive office, version ≤ 0, manager = self, lengths; errors are `{field, code}` with no values |
 | `FieldOwnershipPolicyTest` | default split; HR snapshot filtered to HR fields; transport keys reported as `FIELD_NOT_OWNED_BY_SOURCE`; moving `PHONE` to TRANSPORT via config flips both directions |
 | `ChangeDeciderTest` | v > current → APPLY with changed fields; v < → STALE; v == & same hash → DUPLICATE; v == & different → CONFLICT; snapshot mode HEAL; tombstone + lower CREATE → STALE; UPDATE for unknown → APPLY(create) |
-| `ChangeDeciderPropertyTest` (jqwik) | **for any permutation of a set of full-state events, the final state equals the max-version event and each version is applied at most once** — the formal version of "order doesn't matter" |
+| `ChangeDeciderPropertyTest` (jqwik, 1,000 tries, seed `2026103001`) | **for any permutation of a set of full-state events, the final state equals the max-version event and each version is applied at most once** — the formal version of "order doesn't matter" |
 | `RecordHasherTest` | stable across runs; field order fixed; email case-insensitive; transport fields don't affect hash; null vs empty distinct |
 | `BucketPartitionerTest` | CRC32 bucket stable for known IDs (golden values); distribution roughly uniform over 200k IDs (chi-square-ish bound) |
 | `BucketDifferTest` | each row of the decision table in `RECONCILIATION.md §3`, incl. `hr_updated_at > asOf` guard and present-but-invalid |
 | `SafetyBrakeTest` | 29.99 % passes, 30.00 % trips (boundary), count guard, trailer mismatch, expectedRowCount, zero active skips ratio/count guards but trailer/expected-count mismatches still trip, threshold configurable |
 | `BackoffPolicyTest` | outbox backoff 1,2,4,…,300 s cap; DEAD after max attempts |
-| `ArchitectureTest` | `domain` imports nothing from Spring/JPA; controllers don't touch repositories; tenant repository methods take `tenantId` |
+| `ArchitectureTest` | `domain` depends on no Spring, Jakarta, java.sql, infrastructure, application or API classes; controllers don't touch repositories; tenant repository methods take `tenantId` |
 
 ### Integration — hard rules
 | Class | Proves (brief wording in quotes) |
@@ -98,3 +98,9 @@ mvn verify -Pbenchmark        # + 200k benchmark
 ./scripts/loadtest.sh         # k6 against the running compose stack
 ./scripts/demo.sh             # scripted curl walkthrough used in the video
 ```
+
+## Phase 2 proof
+
+`./mvnw test` runs the fixed-seed jqwik property and ArchUnit alongside deterministic unit cases. Jupiter uses the Boot-managed JUnit 6 runtime because Spring Framework 7's SpringExtension requires it; forcing Jupiter 5 causes NoSuchMethodError before integration setup. See https://docs.spring.io/spring/reference/testing/testcontext-framework/support-classes.html.
+
+JaCoCo attaches to Surefire and Failsafe, and its report is bound to `verify` without a coverage gate. Open `target/site/jacoco/index.html`; the domain line coverage measured after Phase 2 is 99.40% (334 covered, 2 missed lines). The missing lines are the impossible-on-a-conforming-JDK SHA-256 algorithm exception path. `./mvnw jacoco:report` can also render existing execution data while Docker-dependent verification is blocked.

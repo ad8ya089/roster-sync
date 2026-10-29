@@ -143,6 +143,8 @@ sequenceDiagram
   RS->>DB: status = COMPLETED with counts
 ```
 
+The domain decision core is pure Java. Higher-version identical CREATE/UPDATE snapshots still advance the version with an empty changed-fields list. Equal-version file drift is a heal, while equal-version event drift is a conflict. Repeated deactivation of an empty tombstone is the documented duplicate-equivalent exception.
+
 Details, edge cases, complexity and the brake formula are in `RECONCILIATION.md`.
 
 ### 5.3 Outbox publish + deactivation side effects

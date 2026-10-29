@@ -83,7 +83,7 @@ TRIP if any of:
    activeBefore > 0 && ratio >= maxMissingRatio                         (default 0.30, per tenant override, configurable)
    activeBefore > 0 && maxMissingCount != null && missingActive >= maxMissingCount   (absolute guard, off by default)
    trailer present && trailer.rowCount != dataRowsRead           (file provably cut short)
-   expectedRowCount != null && dataRowsRead < expectedRowCount
+   expectedRowCount != null && dataRowsRead != expectedRowCount
 ```
 
 - Defaults come from `roster.reconciliation.brake.max-missing-ratio` (env `BRAKE_MAX_MISSING_RATIO`); a tenant row in `tenant_settings` overrides; `PUT /settings/reconciliation` changes it at runtime — that is the "change the threshold live" demo. Settings are read **from the DB at the start of each run** (never from cache) because this is a safety decision.
@@ -93,6 +93,10 @@ TRIP if any of:
 - Edge: tiny tenants (10 employees, 3 legitimate exits = 30 %) will trip. That's acceptable — the cost of a human click is far lower than the cost of wrongly cancelling cabs. Mention in trade-offs.
 
 **The brief's example**: 200,000 active, file cut at 120,000 rows → 80,000 missing → 40 % ≥ 30 % → tripped; message says "missing 80,000 of 200,000 active employees (40.0%)". If the file also had a trailer, `ROW_COUNT_MISMATCH` is reported too.
+
+Threshold comparisons use BigDecimal against the original integer counts, without rounding a ratio first. Multiple reasons are exposed in this order: `ROW_COUNT_MISMATCH`, `MISSING_RATIO`, `MISSING_COUNT`; the first is the primary reason. Zero active employees skips only the missing ratio/count guards. A trailer or expected-row-count mismatch still trips, in either direction.
+
+The missing-ratio message follows the API example exactly with Locale.ENGLISH, thousands separators, and one decimal percentage. Count-only and row-count failures keep the same missing-employee prefix and explicitly identify the count threshold or file-row mismatch. `BucketDiffer` follows its table: equal content is UNCHANGED even if the file version differs; unlike `ChangeDecider`, it does not create a version-only action for equal hashes.
 
 ## 5. Run state machine
 

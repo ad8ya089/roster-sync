@@ -2,7 +2,7 @@
 
 MoveInSync Backend Case Study 5 (Advanced Track). Java 21 · Spring Boot 4.1 · PostgreSQL 17 · one `docker compose up`.
 
-> Status: **Phase 1 code implemented; Docker acceptance checks PENDING-DOCKER**. The scaffold, schema, demo seed, health probes and error foundation are present. Business APIs arrive in later phases. Benchmark results will be measured in Phase 8.
+> Status: **Phases 1–2 code implemented; Docker acceptance checks PENDING-DOCKER**. The scaffold, schema, demo seed, health/error foundation and pure Java domain core are present. Business APIs arrive in later phases. Benchmark results will be measured in Phase 8.
 
 ## Target behavior
 
@@ -41,6 +41,8 @@ Compose defaults to `demo`. Ordinary production uses `prod` alone, without demo 
 ## The rules, stated precisely
 
 **Idempotency key:** `(tenantId, employeeId, version)`. **Version comparison** (per employee, under a row lock): `incoming > current` → apply · `incoming < current` → `STALE` (ignored) · equal → `DUPLICATE` if the payload hash matches, else `CONFLICT`. Events carry the **full HR-owned state** at that version, so the final state never depends on arrival order.
+
+Higher-version identical CREATE/UPDATE snapshots apply with `changedFields=[]` and advance the version. Repeating DEACTIVATE against an empty tombstone is the explicit duplicate-equivalent no-op exception. The full rules are in `docs/API.md`.
 
 **Field ownership conflict rule:** every field has exactly one owner (HR: name, email, phone, manager, office, shift, status; transport admin: pickup point, special assistance). A source may change only the fields it owns; non-owned fields in a payload are ignored and reported as the warning `FIELD_NOT_OWNED_BY_SOURCE`. Ownership is configuration (`roster.ownership.transport-owned`).
 
@@ -81,7 +83,13 @@ Compose defaults to `demo`. Ordinary production uses `prod` alone, without demo 
 Event apply: O(log M) index lookup, O(1) memory. Reconciliation: O(N + M) time, O(N/B) heap with B = 256 buckets, O(N) temp disk. First scaling limits: single Postgres writer, single outbox poller, table growth, per-row apply for mass changes.
 
 ## Tests _(counts filled in Phase 8)_
-Phase 1 has 29 passing unit test cases across configuration, errors/correlation IDs and CRC32 partitioning. Seven PostgreSQL integration test cases cover migrations, health and demo seeding; execution is PENDING-DOCKER. Later phases add concurrency, failure-injection, reconciliation benchmarks and k6 load tests.
+Phases 1–2 have 99 passing test cases, including a jqwik property with 1,000 trials and fixed seed `2026103001`, plus ArchUnit rules. Domain line coverage is 99.40% (JaCoCo, no gate). Seven PostgreSQL integration test cases cover migrations, health and demo seeding; execution remains PENDING-DOCKER. Later phases add concurrency, failure-injection, reconciliation benchmarks and k6 load tests.
 
 ## Demo video
 _link here_
+
+## Local verification status
+
+Docker Desktop is installed, but its Linux engine cannot start because WSL is not installed. An administrator must run `wsl --install`, restart Windows when requested, then start Docker Desktop. `docker compose config --quiet` passes; image build, database tests, readiness, JSON log inspection and restart/idempotency checks remain pending.
+
+Host Maven currently reaches Maven Central directly without proxy settings. A temporary Maven proxy configuration used during initial setup was outside the repository; no proxy URL or credentials are committed. Whether Docker builds require HTTP_PROXY/HTTPS_PROXY cannot be verified until the engine starts. Docker supports proxy build arguments without persisting them as runtime ENV; Maven JVM networking requires separate proxy configuration. See https://docs.docker.com/build/building/variables/#proxy-arguments. No network-specific proxy defaults are set here.
