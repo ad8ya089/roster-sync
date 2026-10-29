@@ -21,6 +21,7 @@
         <commons-csv.version>1.14.1</commons-csv.version>
         <excluded.test.groups>benchmark</excluded.test.groups>
         <integration.test.argLine/>
+        <jacocoAgent/>
     </properties>
     <dependencies>
         <dependency><groupId>org.springframework.boot</groupId><artifactId>spring-boot-starter-webmvc</artifactId></dependency>
@@ -45,20 +46,29 @@
         <dependency><groupId>org.testcontainers</groupId><artifactId>testcontainers-junit-jupiter</artifactId><scope>test</scope></dependency>
         <dependency><groupId>org.testcontainers</groupId><artifactId>testcontainers-postgresql</artifactId><scope>test</scope></dependency>
         <dependency><groupId>net.jqwik</groupId><artifactId>jqwik</artifactId><version>${jqwik.version}</version><scope>test</scope></dependency>
+        <dependency><groupId>com.tngtech.archunit</groupId><artifactId>archunit</artifactId><version>1.5.1</version><scope>test</scope></dependency>
     </dependencies>
     <build>
         <plugins>
             <plugin><groupId>org.springframework.boot</groupId><artifactId>spring-boot-maven-plugin</artifactId></plugin>
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId><artifactId>maven-surefire-plugin</artifactId>
-                <configuration><excludedGroups>${excluded.test.groups}</excludedGroups></configuration>
+                <configuration><excludedGroups>${excluded.test.groups}</excludedGroups><argLine>@{jacocoAgent}</argLine></configuration>
+            </plugin>
+            <plugin>
+                <groupId>org.jacoco</groupId><artifactId>jacoco-maven-plugin</artifactId><version>0.8.16</version>
+                <configuration><propertyName>jacocoAgent</propertyName><append>true</append></configuration>
+                <executions>
+                    <execution><id>coverage-agent</id><goals><goal>prepare-agent</goal></goals></execution>
+                    <execution><id>coverage-report</id><phase>verify</phase><goals><goal>report</goal></goals></execution>
+                </executions>
             </plugin>
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId><artifactId>maven-failsafe-plugin</artifactId>
                 <configuration>
                     <includes><include>**/*IT.java</include></includes>
                     <excludedGroups>${excluded.test.groups}</excludedGroups>
-                    <argLine>${integration.test.argLine}</argLine>
+                    <argLine>@{jacocoAgent} ${integration.test.argLine}</argLine>
                 </configuration>
                 <executions><execution><goals><goal>integration-test</goal><goal>verify</goal></goals></execution></executions>
             </plugin>
