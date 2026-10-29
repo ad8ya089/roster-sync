@@ -5,6 +5,8 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
+import org.springframework.boot.context.properties.bind.Binder;
+import org.springframework.boot.Banner;
 import org.springframework.boot.test.context.runner.ApplicationContextRunner;
 import org.springframework.boot.test.context.ConfigDataApplicationContextInitializer;
 import org.springframework.context.annotation.Configuration;
@@ -52,6 +54,20 @@ class RosterPropertiesTest {
                     assertThat(properties.reconciliation().brake().maxMissingRatio()).isEqualByComparingTo("0.5");
                     assertThat(properties.reconciliation().brake().maxMissingCount()).isEqualTo(5000);
                     assertThat(properties.outbox().pollInterval()).isEqualTo(Duration.ofSeconds(1));
+                });
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"demo", "prod", "prod,demo"})
+    void structuredProfilesDisableThePlainTextBanner(String profiles) {
+        context.withInitializer(new ConfigDataApplicationContextInitializer())
+                .withPropertyValues("spring.profiles.active=" + profiles)
+                .run(application -> {
+                    assertThat(application).hasNotFailed();
+                    assertThat(Binder.get(application.getEnvironment()).bind("spring.main.banner-mode", Banner.Mode.class).get())
+                            .isEqualTo(Banner.Mode.OFF);
+                    assertThat(application.getEnvironment().getProperty("logging.structured.format.console"))
+                            .isEqualTo("ecs");
                 });
     }
 
