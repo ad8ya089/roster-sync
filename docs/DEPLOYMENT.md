@@ -107,7 +107,7 @@ Optional (you already know CDK): `deploy/aws-cdk/` — a ~80-line CDK stack (def
 
 ## 4. CI (GitHub Actions)
 
-`.github/workflows/ci.yml`: on push/PR → `actions/setup-java` (Temurin 21, Maven cache) → `mvn -B verify` (Testcontainers works on `ubuntu-latest`, Docker is available) → upload Surefire/Failsafe reports → build the Docker image (no push) to prove the Dockerfile works. A green badge in the README is cheap credibility.
+`.github/workflows/ci.yml`: on push/PR → `actions/setup-java` (Temurin 21, Maven cache) → `./mvnw -B verify` (Testcontainers works on `ubuntu-latest`, Docker is available) → upload Surefire/Failsafe reports → build the Docker image (no push) to prove the Dockerfile works. A green badge in the README is cheap credibility.
 
 ---
 

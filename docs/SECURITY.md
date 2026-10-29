@@ -4,7 +4,7 @@ Covers plus-points **1 (Authentication + RBAC + tenant isolation)** and **8 (Err
 
 ## 1. Authentication
 
-- `spring-boot-starter-security` + `spring-boot-starter-oauth2-resource-server` (JWT).
+- `spring-boot-starter-security` + `spring-boot-starter-security-oauth2-resource-server` (JWT, Boot 4 coordinate).
 - Tokens are minted by `POST /api/v1/auth/token` using `NimbusJwtEncoder` with an HS256 secret from `JWT_SECRET` (≥ 32 bytes; the app refuses to start if shorter). Expiry 1 h (`roster.security.token-ttl`).
 - Passwords: BCrypt (`PasswordEncoderFactories` / `BCryptPasswordEncoder`, strength 10). Login failures return one generic 401 for unknown user and wrong password (no user enumeration). Failed logins are logged as `auth.login.failed` with the **username only** (usernames are not personal data here — they are `acme.hr`-style service names; employee usernames are their employee IDs).
 - Stateless: `SessionCreationPolicy.STATELESS`, CSRF disabled (no cookies), CORS off by default.
