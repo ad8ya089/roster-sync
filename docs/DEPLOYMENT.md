@@ -114,3 +114,7 @@ Optional (you already know CDK): `deploy/aws-cdk/` — a ~80-line CDK stack (def
 ## 5. Non-AWS fallback (if you just need a URL fast)
 
 Render can run the Dockerfile as a free web service with a free Postgres, but: free services sleep after 15 minutes idle (~1 min wake-up), have 512 MB RAM / 0.1 CPU (slow for a JVM), and the free database expires after 30 days. Acceptable as a backup link, not for running the 200k benchmark live.
+
+## Local acceptance evidence (2026-10-30)
+
+The default two-service stack was verified from clean named volumes. `docker compose up --build -d` succeeds without proxy build arguments; readiness is UP in 33.36 seconds after app start. Restart readiness takes 22.63 seconds and demo rows are not duplicated. The runtime is Temurin 21.0.13, UID 10001, with writable `/data`; all captured application log lines are JSON. Full Maven verification also passes all 106 tests. These are local acceptance measurements, not the Phase 8 performance benchmark.

@@ -2,7 +2,7 @@
 
 MoveInSync Backend Case Study 5 (Advanced Track). Java 21 · Spring Boot 4.1 · PostgreSQL 17 · one `docker compose up`.
 
-> Status: **Phases 1–2 code implemented; Docker acceptance checks PENDING-DOCKER**. The scaffold, schema, demo seed, health/error foundation and pure Java domain core are present. Business APIs arrive in later phases. Benchmark results will be measured in Phase 8.
+> Status: **Phases 1–2 implemented and verified locally**. The scaffold, schema, demo seed, health/error foundation and pure Java domain core are present. Business APIs arrive in later phases. Benchmark results will be measured in Phase 8.
 
 ## Target behavior
 
@@ -83,13 +83,13 @@ Higher-version identical CREATE/UPDATE snapshots apply with `changedFields=[]` a
 Event apply: O(log M) index lookup, O(1) memory. Reconciliation: O(N + M) time, O(N/B) heap with B = 256 buckets, O(N) temp disk. First scaling limits: single Postgres writer, single outbox poller, table growth, per-row apply for mass changes.
 
 ## Tests _(counts filled in Phase 8)_
-Phases 1–2 have 99 passing test cases, including a jqwik property with 1,000 trials and fixed seed `2026103001`, plus ArchUnit rules. Domain line coverage is 99.40% (JaCoCo, no gate). Seven PostgreSQL integration test cases cover migrations, health and demo seeding; execution remains PENDING-DOCKER. Later phases add concurrency, failure-injection, reconciliation benchmarks and k6 load tests.
+Full `./mvnw -B verify` passes 99 unit/property/architecture tests and 7 PostgreSQL integration tests (106 total), with no failures, errors or skips. The jqwik property runs 1,000 trials with fixed seed `2026103001`. Domain line coverage is 99.40% (JaCoCo, no gate). Integration tests prove migrations, health and demo seeding. Later phases add concurrency, failure-injection, reconciliation benchmarks and k6 load tests.
 
 ## Demo video
 _link here_
 
 ## Local verification status
 
-Docker Desktop is installed, but its Linux engine cannot start because WSL is not installed. An administrator must run `wsl --install`, restart Windows when requested, then start Docker Desktop. `docker compose config --quiet` passes; image build, database tests, readiness, JSON log inspection and restart/idempotency checks remain pending.
+Verified on 2026-10-30 with Docker Desktop's Linux/WSL2 engine: clean-volume `docker compose up --build -d` succeeds. Readiness became UP in 33.36 seconds, and in 22.63 seconds after restarting the app. All 13 core tables plus Flyway history exist; demo fixture counts are correct and unchanged after restart. All 30 captured application log lines were ECS JSON without fixture PII or sample secrets. Correlation headers and liveness pass. The container runs Temurin 21.0.13 as UID 10001 with writable `/data`.
 
-Host Maven currently reaches Maven Central directly without proxy settings. A temporary Maven proxy configuration used during initial setup was outside the repository; no proxy URL or credentials are committed. Whether Docker builds require HTTP_PROXY/HTTPS_PROXY cannot be verified until the engine starts. Docker supports proxy build arguments without persisting them as runtime ENV; Maven JVM networking requires separate proxy configuration. See https://docs.docker.com/build/building/variables/#proxy-arguments. No network-specific proxy defaults are set here.
+Host Maven and Maven inside the build image reach Maven Central directly. The plain Docker build succeeds without HTTP_PROXY/HTTPS_PROXY build arguments, and Docker client automatic proxy defaults were unset. No proxy URLs, credentials, or network-specific defaults are committed. The temporary Maven settings used during initial setup remain outside the repository. First builds download images and dependencies; subsequent builds reuse the Maven build layers.

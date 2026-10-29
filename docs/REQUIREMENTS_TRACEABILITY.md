@@ -94,7 +94,7 @@ Every sentence of the case-study PDF, mapped to design, code and proof. Agents m
 | A1 | Every hard rule has an automated test, incl. ≥ 1 concurrency and ≥ 1 failure test | this file + `TESTING.md` | |
 | A2 | Load test / benchmark with throughput and p50/p99, in README with the machine | `TESTING.md` benchmark + k6; README "Benchmarks" | |
 | A3 | Design note (1–2 pages): architecture diagram, sequence diagram for hardest flow, failure-mode table | `docs/DESIGN.md` | |
-| A4 | One-command run incl. DB/broker | `docker compose up` | partial — scaffold implemented; Compose readiness/schema/log checks PENDING-DOCKER |
+| A4 | One-command run incl. DB/broker | `docker compose up` | done — clean-volume Compose build/run verified; readiness 33.36 s; schema/seed/log/restart checks pass |
 
 ## Instructions
 

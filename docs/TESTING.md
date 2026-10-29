@@ -104,3 +104,8 @@ mvn verify -Pbenchmark        # + 200k benchmark
 `./mvnw test` runs the fixed-seed jqwik property and ArchUnit alongside deterministic unit cases. Jupiter uses the Boot-managed JUnit 6 runtime because Spring Framework 7's SpringExtension requires it; forcing Jupiter 5 causes NoSuchMethodError before integration setup. See https://docs.spring.io/spring/reference/testing/testcontext-framework/support-classes.html.
 
 JaCoCo attaches to Surefire and Failsafe, and its report is bound to `verify` without a coverage gate. Open `target/site/jacoco/index.html`; the domain line coverage measured after Phase 2 is 99.40% (334 covered, 2 missed lines). The missing lines are the impossible-on-a-conforming-JDK SHA-256 algorithm exception path. `./mvnw jacoco:report` can also render existing execution data while Docker-dependent verification is blocked.
+## Docker acceptance verification (2026-10-30)
+
+Full `./mvnw -B verify` passes 99 unit/property/architecture tests and all 7 PostgreSQL integration tests, with zero failures, errors or skips. The fixed-seed property still completes 1,000 trials; domain line coverage remains 99.40%.
+
+Clean-volume Compose startup passes: readiness UP in 33.36 seconds; after app restart, UP in 22.63 seconds with fixture counts unchanged. Verified 13 core tables plus Flyway history, 2 tenants, 4 offices, 7 users, 5 employees, 3 bookings (2 future scheduled, 1 past completed), and 4 seats with E1002 in seat 2. Thirty captured application log lines parse as JSON and contain no seeded PII or sample secrets. Temurin 21.0.13 runs as UID 10001 and `/data` is writable. No proxy build arguments were needed.
