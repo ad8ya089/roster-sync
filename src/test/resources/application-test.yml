@@ -1,0 +1,8 @@
+spring:
+  datasource:
+    password: test
+roster:
+  security:
+    jwt-secret: test-only-secret-with-at-least-32-utf8-bytes
+  outbox:
+    enabled: false

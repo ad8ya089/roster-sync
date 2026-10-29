@@ -1,0 +1,7 @@
+logging:
+  structured:
+    format:
+      console: ecs
+roster:
+  demo:
+    password: ${DEMO_PASSWORD}

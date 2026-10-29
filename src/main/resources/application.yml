@@ -1,0 +1,88 @@
+spring:
+  application:
+    name: roster-sync
+  datasource:
+    url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://localhost:5432/rostersync}
+    username: ${POSTGRES_USER:roster}
+    password: ${POSTGRES_PASSWORD}
+    hikari:
+      maximum-pool-size: 20
+      data-source-properties:
+        options: -c lock_timeout=5000 -c statement_timeout=30000
+  jpa:
+    open-in-view: false
+    show-sql: false
+    hibernate:
+      ddl-auto: validate
+  servlet:
+    multipart:
+      max-file-size: 100MB
+      max-request-size: 101MB
+
+server:
+  error:
+    include-message: never
+    include-stacktrace: never
+    include-binding-errors: never
+  tomcat:
+    accesslog:
+      enabled: false
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,prometheus,metrics
+  endpoint:
+    health:
+      show-details: never
+      probes:
+        enabled: true
+      group:
+        readiness:
+          include: readinessState,db
+
+logging:
+  level:
+    org.hibernate.orm.jdbc.bind: INFO
+
+roster:
+  ownership:
+    transport-owned: ${TRANSPORT_OWNED_FIELDS:PICKUP_POINT,SPECIAL_ASSISTANCE}
+  reconciliation:
+    buckets: ${RECON_BUCKETS:256}
+    brake:
+      max-missing-ratio: ${BRAKE_MAX_MISSING_RATIO:0.30}
+      max-missing-count: ${BRAKE_MAX_MISSING_COUNT:}
+    chunk-size: ${RECON_CHUNK_SIZE:500}
+    data-dir: ${ROSTER_DATA_DIR:/data}
+    inbox-dir: ${RECON_INBOX_DIR:}
+    insert-batch-size: ${RECON_INSERT_BATCH_SIZE:1000}
+    queue-capacity: ${RECON_QUEUE_CAPACITY:10}
+    recovery-interval: ${RECON_RECOVERY_INTERVAL:5m}
+    inbox-cron: ${RECON_INBOX_CRON:0 0 1 * * *}
+  outbox:
+    enabled: ${OUTBOX_ENABLED:true}
+    poll-interval: ${OUTBOX_POLL_INTERVAL:500ms}
+    batch-size: ${OUTBOX_BATCH_SIZE:100}
+    max-attempts: ${OUTBOX_MAX_ATTEMPTS:10}
+    sink-timeout: ${OUTBOX_SINK_TIMEOUT:2s}
+  retention:
+    receipts: ${RETENTION_RECEIPTS:30d}
+    outbox: ${RETENTION_OUTBOX:7d}
+    recon-actions: ${RETENTION_RECON_ACTIONS:7d}
+    processed-events: ${RETENTION_PROCESSED_EVENTS:7d}
+    uploaded-files: ${RETENTION_UPLOADED_FILES:7d}
+    cron: ${RETENTION_CRON:0 0 3 * * *}
+  security:
+    jwt-secret: ${JWT_SECRET}
+    token-ttl: ${TOKEN_TTL:1h}
+  cache:
+    offices:
+      ttl: ${OFFICE_CACHE_TTL:10m}
+      maximum-size: ${OFFICE_CACHE_MAXIMUM_SIZE:10000}
+    employee-view:
+      ttl: ${EMPLOYEE_CACHE_TTL:30s}
+      maximum-size: ${EMPLOYEE_CACHE_MAXIMUM_SIZE:50000}
+  metrics:
+    refresh-interval: ${METRICS_REFRESH_INTERVAL:15s}
