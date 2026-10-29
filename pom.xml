@@ -17,7 +17,6 @@
     <properties>
         <java.version>21</java.version>
         <maven.compiler.release>21</maven.compiler.release>
-        <junit-jupiter.version>5.14.3</junit-jupiter.version>
         <jqwik.version>1.10.2</jqwik.version>
         <commons-csv.version>1.14.1</commons-csv.version>
         <excluded.test.groups>benchmark</excluded.test.groups>

@@ -6,7 +6,7 @@
 
 | Layer | Tooling | Runs with | Speed |
 |---|---|---|---|
-| Unit — pure domain (`domain` package) | JUnit 5, AssertJ, jqwik (property tests) | `mvn test` | ms, no Spring, no DB |
+| Unit — pure domain (`domain` package) | JUnit Jupiter (Boot-managed 6), AssertJ, jqwik (property tests) | `mvn test` | ms, no Spring, no DB |
 | Web slice | `@WebMvcTest` + `spring-boot-starter-webmvc-test`, `@MockitoBean` | `mvn test` | fast |
 | Integration | `@SpringBootTest` + Testcontainers Postgres (`org.testcontainers.postgresql.PostgreSQLContainer`, `@ServiceConnection`), Awaitility | `mvn verify` (Failsafe, `*IT`) | needs Docker |
 | Benchmark | JUnit `@Tag("benchmark")` IT, `-Xmx256m` | `mvn verify -Pbenchmark` | ~1–2 min |
