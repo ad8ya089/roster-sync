@@ -2,6 +2,7 @@ package com.moveinsync.rostersync.domain.decision;
 
 import com.moveinsync.rostersync.domain.command.HrCommand;
 import com.moveinsync.rostersync.domain.command.HrEventType;
+import com.moveinsync.rostersync.domain.hash.RecordHasher;
 import com.moveinsync.rostersync.domain.model.*;
 import com.moveinsync.rostersync.domain.outbox.OutboxEventType;
 import com.moveinsync.rostersync.domain.ownership.FieldOwnershipPolicy;
@@ -12,9 +13,15 @@ import java.util.Optional;
 
 public final class ChangeDecider {
     private final FieldOwnershipPolicy ownership;
+    private final RecordHasher hasher;
 
     public ChangeDecider(FieldOwnershipPolicy ownership) {
+        this(ownership, new RecordHasher(ownership));
+    }
+
+    public ChangeDecider(FieldOwnershipPolicy ownership, RecordHasher hasher) {
         this.ownership = Objects.requireNonNull(ownership, "ownership");
+        this.hasher = Objects.requireNonNull(hasher, "hasher");
     }
 
     public ApplyDecision decide(CurrentEmployeeState current, HrCommand command, DecisionMode mode) {
@@ -23,7 +30,7 @@ public final class ChangeDecider {
         HrSnapshot merged = mergeOwnedFields(current.snapshot(), incoming);
         List<EmployeeField> changed = ownership.hrFields().stream()
                 .filter(field -> !Objects.equals(canonical(current.snapshot(), field), canonical(merged, field))).toList();
-        boolean same = current.exists() && changed.isEmpty();
+        boolean same = current.exists() && hasher.hash(current.snapshot()).equals(hasher.hash(merged));
         boolean equalVersion = current.exists() && command.version() == current.hrVersion();
         if (equalVersion && same) return new ApplyDecision.Duplicate();
         if (equalVersion && mode == DecisionMode.EVENT) return new ApplyDecision.Conflict(current.hrVersion());
@@ -32,7 +39,7 @@ public final class ChangeDecider {
             return new ApplyDecision.Duplicate();
         }
         // Higher versions with identical values still apply: otherwise an older event could overwrite them.
-        assert !changed.isEmpty() || same || ownership.hrFields().isEmpty();
+        assert !changed.isEmpty() || same || !current.exists();
         return new ApplyDecision.Apply(merged, changed, eventType(current, merged), equalVersion && !same);
     }
 
