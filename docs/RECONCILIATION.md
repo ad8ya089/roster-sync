@@ -1,0 +1,157 @@
+# Nightly Reconciliation — Algorithm, Safety Brake, Complexity
+
+## 1. Goal
+
+Compare tonight's full HR export (≤ 200,000 rows) with our store, **without loading both fully into memory**, in **< 60 s**, and:
+- create employees we've never seen (missed CREATE events),
+- update employees whose HR state is newer in the file (missed UPDATE events),
+- heal records whose content drifted at the same version,
+- deactivate active employees who are absent from the file —
+- **unless** the file looks broken, in which case stop, alert, and deactivate nobody until a human approves.
+
+This is the "self-healing" part of the title: the real-time feed is fast but lossy; the nightly snapshot is slow but authoritative, and it repairs whatever the feed missed.
+
+## 2. Why bucketed hashing (and not the alternatives)
+
+| Option | Memory | Why not / why |
+|---|---|---|
+| Load file into a `HashMap`, load DB into a `HashMap`, compare | O(N) both sides (~100–200 MB for 200k rows of objects) | Violates "without loading both fully into memory". |
+| Load only `id → hash` of the file into memory, stream DB | O(N) but small (~20–30 MB) | Works, but still grows linearly with tenant size; not "bounded". Good fallback to mention. |
+| External sort both sides by id, merge-join | O(1) + disk | Correct, but sorting 200k rows on disk is more code than needed. |
+| Staging table + SQL `FULL OUTER JOIN` | O(1) app memory | Very fast, but the core logic lives in SQL — the brief asks for the core algorithm in **plain testable classes**. Mention as the production optimization. |
+| **Grace-hash partitioning: spill file into B hash buckets on disk, then diff one bucket at a time against the DB rows of that bucket** | **O(N/B)** heap + O(N) temp disk | Bounded memory you can tune with B; the per-bucket diff is a pure function (`BucketDiffer`) testable without a DB; each DB query is a small indexed range. **Chosen.** |
+
+This is the classic Grace hash join (partition both inputs by a hash of the join key so each partition fits in memory) applied to a diff; the DB side is already "partitioned" because we store `recon_bucket` with an index. The idea of comparing hashes per range/bucket is the same idea Dynamo-style anti-entropy uses with Merkle trees; we stop at one level of buckets because 200k rows don't need more.
+
+## 3. The algorithm
+
+```
+B = 256                                     // roster.reconciliation.buckets (fixed; changing it needs a re-bucket migration)
+bucket(id) = CRC32(utf8(id)) mod B          // java.util.zip.CRC32: stable across JVMs, uniform enough
+
+PASS 1  — stream the file once (commons-csv, never materialize the whole file)
+  for each row r (line number n):
+     if r is the trailer line: remember trailer count; continue
+     v = RecordValidator.validateFileRow(r, officeLookup)
+     if v has errors:
+         record_rejection(n, r.employeeId?, codes)
+         if r.employeeId is syntactically valid: mark "present-but-invalid" (it still counts as present → never deactivated)
+         continue
+     snapshot = normalize(r);  h = RecordHasher.hash(snapshot)
+     append "id \t version \t h \t <normalized fields>" to spill file bucket(id)    // 256 BufferedWriters, 8 KB each ≈ 2 MB
+  close all writers
+
+PASS 2  — per bucket
+  for b in 0..B-1:
+     fileRows = read spill file b into HashMap<id, FileRow>         // ~800 rows; duplicate id → DUPLICATE_ROW_IN_FILE (keep first)
+     dbRows   = SELECT external_id, hr_version, status, hr_updated_at, <HR columns>
+                FROM employee WHERE tenant_id = ? AND recon_bucket = b
+     actions  = BucketDiffer.diff(fileRows, dbRows, asOf, hasher)   // PURE FUNCTION
+     batch-insert non-UNCHANGED actions into recon_action (JDBC batch of 1000)
+     accumulate counters (activeBefore, missingActive, creates, updates, heals, unchanged, staleSkipped)
+     delete spill file b
+
+BRAKE   — SafetyBrake.evaluate(counters, trailer, expectedRowCount, settings) → PASS | TRIP(reason)
+
+APPLY   — only if not tripped (or after approval), see §6
+```
+
+### BucketDiffer.diff — the decision table (per employee id)
+
+| In file? | In DB? | Condition | Action |
+|---|---|---|---|
+| yes | no | — | `CREATE` (with file version) |
+| yes | yes | hash equal | `UNCHANGED` (status is part of the hash) |
+| yes | yes | hash differs, `file.version > db.hr_version` | `UPDATE` |
+| yes | yes | hash differs, `file.version == db.hr_version` | `HEAL` (same version, different content — the snapshot is authoritative; e.g. a `DEACTIVATE` carried over older fields) |
+| yes | yes | hash differs, `file.version < db.hr_version` | `STALE_SKIP` (a real-time event after the export already moved us ahead) |
+| present-but-invalid | yes | — | nothing (counts as present) |
+| no | yes, ACTIVE | `db.hr_updated_at <= asOf` | `DEACTIVATE` candidate |
+| no | yes, ACTIVE | `db.hr_updated_at > asOf` | skip — the employee was created/changed after the export was taken |
+| no | yes, INACTIVE | — | nothing |
+
+Note the asymmetry with real-time events: for an **event**, same version + different content is a `CONFLICT` (two different messages claim the same version — suspicious, reject). For the **snapshot**, it is a `HEAL` (the export is the authoritative state of HR at that version). Being able to explain this asymmetry is a strong interview point.
+
+## 4. Safety brake
+
+```
+activeBefore  = number of ACTIVE employees seen in DB across all buckets
+missingActive = number of DEACTIVATE candidates
+ratio         = activeBefore == 0 ? 0 : missingActive / activeBefore
+
+TRIP if any of:
+   activeBefore > 0 && ratio >= maxMissingRatio                         (default 0.30, per tenant override, configurable)
+   activeBefore > 0 && maxMissingCount != null && missingActive >= maxMissingCount   (absolute guard, off by default)
+   trailer present && trailer.rowCount != dataRowsRead           (file provably cut short)
+   expectedRowCount != null && dataRowsRead < expectedRowCount
+```
+
+- Defaults come from `roster.reconciliation.brake.max-missing-ratio` (env `BRAKE_MAX_MISSING_RATIO`); a tenant row in `tenant_settings` overrides; `PUT /settings/reconciliation` changes it at runtime — that is the "change the threshold live" demo. Settings are read **from the DB at the start of each run** (never from cache) because this is a safety decision.
+- On TRIP: status `AWAITING_APPROVAL`, `brake_tripped=true`, `brake_reason`, an `ops_alert`, an outbox `ReconciliationBrakeTripped` event (so a pager integration could subscribe), `recon_brake_tripped_total` metric, and a WARN log with run id and counts only. **No action of any type is applied** — not creates, not updates, not deactivations — because a broken file may be broken in other ways too.
+- Operator options: `approve mode=ALL`, `approve mode=SKIP_DEACTIVATIONS` (apply creates/updates/heals from the rows that did arrive, deactivate nobody), or `reject`.
+- Why both a ratio and an optional count: a ratio protects big tenants from a truncated file; an absolute count protects against "only" 5,000 wrong deactivations at a 100k tenant. Microsoft Entra's provisioning service ships the same idea ("accidental deletions prevention") with an absolute threshold, quarantine, and an explicit allow/reject step — a useful real-world precedent to cite.
+- Edge: tiny tenants (10 employees, 3 legitimate exits = 30 %) will trip. That's acceptable — the cost of a human click is far lower than the cost of wrongly cancelling cabs. Mention in trade-offs.
+
+**The brief's example**: 200,000 active, file cut at 120,000 rows → 80,000 missing → 40 % ≥ 30 % → tripped; message says "missing 80,000 of 200,000 active employees (40.0%)". If the file also had a trailer, `ROW_COUNT_MISMATCH` is reported too.
+
+## 5. Run state machine
+
+```mermaid
+stateDiagram-v2
+  [*] --> UPLOADED
+  UPLOADED --> DIFFING : worker picks up
+  DIFFING --> FAILED : bad header / empty / crash (on restart)
+  DIFFING --> PLANNED : dryRun = true
+  DIFFING --> AWAITING_APPROVAL : brake tripped
+  DIFFING --> APPLYING : brake passed
+  AWAITING_APPROVAL --> APPLYING : approve (ALL | SKIP_DEACTIVATIONS)
+  AWAITING_APPROVAL --> REJECTED : reject
+  APPLYING --> COMPLETED
+  APPLYING --> APPLYING : crash → resume on restart
+  PLANNED --> [*]
+  COMPLETED --> [*]
+  REJECTED --> [*]
+  FAILED --> [*]
+```
+
+A partial unique index allows only one non-terminal run per tenant (`UPLOADED`, `DIFFING`, `AWAITING_APPROVAL`, `APPLYING`). `PLANNED` is terminal: a completed dry run never blocks the next upload. Planned HEAL actions have their own `recon_run.planned_heals` counter. Runs execute on a small dedicated executor (`recon-worker`, 1 thread) so the API stays responsive.
+
+## 6. Apply phase
+
+- Read `recon_action` where `status='PENDING'` in id order, chunks of 500.
+- Each chunk runs in one transaction for throughput; if the chunk throws, it is retried **action by action** (one transaction each) so one bad action can't block the rest.
+- Every action goes through the **same** `EmployeeChangeApplier` as real-time events (same row lock, same `ChangeDecider`, same outbox write) — so reconciliation can never bypass ownership rules or forget an event.
+- Re-check at apply time (state may have moved since planning):
+  - `CREATE/UPDATE/HEAL`: decider runs in *snapshot mode* (`>=` for HEAL, `>` otherwise); if the employee's `hr_version` is now higher → `SUPERSEDED`.
+  - `DEACTIVATE`: only if still `ACTIVE` **and** `hr_version == expected_db_version`; otherwise `SUPERSEDED`. Recon deactivation does not bump `hr_version` (it is not an HR version — "absent from a snapshot" is weaker evidence than a versioned event) and sets `deactivation_source='RECON'`.
+- Recon changes do **not** write `hr_event_receipt` rows (they are not events). If the real event for an already-healed version arrives later, the version check classifies it (`DUPLICATE` if content matches, else `CONFLICT`).
+
+## 7. Crash recovery
+
+On `ApplicationReadyEvent` (and every 5 min by a watchdog):
+- runs in `UPLOADED`/`DIFFING` whose worker is gone → `FAILED` with `failure_reason='INTERRUPTED'` (diffing has no side effects, so re-upload is safe);
+- runs in `APPLYING` → resubmitted; only `PENDING` actions are processed; each re-checks under lock, so double-apply is impossible.
+
+## 8. Complexity (state it this way in the interview)
+
+Let N = file rows, M = DB rows for the tenant, B = buckets (256), C = changed rows.
+
+| Phase | Time | Heap | Disk / DB |
+|---|---|---|---|
+| Pass 1 (parse, validate, hash, spill) | O(N) | O(B · buffer) ≈ 2 MB | O(N) temp disk |
+| Pass 2 (per bucket load + query + diff) | O(N + M) total, B queries, each an index range scan | O(N/B + M/B) ≈ 800 + 800 rows ≈ < 1 MB | B small reads |
+| Writing the plan | O(C) | O(batch) | C rows |
+| Apply | O(C · log M) (index lookups) | O(chunk) | C row locks + C outbox rows |
+
+Hashing: SHA-256 of ~150 bytes per row ≈ 1 µs → 0.2 s for 200k. The expected bottleneck is Postgres I/O, not CPU.
+
+**Where it stops scaling:** (1) bucket skew if B is too small for very large tenants — at 10M rows, 256 buckets = 39k rows per bucket (~20 MB), still fine; raise B for more; (2) the apply phase for a mass change (e.g. 200k first-time CREATEs) is dominated by per-row writes + outbox rows — minutes, not seconds; we'd switch to `COPY` + set-based SQL for an initial bulk load; (3) a single worker thread per instance; tenants run in parallel only across instances; (4) the uploaded file is stored on local disk — multiple instances would need S3/EFS.
+
+## 9. Proof (tests)
+
+- `BucketDifferTest` — every row of the decision table.
+- `SafetyBrakeTest` — ratio boundaries (29.99 % pass, 30 % trip), count guard, trailer mismatch, zero active.
+- `ReconciliationFlowIT` — truncated file → `AWAITING_APPROVAL`, nobody deactivated, counts in message; approve/reject paths; SKIP_DEACTIVATIONS.
+- `ReconciliationConcurrencyIT` — real-time event during apply → `SUPERSEDED`; two uploads → 409.
+- `ReconciliationRecoveryIT` — fault at `RECON_AFTER_N_ACTIONS` → restart → completes, no duplicates.
+- `ReconciliationBenchmarkIT` (tag `benchmark`, run with `-Xmx256m`) — 200k-row DB + 200k-row file (1 % changed, 0.5 % missing) → diff wall time < 60 s, asserts peak heap delta, prints numbers for the README.
