@@ -1,6 +1,8 @@
 spring:
   application:
     name: roster-sync
+  autoconfigure:
+    exclude: org.springframework.boot.security.autoconfigure.UserDetailsServiceAutoConfiguration
   datasource:
     url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://localhost:5432/rostersync}
     username: ${POSTGRES_USER:roster}
