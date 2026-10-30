@@ -1,7 +1,6 @@
 package com.moveinsync.rostersync.application.sideeffects;
 
 import com.moveinsync.rostersync.application.outbox.*;
-import com.moveinsync.rostersync.domain.model.EmploymentStatus;
 import com.moveinsync.rostersync.infrastructure.persistence.EmployeeRepository;
 import io.micrometer.core.instrument.MeterRegistry;
 import java.sql.Timestamp;

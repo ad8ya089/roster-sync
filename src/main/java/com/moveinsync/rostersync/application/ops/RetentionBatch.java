@@ -21,7 +21,8 @@ public class RetentionBatch {
     @Transactional(propagation=Propagation.REQUIRES_NEW)
     public int delete(Data data,Instant cutoff) {
         // Global maintenance, bounded to 5,000 rows and committed before the next batch.
-        return jdbc.sql("DELETE FROM "+data.table+" WHERE "+data.key+" IN (SELECT "+data.key+" FROM "+data.table+
+        String selectedKey=data==Data.PROCESSED?"sink,event_id":data.key;
+        return jdbc.sql("DELETE FROM "+data.table+" WHERE "+data.key+" IN (SELECT "+selectedKey+" FROM "+data.table+
                 " WHERE "+data.time+"<?"+data.condition+" ORDER BY "+data.time+" LIMIT 5000)")
                 .param(Timestamp.from(cutoff)).update();
     }
