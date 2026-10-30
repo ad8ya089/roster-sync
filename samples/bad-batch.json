@@ -1,0 +1,54 @@
+{
+  "events": [
+    {
+      "type": "CREATE",
+      "employeeId": "B0001",
+      "version": 1,
+      "name": "Fixture Batch 1",
+      "email": "batch1@example.test",
+      "phone": "+919800000001",
+      "officeCode": "BLR-1",
+      "shiftCode": "S1"
+    },
+    {
+      "type": "CREATE",
+      "employeeId": "B0002",
+      "version": 1,
+      "name": "Fixture Batch 2",
+      "email": "batch2@example.test",
+      "phone": "+919800000001",
+      "officeCode": "BLR-1",
+      "shiftCode": "S1"
+    },
+    {
+      "type": "CREATE",
+      "employeeId": "B0003",
+      "version": 1,
+      "name": "Fixture Batch 3",
+      "email": "batch3@example.test",
+      "phone": "+919800000001",
+      "officeCode": "BLR-1",
+      "shiftCode": "S1"
+    },
+    {
+      "type": "CREATE",
+      "employeeId": "B0004",
+      "version": 1,
+      "name": "Fixture Batch 4",
+      "email": "batch4@example.test",
+      "phone": "+91 9800-001",
+      "officeCode": "BLR-1",
+      "shiftCode": "S1"
+    },
+    {
+      "type": "CREATE",
+      "employeeId": "B0005",
+      "version": 1,
+      "name": "Fixture Batch 5",
+      "email": "batch5@example.test",
+      "phone": "+919800000001",
+      "officeCode": "MARS-1",
+      "shiftCode": "S1"
+    }
+  ]
+}
