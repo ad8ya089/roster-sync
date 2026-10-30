@@ -16,6 +16,8 @@ public enum ErrorCode {
     OFFICE_CODE_EXISTS(HttpStatus.CONFLICT, "Office code already exists"),
     RECON_RUN_ALREADY_ACTIVE(HttpStatus.CONFLICT, "Reconciliation already active"),
     INVALID_RUN_STATE(HttpStatus.CONFLICT, "Invalid run state"),
+    INVALID_STATE(HttpStatus.CONFLICT, "Invalid state"),
+    INVALID_OUTBOX_STATE(HttpStatus.CONFLICT, "Invalid outbox state"),
     CONCURRENT_MODIFICATION(HttpStatus.CONFLICT, "Concurrent modification"),
     EMPLOYEE_INACTIVE(HttpStatus.CONFLICT, "Employee inactive"),
     PAYLOAD_TOO_LARGE(HttpStatus.PAYLOAD_TOO_LARGE, "Payload too large"),
