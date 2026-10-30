@@ -93,3 +93,12 @@ Short ADRs. Each: decision → why → what we gave up → when we'd revisit. Th
 ## Deliberately left out
 
 Kafka/RabbitMQ, Debezium, Redis, Kubernetes, an OIDC provider, refresh tokens, Postgres RLS, PII encryption at rest (pgcrypto / KMS), right-to-erasure workflow, SFTP/S3 ingestion (a scheduled folder poller is the stub), a UI, multi-region, rate limiting per client (would add Bucket4j). Each has a one-line "why not now" above.
+
+## Phase 4 transaction choices
+- Receipt INSERT reserves a key before locking the employee. Unique-create collisions abort PostgreSQL transactions; retry the entire apply call once from the non-transactional ingestion service. Lock failures get up to three retries (four total attempts), with 20–100 ms jitter outside transactions.
+- Rejections/conflicts are audited through REQUIRES_NEW only after the failed apply transaction has rolled back. Conflict payloads never replace accepted receipt hashes.
+- Office activity is checked under a shared lock and refreshed explicitly: a query returning an already-managed office may otherwise retain stale first-level-cache fields. DEACTIVATE carries existing office references and does not introduce/revalidate a submitted office.
+- The APPLY_AFTER_EMPLOYEE_WRITE hook runs after employee flush and outbox insertion but before commit, allowing one fault to prove JPA/JDBC/receipt atomicity. It remains inert in deployed code during Phase 4.
+- Outbox JSONB is serialized with Boot's Jackson 3 JsonMapper and bound using CAST(? AS jsonb) on the JpaTransactionManager connection.
+
+For early JSON body rejection, Tomcat drains at most 4 MiB (OVERSIZE_SWALLOW_LIMIT), while the application body remains capped at 2 MiB plus one detection byte. The bounded drain lets modest oversized requests receive their 413 response. See the [Tomcat HTTP connector reference](https://tomcat.apache.org/tomcat-11.0-doc/config/http.html#Standard_Implementation) for maxSwallowSize; both declared/chunked integration checks and the Compose curl oversized-body check pass.

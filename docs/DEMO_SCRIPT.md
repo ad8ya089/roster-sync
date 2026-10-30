@@ -128,3 +128,5 @@ curl -s $BASE/ops/summary -H "authorization: Bearer $OPS" | jq
 curl -s localhost:8080/actuator/prometheus -H "authorization: Bearer $OPS" | grep -E '^(roster_events_total|outbox_pending|recon_brake)'
 ```
 Close with the README benchmark table and test count (`mvn verify` summary screenshot).
+
+Phase 4 note for step 4: `/ops/summary` arrives in Phase 7. Until then compare outbox counts using `docker compose exec -T db psql -U roster -d rostersync -At -c 'SELECT count(*) FROM outbox_event'` before/after replay. This checks the same invariant without adding a premature ops endpoint. Publishing and booking side effects remain Phase 5 work.

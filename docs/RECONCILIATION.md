@@ -161,3 +161,6 @@ Hashing: SHA-256 of ~150 bytes per row ≈ 1 µs → 0.2 s for 200k. The expecte
 - `ReconciliationConcurrencyIT` — real-time event during apply → `SUPERSEDED`; two uploads → 409.
 - `ReconciliationRecoveryIT` — fault at `RECON_AFTER_N_ACTIONS` → restart → completes, no duplicates.
 - `ReconciliationBenchmarkIT` (tag `benchmark`, run with `-Xmx256m`) — 200k-row DB + 200k-row file (1 % changed, 0.5 % missing) → diff wall time < 60 s, asserts peak heap delta, prints numbers for the README.
+
+## Reserved Phase 6 design question (proposal, no code/migration now)
+Higher-version identical file rows must advance the source watermark. Propose explicit ActionType.ADVANCE and recon_action.action='ADVANCE', with a V3 migration extending its CHECK constraint (after Phase 5's V2 consumer-deduplication migration). The applier would update HR version/timestamp without outbox, through VersionAdvanced. The Phase 6 plan must settle a separate planned_advances/API count so business updates and metadata advances are distinguishable. Until then the existing pure differ schedules such rows as UPDATE and the shared decider distinguishes VersionAdvanced; Phase 4 makes no recon implementation changes.

@@ -124,3 +124,15 @@ Clean-volume Compose startup passes: readiness UP in 33.36 seconds; after app re
 Fresh-volume Compose build/run passes on Temurin 21. Curl obtains tokens for all seven demo accounts; acme.admin lists BLR-1/BLR-2/BLR-3, globex.admin lists HYD-1, and globex accessing BLR-1 returns 404. Anonymous offices, logout and OAuth metadata requests return 401. Domain coverage is rendered by JaCoCo at verify, without a gate.
 
 Measured Phase 3 domain line coverage is 99.43% (349/351 lines). The final repository guard also checks inherited repository methods, excluding only java.lang.Object methods and the exact login-by-username exception; inheriting an unscoped CRUD query therefore fails the guard.
+
+## Phase 4 proof (2026-10-30)
+- ReplayIdempotencyIT verifies 50 duplicate replays, byte-identical employee/receipt row serialization, stable receipt counts and outbox totals, ignored metadata, type/content conflicts and the seed/recon conflict-correct-resend case.
+- OutOfOrderIT.briefExample proves v7 office transfer defeats late v6 shift state. NO_CHANGE tests verify source version/timestamp advancement, receipt outcomes and no Employee event; TombstoneIT includes v5 -> DEACTIVATE v8 -> CREATE v6 -> CREATE v9.
+- BatchIsolationIT covers three valid/two invalid records, corrected keys, unknown properties, malformed record types, DEACTIVATE field ignoring, empty/overlarge envelopes and declared/chunked 2 MiB limits.
+- TransactionAtomicityIT confirms JpaTransactionManager, verifies employee+outbox+provisional receipt exist inside the transaction, then forces rollback and proves all three are removed/restored. It also verifies an inactive office found after initial validation and refreshing an already-managed JPA office before its active flag is used.
+- TransportFieldsIT/FieldOwnershipIT/MovedPhoneOwnershipIT cover null/absent/no-op/inactive semantics, ownership warnings, malformed non-owned values, unknown keys and moving PHONE to transport ownership.
+- EmployeeApiIT verifies paged DTOs, version-descending receipts without payloads, role/self-access and tenant isolation with identical external IDs. Existing annotation and registered-mapping guards include all new endpoints automatically.
+- ConcurrentEventsIT runs 200 shuffled versions, 20 identical sends and a forced concurrent-create race; each uses a start latch and verifies Employee outbox rows == APPLIED count. ReceiptConcurrencyIT observes PostgreSQL's actual lock wait, then proves both first-commit and first-rollback outcomes. Each new integration test has a 30-second timeout. Test pools use eight connections to keep cached contexts below PostgreSQL's connection budget.
+- PiiLeakIT exercises ingest, conflicts, rejections, transport changes and outbox JSON with canaries. Future phases extend it to publishing and reconciliation.
+
+Final measured run: 136 unit/property/architecture tests + 92 PostgreSQL integration tests = 228, with zero failures/errors/skips. Two properties each run 1,000 fixed-seed trials. Domain line coverage is 99.44% (354/356), no gate.

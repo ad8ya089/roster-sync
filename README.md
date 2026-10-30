@@ -2,7 +2,7 @@
 
 MoveInSync Backend Case Study 5 (Advanced Track). Java 21 · Spring Boot 4.1 · PostgreSQL 17 · one `docker compose up`.
 
-> Status: **Phases 1–3 implemented and verified locally**. JWT login, role authorization, tenant-scoped offices and safe HTTP errors are available alongside the schema, demo fixtures and pure Java domain core. Employee ingestion starts in Phase 4. Benchmark results will be measured in Phase 8.
+> Status: **Phases 1–4 implemented and verified locally**. JWT login, tenant-scoped offices, HR event ingestion, employee/self reads and transport patches are available. Changes are recorded atomically in the outbox; publishing/booking side effects arrive in Phase 5. Benchmark results will be measured in Phase 8.
 
 ## Target behavior
 
@@ -95,7 +95,7 @@ Higher-version identical snapshots, including DEACTIVATE on INACTIVE employees o
 Event apply: O(log M) index lookup, O(1) memory. Reconciliation: O(N + M) time, O(N/B) heap with B = 256 buckets, O(N) temp disk. First scaling limits: single Postgres writer, single outbox poller, table growth, per-row apply for mass changes.
 
 ## Tests _(counts filled in Phase 8)_
-Full `./mvnw -B verify` passes 125 unit/property/architecture tests and 58 PostgreSQL integration tests (183 total), with no failures, errors or skips. Two jqwik properties each run 1,000 trials with fixed seeds `2026103001` and `2026103002`, including maximum-version preservation across deactivations and identical snapshots. JaCoCo reports domain coverage at `target/site/jacoco/index.html`, without a gate. Integration tests prove migrations, health, seeding, role authorization, tenant isolation and safe errors. Later phases add ingestion concurrency, failure injection, reconciliation benchmarks and k6 load tests.
+Full `./mvnw -B verify` passes 136 unit/property/architecture tests and 92 PostgreSQL integration tests (228 total), with no failures, errors or skips. Two jqwik properties each run 1,000 trials with fixed seeds `2026103001` and `2026103002`, including maximum-version preservation across deactivations and identical snapshots. JaCoCo reports domain coverage at `target/site/jacoco/index.html`, without a gate. Integration tests prove migrations, health, auth/tenancy, per-record ingestion, replay, ordering, rollback, ownership and concurrency. Later phases add publisher crash recovery, reconciliation benchmarks and k6 load tests.
 
 ## Demo video
 _link here_
@@ -106,4 +106,19 @@ Verified on 2026-10-30 with Docker Desktop's Linux/WSL2 engine: clean-volume `do
 
 Host Maven and Maven inside the build image reach Maven Central directly. The plain Docker build succeeds without HTTP_PROXY/HTTPS_PROXY build arguments, and Docker client automatic proxy defaults were unset. No proxy URLs, credentials, or network-specific defaults are committed. The temporary Maven settings used during initial setup remain outside the repository. First builds download images and dependencies; subsequent builds reuse the Maven build layers.
 
-Domain line coverage after the Phase 2 correction and Phase 3 is 99.43% (349/351 lines, no gate).
+Domain line coverage after the Phase 2 correction and Phase 3 is 99.44% (354/356 lines, no gate).
+
+## Event ingestion and replay
+
+```bash
+curl --fail-with-body localhost:8080/api/v1/hr/events \
+  -H 'Authorization: Bearer <HR_SYSTEM accessToken>' \
+  -H 'Content-Type: application/json' --data-binary @samples/feed.json
+```
+
+The 50-event fixture creates/updates/deactivates/reactivates ten employees. Replaying it returns 50 DUPLICATE results, preserving employee row contents, receipts and outbox counts. Each duplicate includes originalOutcome. `samples/bad-batch.json` returns three APPLIED and two REJECTED results; rejected keys remain available for correction. Conflicts are audited with VERSION_CONFLICT and never keep a new receipt.
+
+GET `/api/v1/employees`, `/employees/{id}`, `/employees/{id}/events` and `/me` enforce role, tenant and employee self-access. Lists return `{items,page,size,totalElements}` with size 1–200. PATCH `/employees/{id}/transport-fields` distinguishes null (clear) from absent (retain), supports inactive employees, and leaves versions/outbox untouched on a no-op. Only transport-owned fields are accepted.
+
+HR batches contain 1–1000 records and at most 2 MiB (2,097,152 bytes). Both Content-Length and chunked bodies are bounded. Accepted event content is hashed with its type; eventId/occurredAt are excluded. Higher identical content advances the HR version/timestamp with NO_CHANGE and no Employee event. Publishing is deliberately deferred to Phase 5, so current outbox rows remain PENDING.
+

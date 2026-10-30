@@ -226,3 +226,10 @@ All dev endpoints require OPERATOR. The interview deployment intentionally enabl
 ### Receipt replay and conflicts
 
 The receipt payload hash includes event type plus normalized, ownership-filtered HR fields; eventId and occurredAt are informational and excluded. Same key and hash returns DUPLICATE with originalOutcome (APPLIED, STALE, NO_CHANGE or DUPLICATE). Same key with a different type/hash returns CONFLICT and currentVersion, preserves any existing receipt and writes a separate VERSION_CONFLICT audit. When a provisional receipt was inserted but the decider finds a same-version conflict, the transaction rolls it back before auditing. Correct content matching seeded/reconciled state can subsequently be accepted as DUPLICATE. Conflicts never keep a new receipt or modify employee/outbox state.
+
+## Phase 4 HTTP details
+- Empty events -> 400 VALIDATION_FAILED; more than 1,000 -> 400 BATCH_TOO_LARGE; Content-Length or chunked content beyond 2 MiB -> 413 PAYLOAD_TOO_LARGE. Limits run after authentication and before JSON deserialization.
+- Unknown event keys produce UNKNOWN_FIELD_IGNORED. Non-owned HR input is filtered before value/type validation; even malformed transport-owned values are ignored with FIELD_NOT_OWNED_BY_SOURCE. DEACTIVATE ignores all carried HR fields.
+- GET /employees returns PageResponse {items,page,size,totalElements}; page >= 0, size 1–200. Receipt history uses the same DTO, version descending, exposing only version/type/outcome/receivedAt.
+- Transport PATCH parses a Map: null clears, absent retains, and unchanged values produce no transport version bump or outbox event. It is allowed for INACTIVE employees. HR-owned keys -> 400 FIELD_NOT_OWNED_BY_SOURCE; unknown keys -> 400 UNKNOWN_FIELD.
+- HR outbox events use source API and aggregate_version=new hr_version. TransportProfileUpdated uses source TRANSPORT_ADMIN and the current HR aggregate version; its changedFields contain names only and values is empty. Its separate transport version is returned in the employee view.
