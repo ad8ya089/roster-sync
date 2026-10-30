@@ -129,6 +129,7 @@ A partial unique index allows only one non-terminal run per tenant (`UPLOADED`, 
 
 - Read `recon_action` where `status='PENDING'` in external_id order, chunks of the configured size (default 40).
 - Lock the employee set in that same order with one query; plain office reads/refreshes happen once per distinct submitted code inside the transaction. The employee query does not join-fetch offices, avoiding Hibernate follow-on locking.
+- Keep chunk 40. The local performance criterion is p99 <1s and maximum <2.5s (half the 5s lock timeout), including cold chunks and commit; this is measured on the documented machine, not a universal latency guarantee. See README for the distribution and DECISIONS for the exact row-lock SQL and cold-JIT variation.
 - Defer JPA flush to the chunk boundary, batch the outbox inserts, update all action statuses with one tenant/run-scoped `id=ANY(...)` statement, then update run counters/heartbeat. Version-only ADVANCE still writes no outbox row.
 - Each chunk runs in one transaction for throughput; if the chunk throws, it is retried **action by action** (one transaction each) so one bad action can't block the rest.
 - Every action goes through the **same** `EmployeeChangeApplier` as real-time events (same row lock and `ChangeDecider`). Apply emits exactly one business outbox event; VersionAdvanced changes only the HR version/timestamp and emits none. Reconciliation cannot bypass ownership or version ordering.

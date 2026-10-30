@@ -2,7 +2,21 @@
 
 MoveInSync Backend Case Study 5 (Advanced Track). Java 21 · Spring Boot 4.1 · PostgreSQL 17 · one `docker compose up`.
 
-> Status: **Live on AWS Sydney.** HTTPS, the light demo, reboot recovery and encrypted S3 backups are verified. The video recording and the local sub-second maximum-chunk target remain open.
+**[Live API](https://rostersync-aditya.duckdns.org)** · **Credentials provided privately** · **[Demo video — recording pending](https://example.com/REPLACE_WITH_DEMO_VIDEO)**
+
+Deployed in **Sydney (`ap-southeast-2`)**; approximately 150 ms of added latency from India is accepted. HTTPS, the light demo, reboot recovery and encrypted S3 backups are verified. The video link is a placeholder.
+
+### How to verify in 2 minutes
+
+Run these five lines in Bash with curl and jq. Enter the password supplied privately; the token stays in the shell variable.
+
+```bash
+BASE=https://rostersync-aditya.duckdns.org; curl --fail-with-body "$BASE/"
+read -rsp 'Private demo password: ' DEMO_PASSWORD; echo
+TOKEN=$(jq -n --arg password "$DEMO_PASSWORD" '{username:"acme.admin",password:$password}' | curl -fsS "$BASE/api/v1/auth/token" -H 'Content-Type: application/json' --data-binary @- | jq -er .accessToken)
+curl --fail-with-body "$BASE/api/v1/offices" -H "Authorization: Bearer $TOKEN" | jq
+curl -sS -o /dev/null -w 'Unauthenticated offices: %{http_code} (expected 401)\n' "$BASE/api/v1/offices"; unset DEMO_PASSWORD TOKEN
+```
 
 ## Target behavior
 
@@ -102,22 +116,41 @@ The benchmark uses three runs in one dedicated 256 MiB JVM, a 200,000-employee s
 
 | Run | Dry-run wall time | Diff phase | Apply 3,132 actions | Sampled peak heap |
 |---|---|---|---|---|
-| 1 | 24.016 s | 23.794 s | 12.739 s | 104.83 MiB |
-| 2 | 15.871 s | 15.732 s | 10.338 s | 111.57 MiB |
-| 3 | 15.812 s | 15.738 s | 9.939 s | 111.77 MiB |
-| **Median** | **15.871 s** | **15.738 s** | **10.338 s** | **111.57 MiB** |
+| 1 | 23.455 s | 23.109 s | 12.713 s | 99.69 MiB |
+| 2 | 17.067 s | 16.954 s | 10.563 s | 103.62 MiB |
+| 3 | 15.548 s | 15.369 s | 10.272 s | 109.40 MiB |
+| **Median** | **17.067 s** | **16.954 s** | **10.563 s** | **103.62 MiB** |
 
-At the candidate 40-action default, median mixed-file apply throughput is **303 actions/s**, and the largest chunk across the final three runs was **1,265 ms**. The throughput target is met, but the requested maximum below one second is **not yet met consistently**. An earlier three-sample run measured 304 actions/s and a 779 ms maximum; both sets are retained locally. Raw JSON is generated under target when the benchmark runs.
+Keep the **40-action default**. Median mixed-file apply throughput in this repeat is **296.5 actions/s**, about 1.2% below the 300 target; earlier repeats reached 303–304, so that throughput floor is not consistent across repeats. No further application tuning was performed. Across **237 nonempty committed chunks**, including cold chunks and transaction commit, nearest-rank **p50 / p99 / max = 127.6 / 310.0 / 1,253.6 ms**. The approved criterion is **p99 <1 second AND max <2.5 seconds** (half the 5-second lock timeout): **PASS; the chunk acceptance item is closed**. Raw durations are generated under target.
 
 The matched update-only profiling comparison used 1,000 warm-up actions, 5,000 measured actions, chunk 64, the same 256 MiB heap and no coverage agent: **89.6 → 380.3 actions/s (4.25×)**. JDBC execution/batch/commit calls fell from **6.08 → 0.17 per action**. These counts describe JDBC calls, not packet captures. The implementation batches action status updates and outbox inserts, defers flushing, and reads/locks employee sets together.
 
-Timings vary with startup and host load. Additional 40-action JDBC-counting probes measured 251–258 actions/s with 219–246 ms measured maxima and 0.833–1.605 s cold-start maxima; a stressed 64-action probe had a larger cold outlier. The final nightly-file repeat also exceeded one second, so performance acceptance remains open pending the agreed treatment of cold chunks and further tuning. See [trade-offs](docs/DECISIONS.md).
+Cold JIT, class loading and host scheduling vary. Earlier mixed-file repeats measured 303–304 actions/s with maxima 779–1,265 ms; instrumented 40-action probes measured 251–258 actions/s and cold maxima 833–1,605 ms. A stressed 64-action probe reached 6,140 ms. These are different workloads/instrumentation and are retained rather than hidden. The old saved summaries contained only maxima, so their p50/p99 cannot be recovered; this repeat adds complete distribution capture. The new criterion replaces the old maximum-below-one-second target. It is a local acceptance measurement, not a guarantee for every host or cold start. See [trade-offs](docs/DECISIONS.md).
 
-| k6 HTTP ingest | Duration | VUs | Batches/s | Events/s | HTTP p50 | HTTP p99 | HTTP / outcome failures |
-|---|---|---|---|---|---|---|---|
-| 50 events/batch, 90% fresh / 5% replay / 5% stale | 60 s | 20 | 8.46 | 423.00 | 2,210 ms | 3,912 ms | 0% / 0% |
+The latest separate 40-action JDBC-counting probe measured 252.2 actions/s, 330 ms maximum after warm-up and 925 ms cold maximum. Its first measured chunk used 0.25 JDBC calls/action. This instrumented update-only workload is separate from both the mixed-file result and the archived matched 64-action comparison.
 
-The run completed 519 batches / 25,950 events. `./scripts/loadtest.sh` uses `BASE_URL=http://host.docker.internal:8080` on Windows Docker Desktop. Linux can also use `DOCKER_NETWORK=host BASE_URL=http://127.0.0.1:8080 ./scripts/loadtest.sh`. It writes the ignored loadtest/results/summary.json and exits non-zero if HTTP or outcome failures reach 1%.
+### HTTP ingestion scaling (k6)
+
+Each case is configured for 60 seconds, with per-VU IDs and a 90% fresh / 5% replay / 5% stale cycle. All six cases had **zero HTTP and outcome failures**. Login/setup is excluded from request latency. Batch size 1 measures actual single-event response latency; the per-event columns for batch size 50 divide each request duration by 50 and are **amortized cost, not individual response latency**. All baseline rows use `synchronous_commit=on`.
+
+| Events/request | VUs | Events/s | Request p50 / p99 (ms) | Per-event p50 / p99 (ms) | Max pool pending | PG commits/s |
+|---|---|---|---|---|---|---|
+| 1 | 5 | 59.0 | 71.2 / 235.4 | 71.18 / 235.36 | 0 | 61.2 |
+| 50 | 1 | 75.9 | 650.6 / 933.1 | 13.01 / 18.66 | 0 | 96.2 |
+| 50 | 5 | 245.1 | 985.6 / 1,380.6 | 19.71 / 27.61 | 0 | 243.4 |
+| 50 | 10 | 322.1 | 1,446.4 / 2,502.7 | 28.93 / 50.05 | 0 | 301.2 |
+| 50 | 20 | 405.0 | 2,325.4 / 3,832.8 | 46.51 / 76.66 | 1 | 372.9 |
+| 50 (sync off, diagnostic) | 20 | 492.0 | 1,873.7 / 3,780.7 | 37.47 / 75.61 | 2 | 436.0 |
+
+The pool size stayed at 20. Hikari gauges were sampled every 200 ms (observed maxima; no gauge errors). PG commits/s is the `xact_commit` delta divided by its measured enclosing wall window: 65.6–69.8 seconds, including container launch/login/teardown, publisher and observation transactions. It is not ingestion-only commits during exactly 60 seconds. Each case started with an empty outbox queue. Raw JSON/logs stay in ignored loadtest/results; the matrix is resumable because draining between cases takes substantially longer than the timed traffic.
+
+1. Scaling bends above 5–10 VUs: 10→20 adds 26% events/s while request p99 rises 53%, so more concurrency increasingly buys waiting time.
+2. Normal-run spot samples showed WALWrite/WalSync waits; `synchronous_commit=off` raised throughput 21.5% and removed those observed waits. Durable commit I/O contributes, but per-record SQL/commit coordination and CPU/runnable work remain; this single diagnostic does not isolate every remaining cost.
+3. Baseline max pending connections was 0/0/0/1 across batch-50 cases; raising the pool is not justified by that and cannot remove commit costs. The 20-VU case ended with 22,260 pending outbox rows: 405 events/s is an **ingress burst rate**, not sustainable end-to-end delivery capacity.
+
+The diagnostic temporarily relaxed durability only on the local database and restored `synchronous_commit=on` in finally, verified before the test suite. It is not a production recommendation: acknowledged commits may be lost after a crash with asynchronous commit. The earlier isolated 20-VU run measured 423 events/s (request p50/p99 2,210/3,912 ms); retain that as variation, rather than treating either run as a hardware-independent guarantee.
+
+Run `BATCH_SIZE=1 LOAD_VUS=5 ./scripts/loadtest.sh` or the default batch50 case. `python loadtest/run-matrix.py` runs the local-only matrix, including the temporary durability diagnostic. Docker Desktop uses `BASE_URL=http://host.docker.internal:8080`; Linux may use `DOCKER_NETWORK=host BASE_URL=http://127.0.0.1:8080`. See [test methodology](docs/TESTING.md).
 
 ## Complexity & limits _(summary; details in RECONCILIATION.md and DECISIONS.md)_
 Event apply: O(log M) index lookup, O(1) memory. Reconciliation: O(N + M) time, O(N/B) heap with B = 256 buckets, O(N) temp disk. First scaling limits: single Postgres writer, single outbox poller, table growth, per-row apply for mass changes.
@@ -129,11 +162,11 @@ Event apply: O(log M) index lookup, O(1) memory. Reconciliation: O(N + M) time, 
 | Unit and web-slice | 139 |
 | jqwik properties | 2, each with 1,000 fixed-seed trials |
 | Architecture and endpoint guards | 4 |
-| PostgreSQL integration | 144 |
+| PostgreSQL integration | 145 |
 | Benchmark/profile methods | 2; the 200k method executes three samples |
-| **Total including benchmark profile** | **291** |
+| **Total including benchmark profile** | **292** |
 
-The final unfiltered `./mvnw -B verify -Pbenchmark` passes all 291 tests with zero failures/errors/skips. Performance timings are measurements; the one-second chunk target remains open as stated above. Domain line coverage is **99.45% (359/361)**; JaCoCo renders its report at target/site/jacoco/index.html without a gate. Coverage includes ordering, idempotency, version-only updates, ownership, tenant/role isolation, rollback, real-context restart recovery, publisher concurrency, rehire, streaming/200k safety brake, management isolation, rollback-safe caches and PII boundaries. [Testing details](docs/TESTING.md).
+The final unfiltered `./mvnw -B verify -Pbenchmark` passes all 292 tests with zero failures/errors/skips. Normal push/PR CI runs `verify`; the benchmark runs only on manual dispatch and the weekly Monday 03:00 UTC schedule. The approved chunk p99/max criterion passes as stated above. Domain line coverage is **99.45% (359/361)**; JaCoCo renders its report at target/site/jacoco/index.html without a gate. Coverage includes ordering, idempotency, version-only updates, ownership, tenant/role isolation, rollback, real-context restart recovery, publisher concurrency, rehire, streaming/200k safety brake, management isolation, rollback-safe caches and PII boundaries. [Testing details](docs/TESTING.md).
 
 ## Demo video
 [Demo video — recording pending](https://example.com/REPLACE_WITH_DEMO_VIDEO)

@@ -70,15 +70,15 @@ Every sentence of the case-study PDF, mapped to design, code and proof. Agents m
 | K2 | Show a test that replays the same feed twice and changes nothing | `ReplayIdempotencyIT` | itself | done — Phase 4 API/domain/integration proof passes |
 | K3 | Safety brake threshold configurable | property `BRAKE_MAX_MISSING_RATIO`, per-tenant `PUT /settings/reconciliation` | `SafetyBrakeTest`, `ReconciliationFlowIT.thresholdChangeTakesEffect` | done — Phase 6 streaming upload/diff/brake/apply and 200k truncation proof |
 | K4 | Never write personal data into logs or error reports. Use employee IDs | `SECURITY.md §4` | `ErrorHandlingIT`, `PiiLeakIT` | done — PiiLeakIT covers API, auth, conflict, recon bad rows, publishing and operational stores |
-| K5 | Diff a 200,000-row snapshot in under 60 s with bounded memory | `ReconciliationBenchmarkIT` | README benchmark table | done — three-run 256 MiB benchmark; final median dry-run wall time 15.871s for 199,190 rows from 200k employees |
+| K5 | Diff a 200,000-row snapshot in under 60 s with bounded memory | `ReconciliationBenchmarkIT` | README benchmark table | done — three-run 256 MiB benchmark; final median dry-run wall time 17.067s for 199,190 rows from 200k employees |
 | K6 | Run a test that crashes the process between the DB write and the event publish | `OutboxCrashRecoveryIT.crashAfterCommitBeforePublish` (+ live kill -9 demo) | itself | done — Phase 5 restart recovery and side-effect proof pass |
 
 ## Plus points (overall evaluation criteria)
 
 | # | Plus point | Where | Proof | Status |
 |---|---|---|---|---|
-| X1 | Authentication + role-based access (employee vs admin vs operator) | `SECURITY.md §1–2` | `AuthorizationIT`, `SecuredEndpointsTest`, `JwtTokenServiceTest`, `LoginTimingTest` | done for current endpoints — JWT/RBAC matrix and automatic future-handler guards pass |
-| X1b | Tenant isolation — one client can never read another's data | `SECURITY.md §3` | `TenantIsolationIT`, `ArchitectureTest`, `TenantContextFilterTest` | done for current endpoints — tenant-scoped offices/employees/bookings/ops/reconciliation and repository guards |
+| X1 | Authentication + role-based access (employee vs admin vs operator) | `SECURITY.md §1–2` | `AuthorizationIT`, `SecuredEndpointsTest`, `JwtTokenServiceTest`, `LoginTimingTest` | done — JWT/RBAC matrix covers the complete API; reflection and mapping guards enforce protection on new handlers |
+| X1b | Tenant isolation — one client can never read another's data | `SECURITY.md §3` | `TenantIsolationIT`, `ArchitectureTest`, `TenantContextFilterTest` | done — tenant-scoped offices/employees/bookings/ops/reconciliation, self-access and tenant-explicit repository guards |
 | X2 | Time & space complexity of core logic + small benchmark; where it stops scaling and why | `RECONCILIATION.md §8`, `DECISIONS.md` "Where the system stops scaling", README complexity section | `ReconciliationBenchmarkIT`, k6 | done — three 256 MiB benchmark samples, matched JDBC-call comparison and HTTP load test; machine/results in README |
 | X3 | Fault tolerance: crashes, timeouts, duplicate & out-of-order messages, partial failures; ≥ 1 failure-injection test | `DESIGN.md §6`, `FaultInjector` | `OutboxCrashRecoveryIT`, `OutboxRetryIT` (timeouts), `ReconciliationRecoveryIT` (partial failure) | done — ingest/outbox failures, timeout/redelivery and real reconciliation restart recovery tested |
 | X4 | OOP: encapsulation, inheritance, polymorphism; controller/service/repository layering | `docs/DESIGN.md` layering and entity/command hierarchies | `ArchitectureTest` + code review | done — encapsulated entities, command/decision hierarchies, EventSink implementations and shared snapshot applier; architecture guards pass |
@@ -92,7 +92,7 @@ Every sentence of the case-study PDF, mapped to design, code and proof. Agents m
 | # | Requirement | Where | Status |
 |---|---|---|---|
 | A1 | Every hard rule has an automated test, incl. ≥ 1 concurrency and ≥ 1 failure test | this file + `TESTING.md` | done — hard-rule, concurrency and fault/restart tests mapped above |
-| A2 | Load test / benchmark with throughput and p50/p99, in README with the machine | `TESTING.md` benchmark + k6; README "Benchmarks" | done — three-run benchmark plus 20-VU/60s k6 throughput and p50/p99 with machine specification |
+| A2 | Load test / benchmark with throughput and p50/p99, in README with the machine | `TESTING.md` benchmark + k6; README "Measured local performance" | done — three-run 256 MiB benchmark; batch-1 and batch-50 VU matrix with request/amortized-event latency, pool/commit diagnostics and machine specification |
 | A3 | Design note (1–2 pages): architecture diagram, sequence diagram for hardest flow, failure-mode table | `docs/DESIGN.md` | done — architecture/sequence diagrams and failure-mode table in the design note |
 | A4 | One-command run incl. DB/broker | `docker compose up` | done — fresh-volume Phase 3 build/run healthy; curl login succeeds for all seven demo users and office lists remain tenant-scoped |
 
@@ -106,6 +106,6 @@ Every sentence of the case-study PDF, mapped to design, code and proof. Agents m
 | N4 | Clean layered code, meaningful names; core algorithm in plain classes testable without web server or DB | `domain` package, `ArchitectureTest` | done — pure Java decision/diff/brake core with ArchUnit enforcing dependency boundaries |
 | N5 | Unit tests for core logic + concurrency, failure, benchmark tests; normal inputs AND edge cases | `TESTING.md` | done — unit/property/architecture, real PostgreSQL concurrency/recovery and bounded-heap benchmark tests |
 | N6 | README: how to run, assumptions, benchmark results, trade-offs note | `README.md` | done — run instructions, precise rules, measured results, test counts and trade-offs linked |
-| N7 | Public GitHub repo; meaningful commit history, not one giant commit | Conventional Commits, small verified commits | done — public ad8ya089/roster-sync main contains all 72 implementation commits; verified full-history Gitleaks has no findings |
+| N7 | Public GitHub repo; meaningful commit history, not one giant commit | Conventional Commits, small verified commits | done — public ad8ya089/roster-sync main has small implementation/test/docs commits; full-history Gitleaks has no findings |
 | N8 | Demo video: main flows, one failure scenario live, sample API calls (Postman/curl) | `docs/DEMO_SCRIPT.md`, `scripts/demo.sh`, `postman/` collection | partial — automated curl demo, crash proof and Postman collection ready; video recording pending |
 
