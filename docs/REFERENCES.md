@@ -29,3 +29,8 @@
 | Grafana pinned release | [Grafana v13.3.0](https://github.com/grafana/grafana/releases/tag/v13.3.0) | optional dashboard image |
 | k6 pinned release | [k6 v2.3.0](https://github.com/grafana/k6/releases/tag/v2.3.0) | portable Docker load runner |
 | Failsafe report handling | [Failsafe integration-test parameters](https://maven.apache.org/surefire/maven-failsafe-plugin/integration-test-mojo.html) | separate benchmark execution and summary file |
+
+## Frontend foundations
+- [JSON.parse source-text reviver](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/JSON/parse) for preserving long version tokens.
+- [Tailwind with Vite](https://tailwindcss.com/docs/installation/using-vite) for build-time theme integration.
+- [TanStack Query retries](https://tanstack.com/query/latest/docs/framework/react/guides/query-retries) for bounded GET retries; mutations are not retried.

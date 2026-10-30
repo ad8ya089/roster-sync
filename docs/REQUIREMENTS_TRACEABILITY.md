@@ -109,3 +109,7 @@ Every sentence of the case-study PDF, mapped to design, code and proof. Agents m
 | N7 | Public GitHub repo; meaningful commit history, not one giant commit | Conventional Commits, small verified commits | done — public ad8ya089/roster-sync main has small implementation/test/docs commits; full-history Gitleaks has no findings |
 | N8 | Demo video: main flows, one failure scenario live, sample API calls (Postman/curl) | `docs/DEMO_SCRIPT.md`, `scripts/demo.sh`, `postman/` collection | partial — automated curl demo, crash proof and Postman collection ready; video recording pending |
 
+
+## Phase 9 console checkpoint
+
+The frontend is partial pending design approval: auth/client foundation, dispatch-board styleguide and real braked-run review are implemented and verified. APIcreatedAt, static delivery/cache/security and browser precision/role/accessibility checks pass. The remaining ops, events, employee/profile, demo-tool screens, full console CI job and live redeploy await checkpoint approval; this does not mark the entire frontend phase done. The PDF video requirement remains partial as recorded above.

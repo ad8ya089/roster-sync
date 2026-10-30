@@ -89,6 +89,10 @@ Higher-version identical snapshots, including DEACTIVATE on INACTIVE employees o
 
 ## Documentation
 
+The Phase 9 console is at its **design checkpoint**: login, the opt-in styleguide and a working reconciliation Run detail review. Other screens await design approval. The [console specification](docs/FRONTEND.md) defines the dispatch-board visual rules. Tokens remain in memory; hash routing keeps server API paths independent. Docker builds the UI without requiring host Node, and ordinary Maven verification remains Node-independent.
+
+For local design review with ports 8080/8081 free, run `VITE_STYLEGUIDE=true docker compose -p roster-sync-checkpoint up --build -d`. This uses separate local volumes. The styleguide and username hints default off in the AWS image; the existing live deployment is unchanged until Phase 9 is complete.
+
 | Doc | What's in it |
 |---|---|
 | [`docs/DESIGN.md`](docs/DESIGN.md) | design note: architecture diagram, hardest-flow sequence diagram, failure-mode table |
@@ -162,11 +166,13 @@ Event apply: O(log M) index lookup, O(1) memory. Reconciliation: O(N + M) time, 
 | Unit and web-slice | 139 |
 | jqwik properties | 2, each with 1,000 fixed-seed trials |
 | Architecture and endpoint guards | 4 |
-| PostgreSQL integration | 145 |
-| Benchmark/profile methods | 2; the 200k method executes three samples |
-| **Total including benchmark profile** | **292** |
+| PostgreSQL integration | 147 |
+| **Backend normal verify** | **292** |
+| Frontend unit | 17 |
+| Design-checkpoint browser cases | 5, including 12 axe scans |
+| Benchmark/profile methods | 2, last run in Phase 8; the 200k method executes three samples |
 
-The final unfiltered `./mvnw -B verify -Pbenchmark` passes all 292 tests with zero failures/errors/skips. Normal push/PR CI runs `verify`; the benchmark runs only on manual dispatch and the weekly Monday 03:00 UTC schedule. The approved chunk p99/max criterion passes as stated above. Domain line coverage is **99.45% (359/361)**; JaCoCo renders its report at target/site/jacoco/index.html without a gate. Coverage includes ordering, idempotency, version-only updates, ownership, tenant/role isolation, rollback, real-context restart recovery, publisher concurrency, rehire, streaming/200k safety brake, management isolation, rollback-safe caches and PII boundaries. [Testing details](docs/TESTING.md).
+The Phase 9 checkpoint `./mvnw -B verify` passes 292 backend tests with Node absent from PATH and zero failures/errors/skips. The earlier Phase 8 unfiltered `verify -Pbenchmark` passed 292 tests at that revision; the benchmark profile has not been rerun for this frontend checkpoint. Normal push/PR CI runs `verify`; the benchmark runs only on manual dispatch and the weekly Monday 03:00 UTC schedule. The approved chunk p99/max criterion passes as stated above. Domain line coverage is **99.45% (359/361)**; JaCoCo renders its report at target/site/jacoco/index.html without a gate. Coverage includes ordering, idempotency, version-only updates, ownership, tenant/role isolation, rollback, real-context restart recovery, publisher concurrency, rehire, streaming/200k safety brake, management isolation, rollback-safe caches and PII boundaries. [Testing details](docs/TESTING.md).
 
 ## Demo video
 [Demo video — recording pending](https://example.com/REPLACE_WITH_DEMO_VIDEO)
