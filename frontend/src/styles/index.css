@@ -1397,3 +1397,19 @@ select {
     flex-basis: 100%;
   }
 }
+
+/* Grid children shrink; only the focused table region scrolls. */
+.specimen {
+  min-width: 0;
+}
+.specimen-grid {
+  grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr);
+}
+.plan-cell {
+  white-space: normal;
+}
+@media (max-width: 520px) {
+  .specimen-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}

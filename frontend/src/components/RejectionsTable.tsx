@@ -9,7 +9,12 @@ export function RejectionsTable({ runId }: { runId: string }) {
   const result = query.data;
   return (
     <div>
-      <div className="table-scroll">
+      <div
+        className="table-scroll"
+        role="region"
+        aria-label="Rejected rows"
+        tabIndex={0}
+      >
         <table>
           <caption className="sr-only">Rejected file rows</caption>
           <thead>

@@ -33,6 +33,7 @@ export function EmployeeDetailDrawer() {
         <>
           <EmployeeFields employee={employee.data} />
           {history.error && <ErrorNotice error={history.error} />}
+          {history.isPending && <p role="status">Loading receipt history</p>}
           {history.data && (
             <section className="employee-fields">
               <VersionTimeline

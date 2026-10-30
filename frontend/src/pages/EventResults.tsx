@@ -28,7 +28,12 @@ export function EventResults({
                   </div>
                 ))}
               </dl>
-              <div className="table-scroll">
+              <div
+                className="table-scroll"
+                role="region"
+                aria-label="Event outcomes"
+                tabIndex={0}
+              >
                 <table>
                   <caption>Record outcomes, step {step + 1}</caption>
                   <thead>

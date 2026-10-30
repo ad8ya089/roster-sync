@@ -78,7 +78,12 @@ export function StyleguidePage() {
               <OutcomeBadge key={outcome} outcome={outcome} />
             ))}
           </div>
-          <div className="table-scroll">
+          <div
+            className="table-scroll"
+            role="region"
+            aria-label="Illustrative records"
+            tabIndex={0}
+          >
             <table>
               <caption className="sr-only">Illustrative roster records</caption>
               <thead>

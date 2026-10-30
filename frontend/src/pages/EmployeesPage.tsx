@@ -80,7 +80,12 @@ export function EmployeesPage() {
         <button className="button button-secondary">Filter employees</button>
       </form>
       {query.error && <ErrorNotice error={query.error} />}
-      <div className="table-scroll">
+      <div
+        className="table-scroll"
+        role="region"
+        aria-label="Employee records"
+        tabIndex={0}
+      >
         <table>
           <caption>Tenant employees</caption>
           <thead>

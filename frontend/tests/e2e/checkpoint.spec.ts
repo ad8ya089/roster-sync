@@ -16,10 +16,21 @@ for (const theme of ["light", "dark"] as const)
       page.on("pageerror", () => failures.push("PAGE_ERROR"));
       page.on("console", (message) => consoleMessages.push(message.text()));
       await page.goto("/#/login");
-      await expect(page.getByRole("heading", { name: "Sign in to operations" })).toBeVisible();
+      await expect(
+        page.getByRole("heading", { name: "Sign in to operations" }),
+      ).toBeVisible();
       const loginAudit = await new AxeBuilder({ page }).analyze();
-      const loginIssues = loginAudit.violations.filter(violation => ["serious", "critical"].includes(violation.impact ?? "")).map(violation => violation.id);
+      const loginIssues = loginAudit.violations
+        .filter((violation) =>
+          ["serious", "critical"].includes(violation.impact ?? ""),
+        )
+        .map((violation) => violation.id);
       expect(loginIssues).toEqual([]);
+      mkdirSync("tests/e2e/screenshots", { recursive: true });
+      await page.screenshot({
+        path: `tests/e2e/screenshots/login-${theme}-${size.label}.png`,
+        animations: "disabled",
+      });
       await page.getByLabel("Username", { exact: true }).fill("acme.operator");
       await page
         .getByLabel("Password", { exact: true })
@@ -28,7 +39,9 @@ for (const theme of ["light", "dark"] as const)
       await expect(page.getByRole("button", { name: "Log out" })).toBeVisible();
       const { runId } = JSON.parse(readFileSync(".checkpoint.json", "utf8"));
       mkdirSync("tests/e2e/screenshots", { recursive: true });
-      const audits = [{ screen: "login", theme, viewport: size.label, serious: loginIssues }];
+      const audits = [
+        { screen: "login", theme, viewport: size.label, serious: loginIssues },
+      ];
       for (const screen of ["styleguide", "run-detail"]) {
         await page.goto(
           screen === "styleguide" ? "/#/styleguide" : `/#/runs/${runId}`,
@@ -86,7 +99,9 @@ for (const theme of ["light", "dark"] as const)
       ).toBeDisabled();
       await page.getByLabel("Decision note", { exact: true }).focus();
       await page.keyboard.press("Tab");
-      await expect(page.getByRole("button", { name: "Cancel", exact: true })).toBeFocused();
+      await expect(
+        page.getByRole("button", { name: "Cancel", exact: true }),
+      ).toBeFocused();
       await page.keyboard.press("Escape");
       await expect(page.getByRole("dialog")).not.toBeVisible();
       const leaked = consoleMessages.some(
@@ -118,17 +133,29 @@ for (const theme of ["light", "dark"] as const)
     });
   }
 
-test("transport admin review is read-only and reload clears the session", async ({ page }) => {
+test("transport admin review is read-only and reload clears the session", async ({
+  page,
+}) => {
   await page.goto("/#/login");
   await page.getByLabel("Username", { exact: true }).fill("acme.admin");
-  await page.getByLabel("Password", { exact: true }).fill(process.env.DEMO_PASSWORD!);
+  await page
+    .getByLabel("Password", { exact: true })
+    .fill(process.env.DEMO_PASSWORD!);
   await page.getByRole("button", { name: "Sign in", exact: true }).click();
   await expect(page.getByRole("button", { name: "Log out" })).toBeVisible();
   const { runId } = JSON.parse(readFileSync(".checkpoint.json", "utf8"));
   await page.goto(`/#/runs/${runId}`);
-  await expect(page.getByText("Waiting for an operator. No changes have been applied.")).toBeVisible();
-  await expect(page.getByRole("button", { name: "Approve all changes", exact: true })).toHaveCount(0);
-  await expect(page.getByRole("button", { name: "Reject run", exact: true })).toHaveCount(0);
+  await expect(
+    page.getByText("Waiting for an operator. No changes have been applied."),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: "Approve all changes", exact: true }),
+  ).toHaveCount(0);
+  await expect(
+    page.getByRole("button", { name: "Reject run", exact: true }),
+  ).toHaveCount(0);
   await page.reload();
-  await expect(page.getByRole("heading", { name: "Sign in to operations" })).toBeVisible();
+  await expect(
+    page.getByRole("heading", { name: "Sign in to operations" }),
+  ).toBeVisible();
 });

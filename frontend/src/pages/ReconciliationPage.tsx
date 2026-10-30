@@ -72,7 +72,12 @@ export function ReconciliationPage() {
         </div>
       </div>
       {query.error && <ErrorNotice error={query.error} />}
-      <div className="table-scroll">
+      <div
+        className="table-scroll"
+        role="region"
+        aria-label="Reconciliation records"
+        tabIndex={0}
+      >
         <table>
           <caption>Nightly export runs</caption>
           <thead>

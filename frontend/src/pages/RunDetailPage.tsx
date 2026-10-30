@@ -108,6 +108,20 @@ export function RunDetailPage() {
         )}
       </dl>
       <RunStages status={run.status} />
+      {run.status === "APPLYING" && (
+        <p role="status">
+          {run.applied.toLocaleString("en-US")} applied,{" "}
+          {run.superseded.toLocaleString("en-US")} superseded of{" "}
+          {(
+            run.plan.creates +
+            run.plan.updates +
+            run.plan.heals +
+            run.plan.advances +
+            run.plan.deactivations
+          ).toLocaleString("en-US")}{" "}
+          planned actions. Skipped deactivations are not applied.
+        </p>
+      )}
       {notice && (
         <p className="save-notice" role="status">
           {notice}

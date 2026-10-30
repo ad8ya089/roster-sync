@@ -17,7 +17,12 @@ export function BookingsList({ employeeId }: { employeeId: string }) {
       ) : query.data.length === 0 ? (
         <p>No bookings.</p>
       ) : (
-        <div className="table-scroll">
+        <div
+          className="table-scroll"
+          role="region"
+          aria-label="Transport bookings"
+          tabIndex={0}
+        >
           <table>
             <caption>Transport bookings</caption>
             <thead>
