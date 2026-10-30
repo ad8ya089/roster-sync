@@ -11,6 +11,8 @@ PostgreSQL 17. All tables are created by Flyway (`src/main/resources/db/migratio
 
 Entity mappings use `TenantScopedEntity` for `tenantId` and `AuditedTenantEntity` extending it for `createdAt` and `updatedAt` only where those columns exist. Other timestamp fields are mapped by the concrete entity; inheritance does not add columns.
 
+`tenant_settings` maps `tenantId` directly as its primary key: JPA does not allow a subclass to promote an inherited non-ID property to `@Id`. It still requires a tenant UUID on every repository operation. `tenant` is the tenant root and has no tenant_id column.
+
 ## V1__core_schema.sql (target DDL — agents implement exactly this unless a task says otherwise)
 
 ```sql

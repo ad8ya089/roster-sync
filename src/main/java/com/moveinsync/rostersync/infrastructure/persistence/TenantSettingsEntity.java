@@ -1,6 +1,8 @@
 package com.moveinsync.rostersync.infrastructure.persistence;
 
 import jakarta.persistence.Column;
+import jakarta.persistence.Access;
+import jakarta.persistence.AccessType;
 import jakarta.persistence.Entity;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
@@ -10,16 +12,19 @@ import java.util.UUID;
 
 @Entity
 @Table(name = "tenant_settings")
-public class TenantSettingsEntity extends TenantScopedEntity {
+@Access(AccessType.PROPERTY)
+public class TenantSettingsEntity {
+    private UUID tenantId;
     private BigDecimal brakeMaxMissingRatio;
     private Integer brakeMaxMissingCount;
     private Instant updatedAt;
     private String updatedBy;
 
     protected TenantSettingsEntity() { }
-    // This table's tenant key is also its primary key; no extra id or audit columns.
-    @Id @Override @Column(name = "tenant_id", nullable = false, updatable = false)
-    public UUID getTenantId() { return super.getTenantId(); }
+    // JPA forbids promoting an inherited non-id property to @Id; map this tenant primary key directly.
+    @Id @Column(name = "tenant_id", nullable = false, updatable = false)
+    public UUID getTenantId() { return tenantId; }
+    protected void setTenantId(UUID value) { tenantId = value; }
     @Column(name = "brake_max_missing_ratio", precision = 4, scale = 3)
     public BigDecimal getBrakeMaxMissingRatio() { return brakeMaxMissingRatio; }
     protected void setBrakeMaxMissingRatio(BigDecimal value) { brakeMaxMissingRatio = value; }
