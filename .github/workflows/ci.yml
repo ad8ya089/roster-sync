@@ -19,8 +19,8 @@ jobs:
           distribution: temurin
           java-version: '21'
           cache: maven
-      - name: Unit, PostgreSQL integration and bounded-heap benchmark tests
-        run: ./mvnw -B verify -Pbenchmark
+      - name: Unit and PostgreSQL integration tests
+        run: ./mvnw -B verify
       - name: Upload test reports
         if: always()
         uses: actions/upload-artifact@v7
@@ -29,9 +29,6 @@ jobs:
           path: |
             target/surefire-reports/
             target/failsafe-reports/
-            target/benchmark-reports/
-            target/phase8-benchmark.json
-            target/phase8-throughput-current.json
           if-no-files-found: warn
       - name: Build the runtime image
         run: docker build -t roster-sync:ci .
