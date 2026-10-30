@@ -1,0 +1,33 @@
+groups:
+  - name: roster-sync
+    rules:
+      - alert: OutboxPublishLag
+        expr: outbox_oldest_pending_age_seconds > 60
+        for: 5m
+        labels: {severity: warning}
+        annotations: {summary: 'Outbox has waited more than one minute'}
+      - alert: OutboxDeadLetters
+        expr: outbox_dead > 0
+        for: 1m
+        labels: {severity: critical}
+        annotations: {summary: 'Outbox dead letters require an operator'}
+      - alert: ReconciliationAwaitingApproval
+        expr: recon_runs_awaiting_approval > 0
+        for: 30m
+        labels: {severity: warning}
+        annotations: {summary: 'Reconciliation approval is overdue'}
+      - alert: HighRosterRejectionRate
+        expr: sum(rate(roster_events_total{outcome=~"rejected|retryable_error|conflict"}[5m])) / clamp_min(sum(rate(roster_events_total[5m])), 0.000001) > 0.05
+        for: 10m
+        labels: {severity: warning}
+        annotations: {summary: 'HR event error rate exceeds five percent'}
+      - alert: HighRosterLockRetries
+        expr: sum(increase(roster_apply_retries_total[5m])) > 100
+        for: 5m
+        labels: {severity: warning}
+        annotations: {summary: 'Roster write contention is elevated'}
+      - alert: RosterScrapeUnavailable
+        expr: up{job="roster-sync"} == 0
+        for: 1m
+        labels: {severity: critical}
+        annotations: {summary: 'Roster management listener is unavailable'}

@@ -1,0 +1,430 @@
+{
+  "title": "Roster Sync Operations",
+  "schemaVersion": 39,
+  "refresh": "15s",
+  "time": {
+    "from": "now-15m",
+    "to": "now"
+  },
+  "uid": "roster-sync",
+  "panels": [
+    {
+      "fieldConfig": {
+        "overrides": [],
+        "defaults": {
+          "unit": "ops"
+        }
+      },
+      "datasource": {
+        "uid": "prometheus",
+        "type": "prometheus"
+      },
+      "title": "Events by outcome",
+      "id": 1,
+      "type": "timeseries",
+      "targets": [
+        {
+          "refId": "A",
+          "legendFormat": "{{outcome}}{{sink}}{{cache}}",
+          "expr": "sum by (outcome) (rate(roster_events_total[5m]))"
+        }
+      ],
+      "gridPos": {
+        "w": 12,
+        "y": 0.0,
+        "x": 0,
+        "h": 8
+      },
+      "options": {
+        "legend": {
+          "placement": "bottom",
+          "displayMode": "list"
+        }
+      }
+    },
+    {
+      "fieldConfig": {
+        "overrides": [],
+        "defaults": {
+          "unit": "short"
+        }
+      },
+      "datasource": {
+        "uid": "prometheus",
+        "type": "prometheus"
+      },
+      "title": "Pending outbox",
+      "id": 2,
+      "type": "timeseries",
+      "targets": [
+        {
+          "refId": "A",
+          "legendFormat": "{{outcome}}{{sink}}{{cache}}",
+          "expr": "outbox_pending"
+        }
+      ],
+      "gridPos": {
+        "w": 12,
+        "y": 0.0,
+        "x": 12,
+        "h": 8
+      },
+      "options": {
+        "legend": {
+          "placement": "bottom",
+          "displayMode": "list"
+        }
+      }
+    },
+    {
+      "fieldConfig": {
+        "overrides": [],
+        "defaults": {
+          "unit": "short"
+        }
+      },
+      "datasource": {
+        "uid": "prometheus",
+        "type": "prometheus"
+      },
+      "title": "Dead letters",
+      "id": 3,
+      "type": "timeseries",
+      "targets": [
+        {
+          "refId": "A",
+          "legendFormat": "{{outcome}}{{sink}}{{cache}}",
+          "expr": "outbox_dead"
+        }
+      ],
+      "gridPos": {
+        "w": 12,
+        "y": 8.0,
+        "x": 0,
+        "h": 8
+      },
+      "options": {
+        "legend": {
+          "placement": "bottom",
+          "displayMode": "list"
+        }
+      }
+    },
+    {
+      "fieldConfig": {
+        "overrides": [],
+        "defaults": {
+          "unit": "s"
+        }
+      },
+      "datasource": {
+        "uid": "prometheus",
+        "type": "prometheus"
+      },
+      "title": "Oldest pending age",
+      "id": 4,
+      "type": "timeseries",
+      "targets": [
+        {
+          "refId": "A",
+          "legendFormat": "{{outcome}}{{sink}}{{cache}}",
+          "expr": "outbox_oldest_pending_age_seconds"
+        }
+      ],
+      "gridPos": {
+        "w": 12,
+        "y": 8.0,
+        "x": 12,
+        "h": 8
+      },
+      "options": {
+        "legend": {
+          "placement": "bottom",
+          "displayMode": "list"
+        }
+      }
+    },
+    {
+      "fieldConfig": {
+        "overrides": [],
+        "defaults": {
+          "unit": "short"
+        }
+      },
+      "datasource": {
+        "uid": "prometheus",
+        "type": "prometheus"
+      },
+      "title": "Awaiting approval",
+      "id": 5,
+      "type": "timeseries",
+      "targets": [
+        {
+          "refId": "A",
+          "legendFormat": "{{outcome}}{{sink}}{{cache}}",
+          "expr": "recon_runs_awaiting_approval"
+        }
+      ],
+      "gridPos": {
+        "w": 12,
+        "y": 16.0,
+        "x": 0,
+        "h": 8
+      },
+      "options": {
+        "legend": {
+          "placement": "bottom",
+          "displayMode": "list"
+        }
+      }
+    },
+    {
+      "fieldConfig": {
+        "overrides": [],
+        "defaults": {
+          "unit": "s"
+        }
+      },
+      "datasource": {
+        "uid": "prometheus",
+        "type": "prometheus"
+      },
+      "title": "Apply p50 / p99",
+      "id": 6,
+      "type": "timeseries",
+      "targets": [
+        {
+          "refId": "A",
+          "legendFormat": "p99",
+          "expr": "histogram_quantile(0.99,sum by(le)(rate(roster_apply_duration_seconds_bucket[5m])))"
+        },
+        {
+          "refId": "B",
+          "legendFormat": "p50",
+          "expr": "histogram_quantile(0.5,sum by(le)(rate(roster_apply_duration_seconds_bucket[5m])))"
+        }
+      ],
+      "gridPos": {
+        "w": 12,
+        "y": 16.0,
+        "x": 12,
+        "h": 8
+      },
+      "options": {
+        "legend": {
+          "placement": "bottom",
+          "displayMode": "list"
+        }
+      }
+    },
+    {
+      "fieldConfig": {
+        "overrides": [],
+        "defaults": {
+          "unit": "s"
+        }
+      },
+      "datasource": {
+        "uid": "prometheus",
+        "type": "prometheus"
+      },
+      "title": "Ingest lag p99",
+      "id": 7,
+      "type": "timeseries",
+      "targets": [
+        {
+          "refId": "A",
+          "legendFormat": "{{outcome}}{{sink}}{{cache}}",
+          "expr": "histogram_quantile(0.99,sum by(le)(rate(roster_ingest_lag_seconds_bucket[5m])))"
+        }
+      ],
+      "gridPos": {
+        "w": 12,
+        "y": 24.0,
+        "x": 0,
+        "h": 8
+      },
+      "options": {
+        "legend": {
+          "placement": "bottom",
+          "displayMode": "list"
+        }
+      }
+    },
+    {
+      "fieldConfig": {
+        "overrides": [],
+        "defaults": {
+          "unit": "short"
+        }
+      },
+      "datasource": {
+        "uid": "prometheus",
+        "type": "prometheus"
+      },
+      "title": "Apply retries / 5 min",
+      "id": 8,
+      "type": "timeseries",
+      "targets": [
+        {
+          "refId": "A",
+          "legendFormat": "{{outcome}}{{sink}}{{cache}}",
+          "expr": "sum(increase(roster_apply_retries_total[5m]))"
+        }
+      ],
+      "gridPos": {
+        "w": 12,
+        "y": 24.0,
+        "x": 12,
+        "h": 8
+      },
+      "options": {
+        "legend": {
+          "placement": "bottom",
+          "displayMode": "list"
+        }
+      }
+    },
+    {
+      "fieldConfig": {
+        "overrides": [],
+        "defaults": {
+          "unit": "short"
+        }
+      },
+      "datasource": {
+        "uid": "prometheus",
+        "type": "prometheus"
+      },
+      "title": "Publish failures / 5 min",
+      "id": 9,
+      "type": "timeseries",
+      "targets": [
+        {
+          "refId": "A",
+          "legendFormat": "{{outcome}}{{sink}}{{cache}}",
+          "expr": "sum by(sink)(increase(outbox_publish_failures_total[5m]))"
+        }
+      ],
+      "gridPos": {
+        "w": 12,
+        "y": 32.0,
+        "x": 0,
+        "h": 8
+      },
+      "options": {
+        "legend": {
+          "placement": "bottom",
+          "displayMode": "list"
+        }
+      }
+    },
+    {
+      "fieldConfig": {
+        "overrides": [],
+        "defaults": {
+          "unit": "percentunit"
+        }
+      },
+      "datasource": {
+        "uid": "prometheus",
+        "type": "prometheus"
+      },
+      "title": "Cache hit ratio",
+      "id": 10,
+      "type": "timeseries",
+      "targets": [
+        {
+          "refId": "A",
+          "legendFormat": "{{outcome}}{{sink}}{{cache}}",
+          "expr": "sum by(cache)(rate(cache_gets_total{result=\"hit\"}[5m])) / clamp_min(sum by(cache)(rate(cache_gets_total[5m])),0.000001)"
+        }
+      ],
+      "gridPos": {
+        "w": 12,
+        "y": 32.0,
+        "x": 12,
+        "h": 8
+      },
+      "options": {
+        "legend": {
+          "placement": "bottom",
+          "displayMode": "list"
+        }
+      }
+    },
+    {
+      "fieldConfig": {
+        "overrides": [],
+        "defaults": {
+          "unit": "bytes"
+        }
+      },
+      "datasource": {
+        "uid": "prometheus",
+        "type": "prometheus"
+      },
+      "title": "Heap used",
+      "id": 11,
+      "type": "timeseries",
+      "targets": [
+        {
+          "refId": "A",
+          "legendFormat": "{{outcome}}{{sink}}{{cache}}",
+          "expr": "sum(jvm_memory_used_bytes{area=\"heap\"})"
+        }
+      ],
+      "gridPos": {
+        "w": 12,
+        "y": 40.0,
+        "x": 0,
+        "h": 8
+      },
+      "options": {
+        "legend": {
+          "placement": "bottom",
+          "displayMode": "list"
+        }
+      }
+    },
+    {
+      "fieldConfig": {
+        "overrides": [],
+        "defaults": {
+          "unit": "short"
+        }
+      },
+      "datasource": {
+        "uid": "prometheus",
+        "type": "prometheus"
+      },
+      "title": "Application scrape",
+      "id": 12,
+      "type": "timeseries",
+      "targets": [
+        {
+          "refId": "A",
+          "legendFormat": "{{outcome}}{{sink}}{{cache}}",
+          "expr": "up{job=\"roster-sync\"}"
+        }
+      ],
+      "gridPos": {
+        "w": 12,
+        "y": 40.0,
+        "x": 12,
+        "h": 8
+      },
+      "options": {
+        "legend": {
+          "placement": "bottom",
+          "displayMode": "list"
+        }
+      }
+    }
+  ],
+  "version": 1,
+  "tags": [
+    "roster-sync"
+  ],
+  "editable": false
+}
