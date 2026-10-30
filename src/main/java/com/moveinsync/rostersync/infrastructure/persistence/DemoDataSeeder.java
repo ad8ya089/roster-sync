@@ -93,6 +93,9 @@ public class DemoDataSeeder implements ApplicationRunner {
     }
 
     private void seedUser(UUID tenantId, String username, String role, String employeeId, String passwordHash) {
+        if (!com.moveinsync.rostersync.domain.model.Role.valueOf(role).hasRequiredEmployeeId(employeeId)) {
+            throw new IllegalArgumentException("EMPLOYEE users require employee_external_id");
+        }
         jdbc.update("""
                 INSERT INTO app_user (tenant_id, username, password_hash, role, employee_external_id, created_at)
                 VALUES (?, ?, ?, ?, ?, ?) ON CONFLICT (username) DO NOTHING

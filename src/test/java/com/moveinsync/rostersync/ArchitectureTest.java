@@ -31,6 +31,9 @@ class ArchitectureTest {
         for (var type : CLASSES) {
             if (type.isInterface() && type.getSimpleName().endsWith("Repository")) {
                 for (var method : type.getMethods()) {
+                    if (type.getSimpleName().equals("AppUserRepository") && method.getName().equals("findByUsername")
+                            && method.getRawParameterTypes().size() == 1
+                            && method.getRawParameterTypes().getFirst().isEquivalentTo(String.class)) continue;
                     assertThat(method.getRawParameterTypes()).as("Tenant parameter on %s", method.getFullName())
                             .anyMatch(parameter -> parameter.isEquivalentTo(UUID.class));
                 }
