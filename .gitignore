@@ -19,3 +19,11 @@ Thumbs.db
 Desktop.ini
 .jqwik-database
 hs_err_pid*
+frontend/node_modules/
+frontend/dist/
+frontend/test-results/
+frontend/playwright-report/
+frontend/tests/e2e/screenshots/
+frontend/*.tsbuildinfo
+frontend/.checkpoint.json
+src/main/resources/static/
