@@ -40,6 +40,8 @@ public class SecurityConfig {
                 .authorizeHttpRequests(access -> access
                         .requestMatchers(HttpMethod.POST, "/api/v1/auth/token").permitAll()
                         .requestMatchers("/actuator/health", "/actuator/health/**").permitAll()
+                        // No form/Basic/logout filters exist. Let MVC return 404 for their old paths.
+                        .requestMatchers("/login", "/logout").permitAll()
                         .anyRequest().authenticated())
                 .oauth2ResourceServer(resource -> resource
                         .jwt(jwt -> jwt.decoder(tokens.decoder()).jwtAuthenticationConverter(converter))

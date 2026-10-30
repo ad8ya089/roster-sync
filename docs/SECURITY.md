@@ -12,7 +12,7 @@ Covers plus-points **1 (Authentication + RBAC + tenant isolation)** and **8 (Err
 - `JwtClaimsValidator` requires the identity, tenant, role, issuance and expiry claims; role parses to the `Role` enum and EMPLOYEE requires `emp`. The 30-second clock allowance is tested at its exact boundary. Expiry emits `roster_token_expired`; the entry point examines typed validation errors through their exception causes, never exception text.
 - No database lookup occurs during bearer-token validation. Disabling an account stops subsequent logins but leaves existing tokens valid until expiry (one hour by default). Production would add a revocation list or delegate to an identity provider; see ADR-013.
 - `CorrelationIdFilter` is the outer servlet filter, before Spring Security, so rejected tokens and denied roles still receive correlation IDs. `TenantContextFilter` runs after bearer authentication and clears both its ThreadLocal and MDC in `finally`, including when downstream processing throws.
-- Default logout is disabled. Spring Security 7.1 also adds a public OAuth protected-resource metadata filter without a disable switch; the final chain omits it so login and health remain the only anonymous routes. A regression test covers these framework routes as well as registered controller mappings.
+- Form login, HTTP Basic and logout are disabled entirely. `/login` and `/logout` reach MVC with no handler and return 404, including anonymously. Spring Security 7.1 adds a public OAuth protected-resource metadata filter without a disable switch; the final chain omits it. A regression test covers these framework paths as well as registered controller mappings.
 
 ## 2. Authorization (RBAC)
 

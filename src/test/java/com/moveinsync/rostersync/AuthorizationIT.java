@@ -26,7 +26,10 @@ class AuthorizationIT extends AbstractSecurityIntegrationTest {
     }
 
     @Test void frameworkDefaultsDoNotExposeExtraAnonymousRoutes() throws Exception {
-        for (String path : List.of("/logout", "/login", "/.well-known/oauth-protected-resource", "/api/v1/not-a-route")) {
+        for (String path : List.of("/logout", "/login")) {
+            problem(request(path.equals("/logout") ? "POST" : "GET", path, null, null), 404, "NOT_FOUND");
+        }
+        for (String path : List.of("/.well-known/oauth-protected-resource", "/api/v1/not-a-route")) {
             problem(request(path.equals("/logout") ? "POST" : "GET", path, null, null), 401, "UNAUTHENTICATED");
         }
     }
