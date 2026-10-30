@@ -13,6 +13,8 @@ import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationConverter;
 import org.springframework.security.oauth2.server.resource.web.authentication.BearerTokenAuthenticationFilter;
+import org.springframework.security.oauth2.server.resource.web.OAuth2ProtectedResourceMetadataFilter;
+import org.springframework.security.web.DefaultSecurityFilterChain;
 import org.springframework.security.web.SecurityFilterChain;
 import tools.jackson.databind.json.JsonMapper;
 
@@ -31,7 +33,8 @@ public class SecurityConfig {
                 "ROLE_" + Role.valueOf(jwt.getClaimAsString("role")).name())));
 
         // Bearer tokens only: no session, cookies, saved requests, form login or Basic authentication.
-        return http.csrf(AbstractHttpConfigurer::disable).formLogin(AbstractHttpConfigurer::disable)
+        var chain = http.csrf(AbstractHttpConfigurer::disable).formLogin(AbstractHttpConfigurer::disable)
+                .logout(AbstractHttpConfigurer::disable)
                 .httpBasic(AbstractHttpConfigurer::disable).requestCache(AbstractHttpConfigurer::disable)
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(access -> access
@@ -45,5 +48,9 @@ public class SecurityConfig {
                 // Construct here, rather than as a servlet Filter bean, to prevent double registration.
                 .addFilterAfter(new TenantContextFilter(), BearerTokenAuthenticationFilter.class)
                 .build();
+        // Security 7.1 adds public metadata automatically and exposes no disable switch.
+        // Our public-route contract is only login and health, so omit that filter from the chain.
+        return new DefaultSecurityFilterChain(chain.getRequestMatcher(), chain.getFilters().stream()
+                .filter(filter -> !(filter instanceof OAuth2ProtectedResourceMetadataFilter)).toList());
     }
 }

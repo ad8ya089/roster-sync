@@ -6,18 +6,24 @@ Covers plus-points **1 (Authentication + RBAC + tenant isolation)** and **8 (Err
 
 - `spring-boot-starter-security` + `spring-boot-starter-security-oauth2-resource-server` (JWT, Boot 4 coordinate).
 - Tokens are minted by `POST /api/v1/auth/token` using `NimbusJwtEncoder` with an HS256 secret from `JWT_SECRET` (≥ 32 bytes; the app refuses to start if shorter). Expiry 1 h (`roster.security.token-ttl`).
-- Passwords: BCrypt (`PasswordEncoderFactories` / `BCryptPasswordEncoder`, strength 10). Login failures return one generic 401 for unknown user and wrong password (no user enumeration). Failed logins are logged as `auth.login.failed` with the **username only** (usernames are not personal data here — they are `acme.hr`-style service names; employee usernames are their employee IDs).
+- Passwords: BCrypt (`BCryptPasswordEncoder`, strength 10). Unknown, wrong-password and disabled accounts return the same generic 401. Unknown accounts still execute one match against a fixed strength-10 dummy hash. `LoginTimingTest` verifies real BCrypt calls through a spy, without relying on wall-clock timing. Failed logins log `auth.login.failed` without supplied credentials or usernames, since untrusted usernames can themselves contain PII.
 - Stateless: `SessionCreationPolicy.STATELESS`, CSRF disabled (no cookies), CORS off by default.
 - 401 and 403 are written by a custom `AuthenticationEntryPoint` / `AccessDeniedHandler` in the same Problem Details format.
+- `JwtClaimsValidator` requires the identity, tenant, role, issuance and expiry claims; role parses to the `Role` enum and EMPLOYEE requires `emp`. The 30-second clock allowance is tested at its exact boundary. Expiry emits `roster_token_expired`; the entry point examines typed validation errors through their exception causes, never exception text.
+- No database lookup occurs during bearer-token validation. Disabling an account stops subsequent logins but leaves existing tokens valid until expiry (one hour by default). Production would add a revocation list or delegate to an identity provider; see ADR-013.
+- `CorrelationIdFilter` is the outer servlet filter, before Spring Security, so rejected tokens and denied roles still receive correlation IDs. `TenantContextFilter` runs after bearer authentication and clears both its ThreadLocal and MDC in `finally`, including when downstream processing throws.
+- Default logout is disabled. Spring Security 7.1 also adds a public OAuth protected-resource metadata filter without a disable switch; the final chain omits it so login and health remain the only anonymous routes. A regression test covers these framework routes as well as registered controller mappings.
 
 ## 2. Authorization (RBAC)
 
 `@EnableMethodSecurity`; controllers use `@PreAuthorize("hasRole('OPERATOR')")` etc. Role → endpoint matrix is in `API.md`. Employee self-access: `EMPLOYEE` may read `/employees/{id}` only when `id == jwt.emp`; otherwise 404.
 
+Office reads allow TRANSPORT_ADMIN and OPERATOR; writes allow TRANSPORT_ADMIN only. Role checks precede tenant-scoped resource lookups. `SecuredEndpointsTest` reflects over handler methods to require a method-level `@PreAuthorize` on every `/api/v1` endpoint except POST `/auth/token`. `AuthorizationIT` also enumerates registered mappings and proves protected endpoints reject missing tokens; later endpoints are automatically included.
+
 ## 3. Tenant isolation
 
 1. A `TenantContextFilter` (after the JWT filter) reads `tid` from the token into a request-scoped `TenantContext` (a `ThreadLocal`-backed holder cleared in `finally`), and into MDC as `tenantId`.
-2. Every repository / DAO method that reads or writes tenant data **takes `tenantId` as a parameter**; there is no `findById(id)` on tenant tables. `ArchitectureTest` asserts repository methods on tenant entities have a `tenantId` parameter (reflection over `*Repository` interfaces).
+2. Every repository / DAO method that reads or writes tenant data **takes `UUID tenantId` as a parameter**; there is no unscoped `findById(id)` on tenant tables. `ArchitectureTest` checks repository interfaces and write fragments. The sole current exception is `AppUserRepository.findByUsername(String)` at login, because usernames are globally unique; subsequent tenant lookup takes its UUID. No broad repository allowlist exists.
 3. Foreign keys are always looked up with tenant: an office code from tenant A can never resolve for tenant B.
 4. Background work (outbox, reconciliation, side effects) carries `tenantId` from the row it is processing — never from a thread-local.
 5. Cross-tenant access returns **404 NOT_FOUND**, not 403, so a client can't probe whether an ID exists in another tenant.
@@ -33,8 +39,9 @@ Rules every agent must follow:
 - **Error responses and per-record reports** contain field names and codes — never the rejected value.
 - **`record_rejection`, `ops_alert`, `outbox_event.last_error`** — codes and IDs only.
 - **Java records** that hold PII (`HrSnapshot`, request DTOs, `EmployeeView`) override `toString()` to print only `employeeId` and non-PII fields. (Records auto-generate a `toString` with every field — the most common accidental leak.)
-- **Exceptions:** Postgres messages can contain values (`Key (email)=(x@y) already exists`). `GlobalExceptionHandler` never forwards `getMessage()` of persistence/parse exceptions; it logs `exception class + constraint name + correlationId` only. Jackson parse errors are mapped to `MALFORMED_JSON` with the JSON path, not the content.
+- **Exceptions:** Postgres messages can contain rejected values. `GlobalExceptionHandler` forwards no persistence/parse messages and logs unexpected failures once using exception class and correlation ID only. Duplicate offices are recognized by structured PostgreSQL constraint name and SQLSTATE, never by message text. Jackson failures map to generic `MALFORMED_JSON`. Validation exposes only field names and codes. Problem instances use fixed `/api/v1`, avoiding request-path leaks.
 - **SQL logging:** `spring.jpa.show-sql=false`; Hibernate bind-parameter logging (`org.hibernate.orm.jdbc.bind`) must stay at `INFO` or above.
+- Hibernate SQL exception diagnostics are disabled because driver messages can contain values; the handler records safe metadata instead.
 - **Access logs:** off. Paths contain employee IDs only.
 - **Outbox payload:** PII appears only as field **names** in `changedFields`.
 - **Metrics tags:** never employee IDs (cardinality) and never PII; tags are `outcome`, `reason`, `source`, `type`.
@@ -75,5 +82,5 @@ Event batch ≤ 1000 and body ≤ 2 MB; CSV ≤ 100 MB (`spring.servlet.multipar
 
 - `prod` alone has no demo seeder, dev endpoints, or active fault injection.
 - The interview deployment intentionally enables `prod,demo`: production logging plus demo fixtures and, once implemented, demo endpoints. Every `/api/v1/dev/**` endpoint requires OPERATOR authentication; this is an explicit interview-only exception, not the normal production configuration.
-- Phase 1 exposes health publicly and denies all other routes. JWT issuance, roles and the full error mapping arrive in Phase 3. The default generated Spring Security user is disabled so no generated password is logged.
+- Health probes and POST `/auth/token` are public. Other routes require bearer authentication and API handlers declare role authorization. The default generated Spring Security user is disabled so no generated password is logged.
 - Caller correlation IDs must be UUIDs. Other values are replaced with a generated UUID before entering logs; error responses return the resulting ID.
