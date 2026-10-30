@@ -47,6 +47,9 @@ management:
 logging:
   level:
     org.hibernate.orm.jdbc.bind: INFO
+    # Driver diagnostics can contain rejected values; the API logs only safe error metadata.
+    org.hibernate.engine.jdbc.spi.SqlExceptionHelper: OFF
+    org.hibernate.orm.jdbc.error: OFF
 
 roster:
   ownership:
