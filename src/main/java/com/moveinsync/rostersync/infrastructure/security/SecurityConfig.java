@@ -24,7 +24,7 @@ public class SecurityConfig {
     @Bean
     public PasswordEncoder passwordEncoder() { return new BCryptPasswordEncoder(10); }
 
-    @Bean
+    @Bean @org.springframework.core.annotation.Order(1)
     public SecurityFilterChain securityFilterChain(HttpSecurity http, JwtTokenService tokens, JsonMapper mapper) throws Exception {
         var unauthorized = new RestAuthenticationEntryPoint(mapper);
         var forbidden = new RestAccessDeniedHandler(mapper);
@@ -39,7 +39,8 @@ public class SecurityConfig {
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(access -> access
                         .requestMatchers(HttpMethod.POST, "/api/v1/auth/token").permitAll()
-                        .requestMatchers("/actuator/health", "/actuator/health/**").permitAll()
+                        // No actuator handlers exist on this listener; MVC returns 404 even anonymously.
+                        .requestMatchers("/actuator", "/actuator/**").permitAll()
                         // No form/Basic/logout filters exist. Let MVC return 404 for their old paths.
                         .requestMatchers("/login", "/logout").permitAll()
                         .anyRequest().authenticated())

@@ -10,6 +10,7 @@ import org.testcontainers.postgresql.PostgreSQLContainer;
 
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 @ActiveProfiles("test")
+@org.springframework.boot.micrometer.metrics.test.autoconfigure.AutoConfigureMetrics
 public abstract class AbstractIntegrationTest {
     @ServiceConnection
     protected static final PostgreSQLContainer POSTGRES = new PostgreSQLContainer("postgres:17-alpine")
@@ -22,10 +23,12 @@ public abstract class AbstractIntegrationTest {
 
     @Autowired
     protected JdbcTemplate jdbc;
+    @Autowired(required=false) private org.springframework.cache.CacheManager caches;
 
     @BeforeEach
     void resetDatabase() {
         truncateBusinessTables();
+        if(caches!=null)caches.getCacheNames().forEach(name->caches.getCache(name).clear());
     }
 
     protected final void truncateBusinessTables() {

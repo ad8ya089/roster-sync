@@ -15,5 +15,5 @@ WORKDIR /app
 COPY --from=build --chown=roster:roster /workspace/target/roster-sync-0.0.1-SNAPSHOT.jar /app/roster-sync.jar
 USER roster:roster
 ENV JAVA_OPTS="-XX:MaxRAMPercentage=75 -XX:+ExitOnOutOfMemoryError"
-EXPOSE 8080
+EXPOSE 8080 8081
 ENTRYPOINT ["sh", "-c", "exec java $JAVA_OPTS -jar /app/roster-sync.jar"]

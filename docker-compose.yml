@@ -26,11 +26,12 @@ services:
         condition: service_healthy
     ports:
       - "8080:8080"
+      - "127.0.0.1:8081:8081"
     volumes:
       - appdata:/data
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "curl", "--fail", "--silent", "http://localhost:8080/actuator/health/readiness"]
+      test: ["CMD", "curl", "--fail", "--silent", "http://localhost:8081/actuator/health/readiness"]
       interval: 5s
       timeout: 5s
       retries: 12

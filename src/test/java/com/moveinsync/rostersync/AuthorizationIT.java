@@ -17,7 +17,7 @@ class AuthorizationIT extends AbstractSecurityIntegrationTest {
     @Autowired private org.springframework.security.web.FilterChainProxy security;
 
     @Test void tenantFilterRunsAfterBearerAndCorrelationRunsOutsideSecurity() {
-        var filters = security.getFilterChains().getFirst().getFilters().stream().map(filter -> filter.getClass().getSimpleName()).toList();
+        var filters = security.getFilterChains().stream().filter(chain->chain.getFilters().stream().anyMatch(filter->filter.getClass().getSimpleName().equals("BearerTokenAuthenticationFilter"))).findFirst().orElseThrow().getFilters().stream().map(filter -> filter.getClass().getSimpleName()).toList();
         assertThat(filters.indexOf("TenantContextFilter")).isGreaterThan(filters.indexOf("BearerTokenAuthenticationFilter"));
         assertThat(filters).doesNotContain("CorrelationIdFilter", "LogoutFilter", "OAuth2ProtectedResourceMetadataFilter");
         assertThat(com.moveinsync.rostersync.api.error.CorrelationIdFilter.class
@@ -88,7 +88,8 @@ class AuthorizationIT extends AbstractSecurityIntegrationTest {
         for (var entry : mappings.getHandlerMethods().entrySet()) {
             var mapping = entry.getKey();
             for (String pattern : mapping.getPatternValues()) {
-                if (pattern.equals("/api/v1/auth/token") || pattern.startsWith("/actuator/health")) continue;
+                assertThat(pattern).doesNotStartWith("/actuator");
+                if (pattern.equals("/api/v1/auth/token")) continue;
                 if (pattern.startsWith("/api/v1/")) assertThat(entry.getValue().getMethod()
                         .getDeclaredAnnotation(org.springframework.security.access.prepost.PreAuthorize.class)).isNotNull();
                 String path = pattern.replaceAll("\\{[^}]+}", "MISSING");

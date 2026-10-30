@@ -25,7 +25,7 @@ docker events --since 2m --until "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
   --filter "container=$(docker compose ps -aq app)" --filter event=die \
   --format 'container.die exitCode={{index .Actor.Attributes "exitCode"}}'
 for ((attempt=0;attempt<90;attempt++)); do
-  if curl --fail --silent "${BASE%/api/v1}/actuator/health/readiness" >/dev/null; then break; fi
+  if curl --fail --silent "${MANAGEMENT_URL:-http://127.0.0.1:8081}/actuator/health/readiness" >/dev/null; then break; fi
   sleep 1
 done
 EVENT_ID=$(docker compose exec -T db sh -c 'psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -At -c "$1"' sh \
