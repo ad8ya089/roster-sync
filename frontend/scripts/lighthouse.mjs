@@ -6,10 +6,17 @@ import { pathToFileURL } from "node:url";
 import { createRequire } from "node:module";
 import { chromium } from "@playwright/test";
 
-if (existsSync("../.env")) process.loadEnvFile("../.env");
-const base = process.env.BASE_URL ?? "http://127.0.0.1:8080";
-if (!["localhost", "127.0.0.1"].includes(new URL(base).hostname))
-  throw new Error("Accessibility fixture requires the local app");
+if (!process.env.LIVE_BASE_URL && existsSync("../.env"))
+  process.loadEnvFile("../.env");
+const base =
+  process.env.LIVE_BASE_URL ?? process.env.BASE_URL ?? "http://127.0.0.1:8080";
+if (
+  !["localhost", "127.0.0.1"].includes(new URL(base).hostname) &&
+  base !== "https://rostersync-aditya.duckdns.org"
+)
+  throw new Error(
+    "Audit target must be local or the approved HTTPS assignment host",
+  );
 let browser;
 try {
   const bin = process.env.PATH.split(path.delimiter).find((dir) =>
