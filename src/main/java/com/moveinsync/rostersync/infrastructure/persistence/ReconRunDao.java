@@ -35,6 +35,9 @@ public class ReconRunDao {
     }
     @Transactional
     public void transition(UUID tenantId,UUID id,String expected,String next) {
+        // Completion advances the whole-file watermark. Share upload's tenant lock so an
+        // upload cannot miss this completion and slip an older export into the freed active slot.
+        if("COMPLETED".equals(next)) jdbc.sql("SELECT id FROM tenant WHERE id=? FOR UPDATE").param(tenantId).query(UUID.class).single();
         boolean terminal=Set.of("COMPLETED","FAILED","PLANNED","REJECTED").contains(next);
         int changed=jdbc.sql("""
                 UPDATE recon_run SET status=?,heartbeat_at=?,finished_at=CASE WHEN ? THEN ? ELSE finished_at END,

@@ -18,4 +18,5 @@ public class ReconWorkQueue {
         catch(RuntimeException rejected){scheduled.remove(runId);throw rejected;}
     }
     public boolean active(UUID runId){return scheduled.contains(runId);}
+    public boolean idle(){return scheduled.isEmpty();}
 }

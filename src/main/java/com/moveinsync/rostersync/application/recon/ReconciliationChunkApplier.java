@@ -32,7 +32,11 @@ public class ReconciliationChunkApplier {
         entities.flush();entities.clear();return pending.size();
     }
     @Transactional
-    public void markFailed(UUID tenantId,UUID runId,long actionId,String errorClass) {
+    public void markFailed(UUID tenantId,UUID runId,long actionId,String errorClass,String auditCodes) {
+        var employeeId=jdbc.sql("SELECT external_id FROM recon_action WHERE tenant_id=? AND run_id=? AND id=? FOR UPDATE").params(tenantId,runId,actionId).query(String.class).single();
         actions.complete(tenantId,runId,actionId,"FAILED",errorClass);
+        jdbc.sql("INSERT INTO record_rejection(tenant_id,source,run_id,external_id,error_codes,created_at) VALUES (?,'FILE',?,?,?,?)")
+                .params(tenantId,runId,employeeId,auditCodes.length()>500?"record:APPLY_FAILED":auditCodes,Timestamp.from(clock.instant())).update();
+        jdbc.sql("UPDATE recon_run SET heartbeat_at=? WHERE tenant_id=? AND id=? AND status='APPLYING'").params(Timestamp.from(clock.instant()),tenantId,runId).update();
     }
 }

@@ -121,7 +121,13 @@ public class EmployeeChangeApplier {
                 else employee.applyHrSnapshot(change.newSnapshot(),action.fileVersion(),now,office);
                 employees.flush(tenantId);outbox.write(tenantId,action.employeeId(),action.fileVersion(),change.eventType(),"RECON",change.changedFields(),change.newSnapshot(),now);
             }
-            case ApplyDecision.VersionAdvanced advanced -> {employee.advanceHrVersion(advanced.newVersion(),now);employees.flush(tenantId);}
+            case ApplyDecision.VersionAdvanced advanced -> {
+                if(action.snapshot().officeCode()!=null) {
+                    var office=offices.findByTenantIdAndCode(tenantId,action.snapshot().officeCode()).orElseThrow(()->rejected("UNKNOWN_OFFICE"));
+                    offices.refreshPlain(tenantId,office);if(!office.isActive())throw rejected("INACTIVE_OFFICE");
+                }
+                employee.advanceHrVersion(advanced.newVersion(),now);employees.flush(tenantId);
+            }
             case ApplyDecision.Duplicate ignored -> {return "SUPERSEDED";}
             case ApplyDecision.Stale ignored -> {return "SUPERSEDED";}
             case ApplyDecision.Conflict ignored -> throw new IllegalStateException("Snapshot conflict");

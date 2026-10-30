@@ -20,7 +20,7 @@ public class RosterFileGenerator {
     @FunctionalInterface public interface RowConsumer {void accept(String id,long version,HrSnapshot snapshot) throws IOException;}
     public Session open(OutputStream output,Spec spec) throws IOException {return new Session(output,spec);}
     public static final class Session implements AutoCloseable {
-        private final CSVPrinter printer;private final Spec spec;private long existing,dropped,updated,created,written;private boolean truncated;
+        private final CSVPrinter printer;private final Spec spec;private long existing,dropped,updated,created,written,maxNewOrdinal;private boolean truncated;
         private String firstOffice="BLR-1";
         Session(OutputStream output,Spec spec) throws IOException {
             this.spec=spec;printer=new CSVPrinter(new BufferedWriter(new OutputStreamWriter(output,StandardCharsets.UTF_8)),CSVFormat.DEFAULT);
@@ -28,6 +28,8 @@ public class RosterFileGenerator {
         }
         public void accept(String id,long version,HrSnapshot snapshot) throws IOException {
             existing++;if(snapshot.officeCode()!=null) firstOffice=snapshot.officeCode();
+            String prefix="N"+Long.toUnsignedString(spec.seed())+"_";
+            if(id.startsWith(prefix)) try{maxNewOrdinal=Math.max(maxNewOrdinal,Long.parseLong(id.substring(prefix.length())));}catch(NumberFormatException ignored){ }
             // Separate deterministic lanes; drop takes precedence, mutation selects survivors.
             if(selected(id,spec.seed(),spec.dropPercent())){dropped++;return;}
             if(spec.truncateAt()!=null && written>=spec.truncateAt()){truncated=true;return;}
@@ -39,7 +41,7 @@ public class RosterFileGenerator {
             long additions=BigDecimal.valueOf(existing).multiply(spec.newPercent()).divide(new BigDecimal("100"),0,RoundingMode.DOWN).longValueExact();
             for(long index=1;index<=additions;index++) {
                 if(spec.truncateAt()!=null && written>=spec.truncateAt()){truncated=true;break;}
-                String id="N"+Long.toUnsignedString(spec.seed())+"_"+index;
+                String id="N"+Long.toUnsignedString(spec.seed())+"_"+Math.addExact(maxNewOrdinal,index);
                 print(id,1,new HrSnapshot("New Fixture "+index,"new"+index+"@seed.test","+919800000001",null,firstOffice,"S1","ACTIVE"));created++;written++;
             }
             if(!truncated && spec.truncateAt()==null) printer.printRecord("#TRAILER","row_count="+written);

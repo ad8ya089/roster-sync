@@ -27,11 +27,15 @@ public class ReconciliationApplier implements ReconApplyWork {
                     for(var action:remaining) {
                         try{chunks.applyNext(tenantId,runId,1,mode);}
                         catch(SimulatedCrashException interrupted){throw interrupted;}
-                        catch(RuntimeException failed){chunks.markFailed(tenantId,runId,action.id(),failed.getClass().getSimpleName());}
+                        catch(RuntimeException failed){
+                            String codes=failed instanceof com.moveinsync.rostersync.application.ingest.RecordRejectedException rejected
+                                    ? rejected.errors().stream().map(error->error.field()+":"+error.code()).sorted().collect(java.util.stream.Collectors.joining(",")) : "record:APPLY_FAILED";
+                            chunks.markFailed(tenantId,runId,action.id(),failed.getClass().getSimpleName(),codes);
+                        }
                     }
                 }
                 longestChunkNanos.accumulateAndGet(System.nanoTime()-start,Math::max);
-                if(processed==0){runs.transition(tenantId,runId,"APPLYING","COMPLETED");return;}
+                if(processed==0){runs.transition(tenantId,runId,"APPLYING","COMPLETED");LOG.info("recon.apply.completed runId={} longestChunkMs={}",runId,longestChunkMillis());return;}
             }
         } catch(SimulatedCrashException crashed) {LOG.warn("recon.apply.interrupted runId={}",runId);}
     }

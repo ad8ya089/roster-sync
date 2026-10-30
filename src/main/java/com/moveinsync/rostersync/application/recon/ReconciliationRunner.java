@@ -36,8 +36,13 @@ public class ReconciliationRunner {
             if(!run.status().equals("UPLOADED")) return;
             runs.transition(tenantId,runId,"UPLOADED","DIFFING");
             var brakeSettings=settings.get(tenantId).brake();runs.settings(tenantId,runId,brakeSettings);
-            long ignoredColumns=csv.header(run.file()).stream().filter(column->!RosterCsvReader.COLUMNS.contains(column)).count();
+            var header=csv.header(run.file());
+            long ignoredColumns=header.stream().filter(column->!RosterCsvReader.COLUMNS.contains(column)
+                    && Arrays.stream(com.moveinsync.rostersync.domain.model.EmployeeField.values()).noneMatch(field->field.csvName().equals(column))).count();
             if(ignoredColumns>0) LOG.warn("recon.file.warning runId={} code=UNKNOWN_FIELD_IGNORED ignoredColumns={}",runId,ignoredColumns);
+            long ignoredOwned=Arrays.stream(com.moveinsync.rostersync.domain.model.EmployeeField.values()).filter(field->header.contains(field.csvName())
+                    && ownership.ownerOf(field)==com.moveinsync.rostersync.domain.model.FieldOwner.TRANSPORT).count();
+            if(ignoredOwned>0) LOG.warn("recon.file.warning runId={} code=FIELD_NOT_OWNED_BY_SOURCE ignoredColumns={}",runId,ignoredOwned);
             // This small per-run office catalogue avoids 200k point queries. Apply rechecks activity.
             Map<String,OfficeLookup.Status> offices=new HashMap<>();
             jdbc.sql("SELECT code,active FROM office WHERE tenant_id=?").param(tenantId).query((row,n)->{
@@ -82,6 +87,11 @@ public class ReconciliationRunner {
             failIfRunning(tenantId,runId,"MALFORMED_CSV");
         } catch(Exception failure) {
             LOG.error("recon.run.failed runId={} exceptionClass={}",runId,failure.getClass().getSimpleName());
+            for(Throwable cause=failure;cause!=null;cause=cause.getCause()) if(cause instanceof org.postgresql.util.PSQLException postgres && postgres.getServerErrorMessage()!=null) {
+                var detail=postgres.getServerErrorMessage();LOG.error("recon.database.failed sqlState={} constraint={} column={}",postgres.getSQLState(),detail.getConstraint(),detail.getColumn());
+            }
+            Arrays.stream(failure.getStackTrace()).filter(frame->frame.getClassName().startsWith("com.moveinsync")).findFirst()
+                    .ifPresent(frame->LOG.error("recon.failure.location class={} line={}",frame.getClassName(),frame.getLineNumber()));
             if(!Thread.currentThread().isInterrupted()) failIfRunning(tenantId,runId,"PROCESSING_FAILED");
         } finally {
             try{deleteSpills(directory);}catch(IOException failure){LOG.warn("recon.spill.cleanup_failed runId={}",runId);}

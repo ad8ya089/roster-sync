@@ -38,7 +38,7 @@ public record RosterProperties(
     public record Reconciliation(
             @Min(1) @Max(32768) @DefaultValue("256") int buckets,
             @Valid @NotNull @DefaultValue Brake brake,
-            @Min(1) @DefaultValue("500") int chunkSize,
+            @Min(1) @DefaultValue("100") int chunkSize,
             @NotNull @DefaultValue("/data") Path dataDir,
             Path inboxDir,
             @Min(1) @DefaultValue("1000") int insertBatchSize,

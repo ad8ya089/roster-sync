@@ -65,7 +65,7 @@ roster:
     brake:
       max-missing-ratio: ${BRAKE_MAX_MISSING_RATIO:0.30}
       max-missing-count: ${BRAKE_MAX_MISSING_COUNT:}
-    chunk-size: ${RECON_CHUNK_SIZE:500}
+    chunk-size: ${RECON_CHUNK_SIZE:100}
     data-dir: ${ROSTER_DATA_DIR:/data}
     inbox-dir: ${RECON_INBOX_DIR:}
     insert-batch-size: ${RECON_INSERT_BATCH_SIZE:1000}

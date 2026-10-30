@@ -16,11 +16,15 @@ class OutboxRetryIT extends AbstractOutboxIntegrationTest {
         long id=pending("QUEUE","EmployeeUpdated");var release=new CountDownLatch(1);var started=new CountDownLatch(4);
         var tasks=new java.util.ArrayList<CompletableFuture<Void>>();
         try {
-            for(int index=0;index<104;index++) tasks.add(CompletableFuture.runAsync(()->{
+            Runnable blocking=()->{
                 started.countDown();try {if(!release.await(5,TimeUnit.SECONDS)) throw new IllegalStateException();}
                 catch(InterruptedException interrupted){Thread.currentThread().interrupt();throw new IllegalStateException();}
-            },executor));
+            };
+            for(int index=0;index<4;index++) tasks.add(CompletableFuture.runAsync(blocking,executor));
             assertThat(started.await(2,TimeUnit.SECONDS)).isTrue();
+            // Warm core threads may enqueue before idle workers wake. Occupy all workers first,
+            // then fill exactly the queue capacity so rejection belongs to the publisher, not setup.
+            for(int index=0;index<100;index++) tasks.add(CompletableFuture.runAsync(blocking,executor));
             publisher.tick();assertAttempt(id,1,"RejectedExecutionException",1);assertThat(status(id)).isEqualTo("PENDING");
         } finally {release.countDown();CompletableFuture.allOf(tasks.toArray(CompletableFuture[]::new)).get(3,TimeUnit.SECONDS);}
     }
