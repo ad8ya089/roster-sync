@@ -1,4 +1,6 @@
 spring:
+  lifecycle:
+    timeout-per-shutdown-phase: 20s
   application:
     name: roster-sync
   autoconfigure:
@@ -22,6 +24,7 @@ spring:
       max-request-size: 101MB
 
 server:
+  shutdown: graceful
   error:
     include-message: never
     include-stacktrace: never
