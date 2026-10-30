@@ -21,7 +21,7 @@ public class ReconciliationUploadService {
         this.runs=runs;this.csv=csv;root=properties.reconciliation().dataDir().resolve("recon");this.clock=clock;this.queue=queue;this.runner=runner;
     }
     public Accepted upload(UUID tenantId,String username,MultipartFile file,Instant asOf,Integer expected,boolean dryRun) throws IOException {
-        if(file.isEmpty()) throw invalid("file");if(asOf.isAfter(clock.instant().plusSeconds(300))) throw invalid("asOf");
+        if(file==null || file.isEmpty()) throw invalid("file");if(asOf.isAfter(clock.instant().plusSeconds(300))) throw invalid("asOf");
         UUID id=UUID.randomUUID();Files.createDirectories(root);Path destination=root.resolve(id+".csv").toAbsolutePath();boolean accepted=false;
         try {
             file.transferTo(destination);

@@ -19,7 +19,7 @@ public class ReconciliationController {
     private final ReconciliationUploadService uploads;private final ReconciliationQueryService queries;private final ReconciliationDecisionService decisions;
     public ReconciliationController(ReconciliationUploadService uploads,ReconciliationQueryService queries,ReconciliationDecisionService decisions){this.uploads=uploads;this.queries=queries;this.decisions=decisions;}
     @PostMapping(consumes=MediaType.MULTIPART_FORM_DATA_VALUE) @ResponseStatus(HttpStatus.ACCEPTED) @PreAuthorize("hasAnyRole('HR_SYSTEM','OPERATOR')")
-    public ReconciliationUploadService.Accepted upload(@RequestParam MultipartFile file,@RequestParam Instant asOf,@RequestParam(required=false) @Min(0) Integer expectedRowCount,@RequestParam(defaultValue="false") boolean dryRun) throws IOException {
+    public ReconciliationUploadService.Accepted upload(@RequestParam(required=false) MultipartFile file,@RequestParam Instant asOf,@RequestParam(required=false) @Min(0) Integer expectedRowCount,@RequestParam(defaultValue="false") boolean dryRun) throws IOException {
         var user=TenantContext.currentUser();return uploads.upload(user.tenantId(),user.username(),file,asOf,expectedRowCount,dryRun);
     }
     @GetMapping("/{runId}") @PreAuthorize("hasAnyRole('HR_SYSTEM','OPERATOR','TRANSPORT_ADMIN')")

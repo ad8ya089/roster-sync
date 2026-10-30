@@ -16,6 +16,9 @@ public class ReconRunDao {
     public ReconRunDao(JdbcClient jdbc,Clock clock,OutboxWriter outbox){this.jdbc=jdbc;this.clock=clock;this.outbox=outbox;}
     @Transactional
     public void create(UUID tenantId,UUID id,Path file,long bytes,Instant asOf,Integer expected,boolean dryRun,String username) {
+        // PostgreSQL stores microseconds. Canonicalize before comparing AND persisting so
+        // replaying an identical nanosecond-valued request cannot evade the file watermark.
+        asOf=asOf.truncatedTo(java.time.temporal.ChronoUnit.MICROS);
         // Serialize upload acceptance per tenant, including the completed-file watermark check.
         jdbc.sql("SELECT id FROM tenant WHERE id=? FOR UPDATE").param(tenantId).query(UUID.class).single();
         Instant last=jdbc.sql("SELECT as_of FROM recon_run WHERE tenant_id=? AND status='COMPLETED' ORDER BY as_of DESC LIMIT 1").param(tenantId)
