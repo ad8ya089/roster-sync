@@ -20,7 +20,7 @@
         <jqwik.version>1.10.2</jqwik.version>
         <commons-csv.version>1.14.1</commons-csv.version>
         <excluded.test.groups>benchmark</excluded.test.groups>
-        <integration.test.argLine/>
+        <integration.test.argLine>-Xmx1g -XX:+UseG1GC</integration.test.argLine>
         <jacocoAgent/>
     </properties>
     <dependencies>
@@ -69,6 +69,9 @@
                     <includes><include>**/*IT.java</include></includes>
                     <excludedGroups>${excluded.test.groups}</excludedGroups>
                     <argLine>@{jacocoAgent} ${integration.test.argLine}</argLine>
+                    <systemPropertyVariables>
+                        <spring.test.context.cache.maxSize>6</spring.test.context.cache.maxSize>
+                    </systemPropertyVariables>
                 </configuration>
                 <executions><execution><goals><goal>integration-test</goal><goal>verify</goal></goals></execution></executions>
             </plugin>

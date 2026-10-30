@@ -26,7 +26,8 @@ public class ReconciliationQueryService {
                 new Rows(number(row,"rows_total"),number(row,"rows_valid"),number(row,"rows_rejected")),
                 new Plan(number(row,"planned_creates"),number(row,"planned_updates"),number(row,"planned_heals"),number(row,"planned_advances"),number(row,"unchanged"),number(row,"stale_skipped"),number(row,"planned_deactivations")),
                 new Brake((Boolean)row.get("brake_tripped"),(String)row.get("brake_reason"),decision.reasons(),active,missing,decision.ratio(),ratio,nullable(row,"brake_count_used"),decision.message()),
-                number(row,"applied"),number(row,"superseded"),new Timings(duration(row,"diff_started_at","diff_finished_at"),duration(row,"diff_finished_at","finished_at")),(String)row.get("failure_reason"));
+                number(row,"applied"),number(row,"superseded"),new Timings(duration(row,"diff_started_at","diff_finished_at"),
+                        "COMPLETED".equals(row.get("status"))?duration(row,row.get("decided_at")==null?"diff_finished_at":"decided_at","finished_at"):null),(String)row.get("failure_reason"));
     }
     public PageResponse<RunView> list(UUID tenantId,String status,int page,int size,Role role,String username) {
         String owner=role==Role.HR_SYSTEM?username:null;
