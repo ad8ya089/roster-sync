@@ -14,7 +14,8 @@ After secure bootstrap, the service start command will be:
 
 ```bash
 cd /opt/roster-sync
-docker compose --env-file .env -f deploy/aws-ec2/compose.prod.yml up -d --build --wait
+docker compose --env-file .env -f deploy/aws-ec2/compose.prod.yml build
+docker compose --env-file .env -f deploy/aws-ec2/compose.prod.yml up -d --no-build --wait
 ```
 
 The human updates rostersync-aditya.duckdns.org to the approved Elastic IP. Wait for DNS before verifying Caddy's automatically issued HTTPS certificate. No DuckDNS API token is required.
@@ -29,3 +30,12 @@ curl http://127.0.0.1:18081/actuator/health/readiness
 ```
 
 Teardown will require explicit authorization: take/verify a backup, terminate the named instance, release its Elastic IP, remove the project's IAM/SSM/budget resources, and decide whether to retain or delete the S3 backups. No force-push, broad resource deletion or account-plan upgrade is part of this proposal.
+
+Approved deployment changes: swap is enabled before building, Docker is enabled at boot, daemon and per-service logs rotate at10m/3files, and the host builds before Compose up. t4g.small Standard has no launch credits and a20% baseline per vCPU; the first build can be slow. Bootstrap starts db/app only; start-caddy.sh requires matching DNS. The light demo skips only the200k seed/recon; run on the instance over SSM to retain the real crash step without exposing a Docker socket. Public root responds with service identification and valid HTTPS. Acceptance also checks closed ports22/5432/8080/8081 from the user's machine, reboot recovery and a manually verified S3 backup.
+
+Retrieve the demo password yourself in a private terminal (do not paste its output into chat or recordings):
+```bash
+aws ssm get-parameter --profile moveinsync-dev --region ap-southeast-2 \
+  --name /rostersync/DEMO_PASSWORD --with-decryption --query Parameter.Value --output text
+```
+[Pause/teardown commands](TEARDOWN.md) are documented for the named deployment.

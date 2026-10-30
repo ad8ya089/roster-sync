@@ -87,7 +87,7 @@ So: Lambda is excellent for spiky, stateless, short handlers; this service is a 
 
 ## 3. Option A step by step (what Prompt 8 automates in `deploy/aws-ec2/`)
 
-1. **Account hygiene:** create an AWS Budget alert ($15/month) before launching anything.
+1. **Account hygiene:** create an AWS Budget alert ($25/month) before launching anything.
 2. **Proposed launch, subject to the account-specific plan and approval:** Ubuntu 24.04 LTS arm64 on `t4g.small`, or x86_64 `t3.small` fallback, 20 GB encrypted gp3, an SSM instance role and restricted backup-bucket access. Bootstrap adds a 2 GB swap file. No resource is created before the concrete resource/name/cost plan is approved. The proposal below selects Sydney and the verified eligible t4g.small.
 3. **Security group:** inbound 80 and 443 from anywhere; **no** 22 (use SSM Session Manager); no SSH exception. Postgres, 8080 and 8081 are never exposed.
 4. **Elastic IP** (stable address for DNS). Note: every public IPv4 costs ~$0.005/hour whether attached or not — release it when you're done.
@@ -148,7 +148,7 @@ Status: **proposed, not created**. Public-repository preflight on 2026-10-30 pas
 | IAM policies | AmazonSSMManagedInstanceCore plus rostersync-runtime-policy rendered from the reviewable template; project-only parameter reads and backup-prefix writes |
 | Backups | rostersync-backups-687971794741-ap-southeast-2; private Sydney S3 bucket, block public access, bucket-owner enforced, SSE-S3,30-day expiry and1-day incomplete multipart cleanup |
 | SecureStrings | /rostersync/JWT_SECRET, /rostersync/POSTGRES_PASSWORD, /rostersync/DEMO_PASSWORD; Standard tier, AWS-managed aws/ssm key; securely generated and stored only after approval, never printed |
-| Budget | rostersync-monthly-15-usd; account monthly cost USD 15; actual80%/100% and forecast100% email alerts to the privately supplied recipient; exclude credits/refunds so credits do not hide gross usage |
+| Budget | rostersync-monthly-25-usd; account monthly cost USD 25; actual80%/100% and forecast100% email alerts to the privately supplied recipient; exclude credits/refunds so credits do not hide gross usage |
 | Runtime | app+db+caddy only; prod,demo for interview; Xmx768m, Postgres shared_buffers 256 MB; persistent 2 GB swap; container log rotation |
 | Management | Host127.0.0.1:8081 only through SSM port forwarding; Caddy only proxies app:8080 and blocks actuator; no monitoring services on the server |
 | DNS/TLS | rostersync-aditya.duckdns.org; human updates the A record after EIP allocation; Caddy HTTP challenge/automatic HTTPS |
@@ -171,6 +171,15 @@ Rates are from the official regional EC2/EBS and S3 price lists, effective 2026-
 
 [EC2/EBS Sydney price list](https://pricing.us-east-1.amazonaws.com/offers/v1.0/aws/AmazonEC2/current/ap-southeast-2/index.csv), [S3 Sydney price list](https://pricing.us-east-1.amazonaws.com/offers/v1.0/aws/AmazonS3/current/ap-southeast-2/index.csv), [public IPv4 pricing](https://aws.amazon.com/vpc/pricing/), [Budgets pricing](https://aws.amazon.com/aws-cost-management/aws-budgets/faqs/). The pricing distribution hostname is global; it does not change the Sydney deployment region. IAM and Budgets are global control planes, not extra regional deployments.
 
-The USD 15 budget is an alert, **not a hard cap**; the conservative preferred gross estimate exceeds it. Applicable account credits or temporary trials may reduce the actual bill, but are not assumed in the baseline. No Paid-plan upgrade is authorized. Standard CPU credits avoid surplus CPU-credit charges, but may throttle sustained workloads. Additional backup storage, egress beyond free allowances, taxes and other account usage can change costs. No customer-managed KMS key, NAT gateway, load balancer, RDS or monitoring server is proposed.
+The USD 25 budget is an alert, **not a hard cap**; the conservative preferred gross estimate is below it. Applicable account credits or temporary trials may reduce the actual bill, but are not assumed in the baseline. No Paid-plan upgrade is authorized. Standard CPU credits avoid surplus CPU-credit charges, but may throttle sustained workloads. Additional backup storage, egress beyond free allowances, taxes and other account usage can change costs. No customer-managed KMS key, NAT gateway, load balancer, RDS or monitoring server is proposed.
 
 After approval: create the scoped budget/IAM/S3/SSM resources, generate secrets through the SDK without printing them, allocate/associate the EIP, bootstrap the reviewed runtime, wait for the human's DuckDNS update, then verify HTTPS, tenant/auth/demo flows, backup upload and private 8081 forwarding. No AWS write API has been executed for this proposal. Bootstrap/deploy/backup automation remains part of the subsequent approved implementation, not a claim of a live deployment.
+
+Approved deployment changes: swap is enabled before building, Docker is enabled at boot, daemon and per-service logs rotate at10m/3files, and the host builds before Compose up. t4g.small Standard has no launch credits and a20% baseline per vCPU; the first build can be slow. Bootstrap starts db/app only; start-caddy.sh requires matching DNS. The light demo skips only the200k seed/recon; run on the instance over SSM to retain the real crash step without exposing a Docker socket. Public root responds with service identification and valid HTTPS. Acceptance also checks closed ports22/5432/8080/8081 from the user's machine, reboot recovery and a manually verified S3 backup.
+
+Retrieve the demo password yourself in a private terminal (do not paste its output into chat or recordings):
+```bash
+aws ssm get-parameter --profile moveinsync-dev --region ap-southeast-2 \
+  --name /rostersync/DEMO_PASSWORD --with-decryption --query Parameter.Value --output text
+```
+[Pause/teardown commands](../deploy/aws-ec2/TEARDOWN.md) are documented for the named deployment.
