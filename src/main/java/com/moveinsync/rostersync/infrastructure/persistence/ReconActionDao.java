@@ -37,6 +37,22 @@ public class ReconActionDao {
     public void complete(UUID tenantId,UUID runId,long actionId,String status,String reason) {
         client.sql("UPDATE recon_action SET status=?,outcome_reason=? WHERE tenant_id=? AND run_id=? AND id=? AND status='PENDING'").params(status,reason,tenantId,runId,actionId).update();
     }
+    public void completeBatch(UUID tenantId,UUID runId,Map<Long,String> outcomes){
+        if(outcomes.isEmpty())return;
+        if(!outcomes.values().stream().allMatch(Set.of("APPLIED","SUPERSEDED","SKIPPED")::contains))throw new IllegalArgumentException("Invalid action result");
+        jdbc.execute((org.springframework.jdbc.core.ConnectionCallback<Integer>)connection->{
+            var applied=connection.createArrayOf("bigint",outcomes.entrySet().stream().filter(entry->entry.getValue().equals("APPLIED")).map(Map.Entry::getKey).toArray());
+            var superseded=connection.createArrayOf("bigint",outcomes.entrySet().stream().filter(entry->entry.getValue().equals("SUPERSEDED")).map(Map.Entry::getKey).toArray());
+            var ids=connection.createArrayOf("bigint",outcomes.keySet().toArray());
+            try(var statement=connection.prepareStatement("""
+                    UPDATE recon_action SET status=CASE WHEN id=ANY(?) THEN 'APPLIED' WHEN id=ANY(?) THEN 'SUPERSEDED' ELSE 'SKIPPED' END,outcome_reason=NULL
+                    WHERE tenant_id=? AND run_id=? AND id=ANY(?) AND status='PENDING'
+                    """)){
+                statement.setArray(1,applied);statement.setArray(2,superseded);statement.setObject(3,tenantId);statement.setObject(4,runId);statement.setArray(5,ids);
+                int changed=statement.executeUpdate();if(changed!=outcomes.size())throw new IllegalStateException("Action claim changed");return changed;
+            }finally{applied.free();superseded.free();ids.free();}
+        });
+    }
     public record RejectedRow(long number,String employeeId,String codes) { }
     public record Action(long id,String employeeId,ActionType type,Long fileVersion,Long expectedVersion,HrSnapshot snapshot) { }
 }

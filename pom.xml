@@ -80,10 +80,23 @@
     <profiles>
         <profile>
             <id>benchmark</id>
-            <properties>
-                <excluded.test.groups/>
-                <integration.test.argLine>-Xmx256m -XX:+UseG1GC</integration.test.argLine>
-            </properties>
+            <build><plugins><plugin>
+                <groupId>org.apache.maven.plugins</groupId><artifactId>maven-failsafe-plugin</artifactId>
+                <executions><execution>
+                    <id>bounded-heap-benchmark</id>
+                    <goals><goal>integration-test</goal><goal>verify</goal></goals>
+                    <configuration>
+                        <groups>benchmark</groups><excludedGroups>!benchmark</excludedGroups>
+                        <includes><include>**/*BenchmarkIT.java</include><include>**/ReconciliationThroughputIT.java</include></includes>
+                        <!-- Measure runtime work without the coverage agent; normal ITs still collect coverage. -->
+                        <argLine>-Xmx256m -XX:+UseG1GC</argLine>
+                        <reuseForks>false</reuseForks>
+                        <reportsDirectory>${project.build.directory}/benchmark-reports</reportsDirectory>
+                        <summaryFile>${project.build.directory}/benchmark-reports/failsafe-summary.xml</summaryFile>
+                        <systemPropertyVariables><spring.test.context.cache.maxSize>1</spring.test.context.cache.maxSize></systemPropertyVariables>
+                    </configuration>
+                </execution></executions>
+            </plugin></plugins></build>
         </profile>
     </profiles>
 </project>

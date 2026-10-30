@@ -16,6 +16,10 @@ public interface EmployeeRepository extends Repository<EmployeeEntity, Long>, Em
     @Query("select employee from EmployeeEntity employee where employee.tenantId=:tenantId and employee.externalId=:externalId")
     Optional<EmployeeEntity> findForUpdate(UUID tenantId, String externalId);
 
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("select employee from EmployeeEntity employee where employee.tenantId=:tenantId and employee.externalId in :externalIds order by employee.externalId")
+    List<EmployeeEntity> findAllForUpdate(UUID tenantId,Collection<String> externalIds);
+
     @EntityGraph(attributePaths = "office")
     Optional<EmployeeEntity> findByTenantIdAndExternalId(UUID tenantId, String externalId);
 

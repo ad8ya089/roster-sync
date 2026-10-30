@@ -99,16 +99,16 @@ public class EmployeeChangeApplier {
 
     /** Joins the caller's chunk transaction. No receipts and no nested lock retry loop. */
     @Transactional(propagation=org.springframework.transaction.annotation.Propagation.MANDATORY)
-    public String applySnapshot(UUID tenantId,com.moveinsync.rostersync.infrastructure.persistence.ReconActionDao.Action action) {
-        var employee=employees.findForUpdate(tenantId,action.employeeId()).orElse(null);
+    public String applySnapshot(UUID tenantId,com.moveinsync.rostersync.infrastructure.persistence.ReconActionDao.Action action,EmployeeEntity employee,Map<String,OfficeEntity> resolvedOffices,List<OutboxWriter.PendingEvent> pendingEvents) {
+        if(employee!=null && !tenantId.equals(employee.getTenantId()))throw new IllegalArgumentException("Employee tenant mismatch");
         if(action.expectedVersion()==null && employee!=null || action.expectedVersion()!=null &&
                 (employee==null || employee.getHrVersion()>action.expectedVersion())) return "SUPERSEDED";
         var now=clock.instant();
         if(action.type()==com.moveinsync.rostersync.domain.recon.ActionType.DEACTIVATE) {
             if(employee==null || employee.getHrVersion()!=action.expectedVersion() || !"ACTIVE".equals(employee.snapshot().status())) return "SUPERSEDED";
-            employee.markDeactivatedByRecon(now);employees.flush(tenantId);
-            outbox.write(tenantId,action.employeeId(),employee.getHrVersion(),com.moveinsync.rostersync.domain.outbox.OutboxEventType.DEACTIVATED,
-                    "RECON",List.of(EmployeeField.STATUS),employee.snapshot(),now);eviction.employee(tenantId,action.employeeId());return "APPLIED";
+            employee.markDeactivatedByRecon(now);
+            pendingEvents.add(outbox.prepare(tenantId,action.employeeId(),employee.getHrVersion(),com.moveinsync.rostersync.domain.outbox.OutboxEventType.DEACTIVATED,
+                    "RECON",List.of(EmployeeField.STATUS),employee.snapshot(),now));eviction.employee(tenantId,action.employeeId());return "APPLIED";
         }
         var command=new UpdateEmployee(action.employeeId(),action.fileVersion(),null,null,action.snapshot());
         var decision=decider.decide(employee==null?CurrentEmployeeState.missing():employee.currentState(),command,DecisionMode.SNAPSHOT);
@@ -116,24 +116,33 @@ public class EmployeeChangeApplier {
             case ApplyDecision.Apply change -> {
                 OfficeEntity office=null;
                 if(change.newSnapshot().officeCode()!=null) {
-                    office=offices.findByTenantIdAndCode(tenantId,change.newSnapshot().officeCode()).orElseThrow(()->rejected("UNKNOWN_OFFICE"));
-                    offices.refreshPlain(tenantId,office);if(!office.isActive()) throw rejected("INACTIVE_OFFICE");
+                    office=snapshotOffice(tenantId,change.newSnapshot().officeCode(),resolvedOffices);
                 }
-                if(employee==null) employees.saveAndFlush(tenantId,new EmployeeEntity(tenantId,action.employeeId(),BucketPartitioner.bucketOf(action.employeeId(),buckets),change.newSnapshot(),action.fileVersion(),now,office));
+                if(employee==null) employees.persist(tenantId,new EmployeeEntity(tenantId,action.employeeId(),BucketPartitioner.bucketOf(action.employeeId(),buckets),change.newSnapshot(),action.fileVersion(),now,office));
                 else employee.applyHrSnapshot(change.newSnapshot(),action.fileVersion(),now,office);
-                employees.flush(tenantId);outbox.write(tenantId,action.employeeId(),action.fileVersion(),change.eventType(),"RECON",change.changedFields(),change.newSnapshot(),now);
+                pendingEvents.add(outbox.prepare(tenantId,action.employeeId(),action.fileVersion(),change.eventType(),"RECON",change.changedFields(),change.newSnapshot(),now));
             }
             case ApplyDecision.VersionAdvanced advanced -> {
                 if(action.snapshot().officeCode()!=null) {
-                    var office=offices.findByTenantIdAndCode(tenantId,action.snapshot().officeCode()).orElseThrow(()->rejected("UNKNOWN_OFFICE"));
-                    offices.refreshPlain(tenantId,office);if(!office.isActive())throw rejected("INACTIVE_OFFICE");
+                    snapshotOffice(tenantId,action.snapshot().officeCode(),resolvedOffices);
                 }
-                employee.advanceHrVersion(advanced.newVersion(),now);employees.flush(tenantId);
+                employee.advanceHrVersion(advanced.newVersion(),now);
             }
             case ApplyDecision.Duplicate ignored -> {return "SUPERSEDED";}
             case ApplyDecision.Stale ignored -> {return "SUPERSEDED";}
             case ApplyDecision.Conflict ignored -> throw new IllegalStateException("Snapshot conflict");
         }
         eviction.employee(tenantId,action.employeeId());return "APPLIED";
+    }
+    private OfficeEntity snapshotOffice(UUID tenantId,String code,Map<String,OfficeEntity> resolved){
+        var office=resolved.get(code);
+        if(office==null){
+            // A configured ownership change can retain the current office rather than the
+            // submitted code. Resolve that uncommon case with the same uncached plain read.
+            office=offices.findByTenantIdAndCode(tenantId,code).orElseThrow(()->rejected("UNKNOWN_OFFICE"));
+            offices.refreshPlain(tenantId,office);resolved.put(code,office);
+        }
+        if(!tenantId.equals(office.getTenantId()))throw new IllegalArgumentException("Office tenant mismatch");
+        if(!office.isActive())throw rejected("INACTIVE_OFFICE");return office;
     }
 }
