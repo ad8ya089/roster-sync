@@ -1,0 +1,1050 @@
+{
+  "info": {
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "description": "Manual companion to scripts/demo.sh. Set demoPassword from .env. Token: acme.hr starts a new unique demo ID. Uploads require saving an export, choosing the file and setting asOf. Wait for active runs; reject only AWAITING_APPROVAL. HALT/approval/retry requests are deliberate manual actions; do not run the entire collection unattended.",
+    "name": "HR Roster Sync"
+  },
+  "event": [
+    {
+      "listen": "prerequest",
+      "script": {
+        "exec": [
+          "if(pm.info.requestName===\"Token: acme.hr\"){const id=Date.now().toString();pm.environment.set(\"runId\",id);pm.environment.set(\"employeeId\",\"DEMO_\"+id+\"_EMP\");}",
+          "if(pm.info.requestName.startsWith(\"7 Export\")||pm.info.requestName.startsWith(\"8 Export\")){pm.environment.set(\"asOf\",new Date().toISOString());}"
+        ],
+        "type": "text/javascript"
+      }
+    }
+  ],
+  "item": [
+    {
+      "item": [
+        {
+          "name": "Token: acme.hr",
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/api/v1/auth/token",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\"username\":\"acme.hr\",\"password\":\"{{demoPassword}}\"}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Token issued\", () => pm.response.to.have.status(200));",
+                  "pm.environment.set(\"hrToken\",pm.response.json().accessToken);"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "Token: acme.admin",
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/api/v1/auth/token",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\"username\":\"acme.admin\",\"password\":\"{{demoPassword}}\"}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Token issued\", () => pm.response.to.have.status(200));",
+                  "pm.environment.set(\"adminToken\",pm.response.json().accessToken);"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "Token: acme.operator",
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/api/v1/auth/token",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\"username\":\"acme.operator\",\"password\":\"{{demoPassword}}\"}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Token issued\", () => pm.response.to.have.status(200));",
+                  "pm.environment.set(\"opsToken\",pm.response.json().accessToken);"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "Token: E1001",
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/api/v1/auth/token",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\"username\":\"E1001\",\"password\":\"{{demoPassword}}\"}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Token issued\", () => pm.response.to.have.status(200));",
+                  "pm.environment.set(\"employeeToken\",pm.response.json().accessToken);"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "Token: globex.admin",
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/api/v1/auth/token",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\"username\":\"globex.admin\",\"password\":\"{{demoPassword}}\"}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Token issued\", () => pm.response.to.have.status(200));",
+                  "pm.environment.set(\"globexToken\",pm.response.json().accessToken);"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "Token: globex.hr",
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/api/v1/auth/token",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\"username\":\"globex.hr\",\"password\":\"{{demoPassword}}\"}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Token issued\", () => pm.response.to.have.status(200));",
+                  "pm.environment.set(\"globexHrToken\",pm.response.json().accessToken);"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "Token: globex.operator",
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/api/v1/auth/token",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\"username\":\"globex.operator\",\"password\":\"{{demoPassword}}\"}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Token issued\", () => pm.response.to.have.status(200));",
+                  "pm.environment.set(\"globexOpsToken\",pm.response.json().accessToken);"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        }
+      ],
+      "name": "Tokens"
+    },
+    {
+      "item": [
+        {
+          "name": "2 Create employee v5",
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/api/v1/hr/events",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{hrToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\r\n  \"events\": [\r\n    {\r\n      \"type\": \"CREATE\",\r\n      \"version\": 5,\r\n      \"email\": \"demo@example.test\",\r\n      \"officeCode\": \"BLR-1\",\r\n      \"shiftCode\": \"S1\",\r\n      \"phone\": \"+919800000101\",\r\n      \"status\": \"ACTIVE\",\r\n      \"managerId\": \"E1001\",\r\n      \"name\": \"Demo User\",\r\n      \"employeeId\": \"{{employeeId}}\"\r\n    }\r\n  ]\r\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "3 Update v7",
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/api/v1/hr/events",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{hrToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\r\n  \"events\": [\r\n    {\r\n      \"type\": \"UPDATE\",\r\n      \"version\": 7,\r\n      \"email\": \"demo@example.test\",\r\n      \"officeCode\": \"BLR-2\",\r\n      \"shiftCode\": \"S1\",\r\n      \"phone\": \"+919800000101\",\r\n      \"status\": \"ACTIVE\",\r\n      \"managerId\": \"E1001\",\r\n      \"name\": \"Demo User\",\r\n      \"employeeId\": \"{{employeeId}}\"\r\n    }\r\n  ]\r\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "3 Late v6 is stale",
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/api/v1/hr/events",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{hrToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\r\n  \"events\": [\r\n    {\r\n      \"type\": \"UPDATE\",\r\n      \"version\": 6,\r\n      \"email\": \"demo@example.test\",\r\n      \"officeCode\": \"BLR-1\",\r\n      \"shiftCode\": \"S3\",\r\n      \"phone\": \"+919800000101\",\r\n      \"status\": \"ACTIVE\",\r\n      \"managerId\": \"E1001\",\r\n      \"name\": \"Demo User\",\r\n      \"employeeId\": \"{{employeeId}}\"\r\n    }\r\n  ]\r\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Employee view",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/api/v1/employees/{{employeeId}}",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{adminToken}}"
+              }
+            ]
+          },
+          "response": []
+        },
+        {
+          "name": "Receipt history",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/api/v1/employees/{{employeeId}}/events",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{adminToken}}"
+              }
+            ]
+          },
+          "response": []
+        },
+        {
+          "name": "4 Mixed feed",
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/api/v1/hr/events",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{hrToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\r\n  \"events\": [\r\n    {\r\n      \"eventId\": \"feed-1-1\",\r\n      \"type\": \"CREATE\",\r\n      \"employeeId\": \"D{{runId}}_F0001\",\r\n      \"version\": 1,\r\n      \"name\": \"Fixture Employee 1\",\r\n      \"email\": \"f0001@example.test\",\r\n      \"phone\": \"+919800000001\",\r\n      \"officeCode\": \"BLR-1\",\r\n      \"shiftCode\": \"S1\",\r\n      \"status\": \"ACTIVE\"\r\n    },\r\n    {\r\n      \"eventId\": \"feed-2-1\",\r\n      \"type\": \"CREATE\",\r\n      \"employeeId\": \"D{{runId}}_F0002\",\r\n      \"version\": 1,\r\n      \"name\": \"Fixture Employee 2\",\r\n      \"email\": \"f0002@example.test\",\r\n      \"phone\": \"+919800000001\",\r\n      \"officeCode\": \"BLR-1\",\r\n      \"shiftCode\": \"S1\",\r\n      \"status\": \"ACTIVE\"\r\n    },\r\n    {\r\n      \"eventId\": \"feed-3-1\",\r\n      \"type\": \"CREATE\",\r\n      \"employeeId\": \"D{{runId}}_F0003\",\r\n      \"version\": 1,\r\n      \"name\": \"Fixture Employee 3\",\r\n      \"email\": \"f0003@example.test\",\r\n      \"phone\": \"+919800000001\",\r\n      \"officeCode\": \"BLR-1\",\r\n      \"shiftCode\": \"S1\",\r\n      \"status\": \"ACTIVE\"\r\n    },\r\n    {\r\n      \"eventId\": \"feed-4-1\",\r\n      \"type\": \"CREATE\",\r\n      \"employeeId\": \"D{{runId}}_F0004\",\r\n      \"version\": 1,\r\n      \"name\": \"Fixture Employee 4\",\r\n      \"email\": \"f0004@example.test\",\r\n      \"phone\": \"+919800000001\",\r\n      \"officeCode\": \"BLR-1\",\r\n      \"shiftCode\": \"S1\",\r\n      \"status\": \"ACTIVE\"\r\n    },\r\n    {\r\n      \"eventId\": \"feed-5-1\",\r\n      \"type\": \"CREATE\",\r\n      \"employeeId\": \"D{{runId}}_F0005\",\r\n      \"version\": 1,\r\n      \"name\": \"Fixture Employee 5\",\r\n      \"email\": \"f0005@example.test\",\r\n      \"phone\": \"+919800000001\",\r\n      \"officeCode\": \"BLR-1\",\r\n      \"shiftCode\": \"S1\",\r\n      \"status\": \"ACTIVE\"\r\n    },\r\n    {\r\n      \"eventId\": \"feed-6-1\",\r\n      \"type\": \"CREATE\",\r\n      \"employeeId\": \"D{{runId}}_F0006\",\r\n      \"version\": 1,\r\n      \"name\": \"Fixture Employee 6\",\r\n      \"email\": \"f0006@example.test\",\r\n      \"phone\": \"+919800000001\",\r\n      \"officeCode\": \"BLR-1\",\r\n      \"shiftCode\": \"S1\",\r\n      \"status\": \"ACTIVE\"\r\n    },\r\n    {\r\n      \"eventId\": \"feed-7-1\",\r\n      \"type\": \"CREATE\",\r\n      \"employeeId\": \"D{{runId}}_F0007\",\r\n      \"version\": 1,\r\n      \"name\": \"Fixture Employee 7\",\r\n      \"email\": \"f0007@example.test\",\r\n      \"phone\": \"+919800000001\",\r\n      \"officeCode\": \"BLR-1\",\r\n      \"shiftCode\": \"S1\",\r\n      \"status\": \"ACTIVE\"\r\n    },\r\n    {\r\n      \"eventId\": \"feed-8-1\",\r\n      \"type\": \"CREATE\",\r\n      \"employeeId\": \"D{{runId}}_F0008\",\r\n      \"version\": 1,\r\n      \"name\": \"Fixture Employee 8\",\r\n      \"email\": \"f0008@example.test\",\r\n      \"phone\": \"+919800000001\",\r\n      \"officeCode\": \"BLR-1\",\r\n      \"shiftCode\": \"S1\",\r\n      \"status\": \"ACTIVE\"\r\n    },\r\n    {\r\n      \"eventId\": \"feed-9-1\",\r\n      \"type\": \"CREATE\",\r\n      \"employeeId\": \"D{{runId}}_F0009\",\r\n      \"version\": 1,\r\n      \"name\": \"Fixture Employee 9\",\r\n      \"email\": \"f0009@example.test\",\r\n      \"phone\": \"+919800000001\",\r\n      \"officeCode\": \"BLR-1\",\r\n      \"shiftCode\": \"S1\",\r\n      \"status\": \"ACTIVE\"\r\n    },\r\n    {\r\n      \"eventId\": \"feed-10-1\",\r\n      \"type\": \"CREATE\",\r\n      \"employeeId\": \"D{{runId}}_F0010\",\r\n      \"version\": 1,\r\n      \"name\": \"Fixture Employee 10\",\r\n      \"email\": \"f0010@example.test\",\r\n      \"phone\": \"+919800000001\",\r\n      \"officeCode\": \"BLR-1\",\r\n      \"shiftCode\": \"S1\",\r\n      \"status\": \"ACTIVE\"\r\n    },\r\n    {\r\n      \"eventId\": \"feed-4-2\",\r\n      \"type\": \"UPDATE\",\r\n      \"employeeId\": \"D{{runId}}_F0004\",\r\n      \"version\": 2,\r\n      \"name\": \"Fixture Employee 4\",\r\n      \"email\": \"f0004@example.test\",\r\n      \"phone\": \"+919800000001\",\r\n      \"officeCode\": \"BLR-1\",\r\n      \"shiftCode\": \"S2\",\r\n      \"status\": \"ACTIVE\"\r\n    },\r\n    {\r\n      \"eventId\": \"feed-5-2\",\r\n      \"type\": \"UPDATE\",\r\n      \"employeeId\": \"D{{runId}}_F0005\",\r\n      \"version\": 2,\r\n      \"name\": \"Fixture Employee 5\",\r\n      \"email\": \"f0005@example.test\",\r\n      \"phone\": \"+919800000001\",\r\n      \"officeCode\": \"BLR-1\",\r\n      \"shiftCode\": \"S2\",\r\n      \"status\": \"ACTIVE\"\r\n    },\r\n    {\r\n      \"eventId\": \"feed-6-2\",\r\n      \"type\": \"UPDATE\",\r\n      \"employeeId\": \"D{{runId}}_F0006\",\r\n      \"version\": 2,\r\n      \"name\": \"Fixture Employee 6\",\r\n      \"email\": \"f0006@example.test\",\r\n      \"phone\": \"+919800000001\",\r\n      \"officeCode\": \"BLR-1\",\r\n      \"shiftCode\": \"S2\",\r\n      \"status\": \"ACTIVE\"\r\n    },\r\n    {\r\n      \"eventId\": \"feed-7-2\",\r\n      \"type\": \"UPDATE\",\r\n      \"employeeId\": \"D{{runId}}_F0007\",\r\n      \"version\": 2,\r\n      \"name\": \"Fixture Employee 7\",\r\n      \"email\": \"f0007@example.test\",\r\n      \"phone\": \"+919800000001\",\r\n      \"officeCode\": \"BLR-1\",\r\n      \"shiftCode\": \"S2\",\r\n      \"status\": \"ACTIVE\"\r\n    },\r\n    {\r\n      \"eventId\": \"feed-8-2\",\r\n      \"type\": \"UPDATE\",\r\n      \"employeeId\": \"D{{runId}}_F0008\",\r\n      \"version\": 2,\r\n      \"name\": \"Fixture Employee 8\",\r\n      \"email\": \"f0008@example.test\",\r\n      \"phone\": \"+919800000001\",\r\n      \"officeCode\": \"BLR-1\",\r\n      \"shiftCode\": \"S2\",\r\n      \"status\": \"ACTIVE\"\r\n    },\r\n    {\r\n      \"eventId\": \"feed-9-2\",\r\n      \"type\": \"UPDATE\",\r\n      \"employeeId\": \"D{{runId}}_F0009\",\r\n      \"version\": 2,\r\n      \"name\": \"Fixture Employee 9\",\r\n      \"email\": \"f0009@example.test\",\r\n      \"phone\": \"+919800000001\",\r\n      \"officeCode\": \"BLR-1\",\r\n      \"shiftCode\": \"S2\",\r\n      \"status\": \"ACTIVE\"\r\n    },\r\n    {\r\n      \"eventId\": \"feed-10-2\",\r\n      \"type\": \"UPDATE\",\r\n      \"employeeId\": \"D{{runId}}_F0010\",\r\n      \"version\": 2,\r\n      \"name\": \"Fixture Employee 10\",\r\n      \"email\": \"f0010@example.test\",\r\n      \"phone\": \"+919800000001\",\r\n      \"officeCode\": \"BLR-1\",\r\n      \"shiftCode\": \"S2\",\r\n      \"status\": \"ACTIVE\"\r\n    },\r\n    {\r\n      \"eventId\": \"feed-1-3\",\r\n      \"type\": \"DEACTIVATE\",\r\n      \"employeeId\": \"D{{runId}}_F0001\",\r\n      \"version\": 3\r\n    },\r\n    {\r\n      \"eventId\": \"feed-2-3\",\r\n      \"type\": \"DEACTIVATE\",\r\n      \"employeeId\": \"D{{runId}}_F0002\",\r\n      \"version\": 3\r\n    },\r\n    {\r\n      \"eventId\": \"feed-3-3\",\r\n      \"type\": \"DEACTIVATE\",\r\n      \"employeeId\": \"D{{runId}}_F0003\",\r\n      \"version\": 3\r\n    },\r\n    {\r\n      \"eventId\": \"feed-4-3\",\r\n      \"type\": \"DEACTIVATE\",\r\n      \"employeeId\": \"D{{runId}}_F0004\",\r\n      \"version\": 3\r\n    },\r\n    {\r\n      \"eventId\": \"feed-5-3\",\r\n      \"type\": \"DEACTIVATE\",\r\n      \"employeeId\": \"D{{runId}}_F0005\",\r\n      \"version\": 3\r\n    },\r\n    {\r\n      \"eventId\": \"feed-6-3\",\r\n      \"type\": \"DEACTIVATE\",\r\n      \"employeeId\": \"D{{runId}}_F0006\",\r\n      \"version\": 3\r\n    },\r\n    {\r\n      \"eventId\": \"feed-7-3\",\r\n      \"type\": \"DEACTIVATE\",\r\n      \"employeeId\": \"D{{runId}}_F0007\",\r\n      \"version\": 3\r\n    },\r\n    {\r\n      \"eventId\": \"feed-8-3\",\r\n      \"type\": \"DEACTIVATE\",\r\n      \"employeeId\": \"D{{runId}}_F0008\",\r\n      \"version\": 3\r\n    },\r\n    {\r\n      \"eventId\": \"feed-9-3\",\r\n      \"type\": \"DEACTIVATE\",\r\n      \"employeeId\": \"D{{runId}}_F0009\",\r\n      \"version\": 3\r\n    },\r\n    {\r\n      \"eventId\": \"feed-10-3\",\r\n      \"type\": \"DEACTIVATE\",\r\n      \"employeeId\": \"D{{runId}}_F0010\",\r\n      \"version\": 3\r\n    },\r\n    {\r\n      \"eventId\": \"feed-1-4\",\r\n      \"type\": \"UPDATE\",\r\n      \"employeeId\": \"D{{runId}}_F0001\",\r\n      \"version\": 4,\r\n      \"name\": \"Fixture Employee 1\",\r\n      \"email\": \"f0001@example.test\",\r\n      \"phone\": \"+919800000001\",\r\n      \"officeCode\": \"BLR-1\",\r\n      \"shiftCode\": \"S2\",\r\n      \"status\": \"ACTIVE\"\r\n    },\r\n    {\r\n      \"eventId\": \"feed-2-4\",\r\n      \"type\": \"UPDATE\",\r\n      \"employeeId\": \"D{{runId}}_F0002\",\r\n      \"version\": 4,\r\n      \"name\": \"Fixture Employee 2\",\r\n      \"email\": \"f0002@example.test\",\r\n      \"phone\": \"+919800000001\",\r\n      \"officeCode\": \"BLR-1\",\r\n      \"shiftCode\": \"S2\",\r\n      \"status\": \"ACTIVE\"\r\n    },\r\n    {\r\n      \"eventId\": \"feed-3-4\",\r\n      \"type\": \"UPDATE\",\r\n      \"employeeId\": \"D{{runId}}_F0003\",\r\n      \"version\": 4,\r\n      \"name\": \"Fixture Employee 3\",\r\n      \"email\": \"f0003@example.test\",\r\n      \"phone\": \"+919800000001\",\r\n      \"officeCode\": \"BLR-1\",\r\n      \"shiftCode\": \"S2\",\r\n      \"status\": \"ACTIVE\"\r\n    },\r\n    {\r\n      \"eventId\": \"feed-4-4\",\r\n      \"type\": \"UPDATE\",\r\n      \"employeeId\": \"D{{runId}}_F0004\",\r\n      \"version\": 4,\r\n      \"name\": \"Fixture Employee 4\",\r\n      \"email\": \"f0004@example.test\",\r\n      \"phone\": \"+919800000001\",\r\n      \"officeCode\": \"BLR-1\",\r\n      \"shiftCode\": \"S2\",\r\n      \"status\": \"ACTIVE\"\r\n    },\r\n    {\r\n      \"eventId\": \"feed-5-4\",\r\n      \"type\": \"UPDATE\",\r\n      \"employeeId\": \"D{{runId}}_F0005\",\r\n      \"version\": 4,\r\n      \"name\": \"Fixture Employee 5\",\r\n      \"email\": \"f0005@example.test\",\r\n      \"phone\": \"+919800000001\",\r\n      \"officeCode\": \"BLR-1\",\r\n      \"shiftCode\": \"S2\",\r\n      \"status\": \"ACTIVE\"\r\n    },\r\n    {\r\n      \"eventId\": \"feed-6-4\",\r\n      \"type\": \"UPDATE\",\r\n      \"employeeId\": \"D{{runId}}_F0006\",\r\n      \"version\": 4,\r\n      \"name\": \"Fixture Employee 6\",\r\n      \"email\": \"f0006@example.test\",\r\n      \"phone\": \"+919800000001\",\r\n      \"officeCode\": \"BLR-1\",\r\n      \"shiftCode\": \"S2\",\r\n      \"status\": \"ACTIVE\"\r\n    },\r\n    {\r\n      \"eventId\": \"feed-7-4\",\r\n      \"type\": \"UPDATE\",\r\n      \"employeeId\": \"D{{runId}}_F0007\",\r\n      \"version\": 4,\r\n      \"name\": \"Fixture Employee 7\",\r\n      \"email\": \"f0007@example.test\",\r\n      \"phone\": \"+919800000001\",\r\n      \"officeCode\": \"BLR-1\",\r\n      \"shiftCode\": \"S2\",\r\n      \"status\": \"ACTIVE\"\r\n    },\r\n    {\r\n      \"eventId\": \"feed-1-5\",\r\n      \"type\": \"UPDATE\",\r\n      \"employeeId\": \"D{{runId}}_F0001\",\r\n      \"version\": 5,\r\n      \"name\": \"Fixture Employee 1\",\r\n      \"email\": \"f0001@example.test\",\r\n      \"phone\": \"+919800000001\",\r\n      \"officeCode\": \"BLR-2\",\r\n      \"shiftCode\": \"S3\",\r\n      \"status\": \"ACTIVE\"\r\n    },\r\n    {\r\n      \"eventId\": \"feed-2-5\",\r\n      \"type\": \"UPDATE\",\r\n      \"employeeId\": \"D{{runId}}_F0002\",\r\n      \"version\": 5,\r\n      \"name\": \"Fixture Employee 2\",\r\n      \"email\": \"f0002@example.test\",\r\n      \"phone\": \"+919800000001\",\r\n      \"officeCode\": \"BLR-2\",\r\n      \"shiftCode\": \"S3\",\r\n      \"status\": \"ACTIVE\"\r\n    },\r\n    {\r\n      \"eventId\": \"feed-3-5\",\r\n      \"type\": \"UPDATE\",\r\n      \"employeeId\": \"D{{runId}}_F0003\",\r\n      \"version\": 5,\r\n      \"name\": \"Fixture Employee 3\",\r\n      \"email\": \"f0003@example.test\",\r\n      \"phone\": \"+919800000001\",\r\n      \"officeCode\": \"BLR-2\",\r\n      \"shiftCode\": \"S3\",\r\n      \"status\": \"ACTIVE\"\r\n    },\r\n    {\r\n      \"eventId\": \"feed-4-5\",\r\n      \"type\": \"UPDATE\",\r\n      \"employeeId\": \"D{{runId}}_F0004\",\r\n      \"version\": 5,\r\n      \"name\": \"Fixture Employee 4\",\r\n      \"email\": \"f0004@example.test\",\r\n      \"phone\": \"+919800000001\",\r\n      \"officeCode\": \"BLR-2\",\r\n      \"shiftCode\": \"S3\",\r\n      \"status\": \"ACTIVE\"\r\n    },\r\n    {\r\n      \"eventId\": \"feed-5-5\",\r\n      \"type\": \"UPDATE\",\r\n      \"employeeId\": \"D{{runId}}_F0005\",\r\n      \"version\": 5,\r\n      \"name\": \"Fixture Employee 5\",\r\n      \"email\": \"f0005@example.test\",\r\n      \"phone\": \"+919800000001\",\r\n      \"officeCode\": \"BLR-2\",\r\n      \"shiftCode\": \"S3\",\r\n      \"status\": \"ACTIVE\"\r\n    },\r\n    {\r\n      \"eventId\": \"feed-6-5\",\r\n      \"type\": \"UPDATE\",\r\n      \"employeeId\": \"D{{runId}}_F0006\",\r\n      \"version\": 5,\r\n      \"name\": \"Fixture Employee 6\",\r\n      \"email\": \"f0006@example.test\",\r\n      \"phone\": \"+919800000001\",\r\n      \"officeCode\": \"BLR-2\",\r\n      \"shiftCode\": \"S3\",\r\n      \"status\": \"ACTIVE\"\r\n    },\r\n    {\r\n      \"eventId\": \"feed-7-5\",\r\n      \"type\": \"UPDATE\",\r\n      \"employeeId\": \"D{{runId}}_F0007\",\r\n      \"version\": 5,\r\n      \"name\": \"Fixture Employee 7\",\r\n      \"email\": \"f0007@example.test\",\r\n      \"phone\": \"+919800000001\",\r\n      \"officeCode\": \"BLR-2\",\r\n      \"shiftCode\": \"S3\",\r\n      \"status\": \"ACTIVE\"\r\n    },\r\n    {\r\n      \"eventId\": \"feed-8-5\",\r\n      \"type\": \"UPDATE\",\r\n      \"employeeId\": \"D{{runId}}_F0008\",\r\n      \"version\": 5,\r\n      \"name\": \"Fixture Employee 8\",\r\n      \"email\": \"f0008@example.test\",\r\n      \"phone\": \"+919800000001\",\r\n      \"officeCode\": \"BLR-2\",\r\n      \"shiftCode\": \"S3\",\r\n      \"status\": \"ACTIVE\"\r\n    },\r\n    {\r\n      \"eventId\": \"feed-9-5\",\r\n      \"type\": \"UPDATE\",\r\n      \"employeeId\": \"D{{runId}}_F0009\",\r\n      \"version\": 5,\r\n      \"name\": \"Fixture Employee 9\",\r\n      \"email\": \"f0009@example.test\",\r\n      \"phone\": \"+919800000001\",\r\n      \"officeCode\": \"BLR-2\",\r\n      \"shiftCode\": \"S3\",\r\n      \"status\": \"ACTIVE\"\r\n    },\r\n    {\r\n      \"eventId\": \"feed-10-5\",\r\n      \"type\": \"UPDATE\",\r\n      \"employeeId\": \"D{{runId}}_F0010\",\r\n      \"version\": 5,\r\n      \"name\": \"Fixture Employee 10\",\r\n      \"email\": \"f0010@example.test\",\r\n      \"phone\": \"+919800000001\",\r\n      \"officeCode\": \"BLR-2\",\r\n      \"shiftCode\": \"S3\",\r\n      \"status\": \"ACTIVE\"\r\n    },\r\n    {\r\n      \"eventId\": \"feed-1-2\",\r\n      \"type\": \"UPDATE\",\r\n      \"employeeId\": \"D{{runId}}_F0001\",\r\n      \"version\": 2,\r\n      \"name\": \"Fixture Employee 1\",\r\n      \"email\": \"f0001@example.test\",\r\n      \"phone\": \"+919800000001\",\r\n      \"officeCode\": \"BLR-1\",\r\n      \"shiftCode\": \"S2\",\r\n      \"status\": \"ACTIVE\"\r\n    },\r\n    {\r\n      \"eventId\": \"feed-2-2\",\r\n      \"type\": \"UPDATE\",\r\n      \"employeeId\": \"D{{runId}}_F0002\",\r\n      \"version\": 2,\r\n      \"name\": \"Fixture Employee 2\",\r\n      \"email\": \"f0002@example.test\",\r\n      \"phone\": \"+919800000001\",\r\n      \"officeCode\": \"BLR-1\",\r\n      \"shiftCode\": \"S2\",\r\n      \"status\": \"ACTIVE\"\r\n    },\r\n    {\r\n      \"eventId\": \"feed-3-2\",\r\n      \"type\": \"UPDATE\",\r\n      \"employeeId\": \"D{{runId}}_F0003\",\r\n      \"version\": 2,\r\n      \"name\": \"Fixture Employee 3\",\r\n      \"email\": \"f0003@example.test\",\r\n      \"phone\": \"+919800000001\",\r\n      \"officeCode\": \"BLR-1\",\r\n      \"shiftCode\": \"S2\",\r\n      \"status\": \"ACTIVE\"\r\n    },\r\n    {\r\n      \"eventId\": \"feed-1-1\",\r\n      \"type\": \"CREATE\",\r\n      \"employeeId\": \"D{{runId}}_F0001\",\r\n      \"version\": 1,\r\n      \"name\": \"Fixture Employee 1\",\r\n      \"email\": \"f0001@example.test\",\r\n      \"phone\": \"+919800000001\",\r\n      \"officeCode\": \"BLR-1\",\r\n      \"shiftCode\": \"S1\",\r\n      \"status\": \"ACTIVE\"\r\n    },\r\n    {\r\n      \"eventId\": \"feed-2-1\",\r\n      \"type\": \"CREATE\",\r\n      \"employeeId\": \"D{{runId}}_F0002\",\r\n      \"version\": 1,\r\n      \"name\": \"Fixture Employee 2\",\r\n      \"email\": \"f0002@example.test\",\r\n      \"phone\": \"+919800000001\",\r\n      \"officeCode\": \"BLR-1\",\r\n      \"shiftCode\": \"S1\",\r\n      \"status\": \"ACTIVE\"\r\n    },\r\n    {\r\n      \"eventId\": \"feed-3-1\",\r\n      \"type\": \"CREATE\",\r\n      \"employeeId\": \"D{{runId}}_F0003\",\r\n      \"version\": 1,\r\n      \"name\": \"Fixture Employee 3\",\r\n      \"email\": \"f0003@example.test\",\r\n      \"phone\": \"+919800000001\",\r\n      \"officeCode\": \"BLR-1\",\r\n      \"shiftCode\": \"S1\",\r\n      \"status\": \"ACTIVE\"\r\n    }\r\n  ]\r\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "4 Replay feed",
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/api/v1/hr/events",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{hrToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\r\n  \"events\": [\r\n    {\r\n      \"eventId\": \"feed-1-1\",\r\n      \"type\": \"CREATE\",\r\n      \"employeeId\": \"D{{runId}}_F0001\",\r\n      \"version\": 1,\r\n      \"name\": \"Fixture Employee 1\",\r\n      \"email\": \"f0001@example.test\",\r\n      \"phone\": \"+919800000001\",\r\n      \"officeCode\": \"BLR-1\",\r\n      \"shiftCode\": \"S1\",\r\n      \"status\": \"ACTIVE\"\r\n    },\r\n    {\r\n      \"eventId\": \"feed-2-1\",\r\n      \"type\": \"CREATE\",\r\n      \"employeeId\": \"D{{runId}}_F0002\",\r\n      \"version\": 1,\r\n      \"name\": \"Fixture Employee 2\",\r\n      \"email\": \"f0002@example.test\",\r\n      \"phone\": \"+919800000001\",\r\n      \"officeCode\": \"BLR-1\",\r\n      \"shiftCode\": \"S1\",\r\n      \"status\": \"ACTIVE\"\r\n    },\r\n    {\r\n      \"eventId\": \"feed-3-1\",\r\n      \"type\": \"CREATE\",\r\n      \"employeeId\": \"D{{runId}}_F0003\",\r\n      \"version\": 1,\r\n      \"name\": \"Fixture Employee 3\",\r\n      \"email\": \"f0003@example.test\",\r\n      \"phone\": \"+919800000001\",\r\n      \"officeCode\": \"BLR-1\",\r\n      \"shiftCode\": \"S1\",\r\n      \"status\": \"ACTIVE\"\r\n    },\r\n    {\r\n      \"eventId\": \"feed-4-1\",\r\n      \"type\": \"CREATE\",\r\n      \"employeeId\": \"D{{runId}}_F0004\",\r\n      \"version\": 1,\r\n      \"name\": \"Fixture Employee 4\",\r\n      \"email\": \"f0004@example.test\",\r\n      \"phone\": \"+919800000001\",\r\n      \"officeCode\": \"BLR-1\",\r\n      \"shiftCode\": \"S1\",\r\n      \"status\": \"ACTIVE\"\r\n    },\r\n    {\r\n      \"eventId\": \"feed-5-1\",\r\n      \"type\": \"CREATE\",\r\n      \"employeeId\": \"D{{runId}}_F0005\",\r\n      \"version\": 1,\r\n      \"name\": \"Fixture Employee 5\",\r\n      \"email\": \"f0005@example.test\",\r\n      \"phone\": \"+919800000001\",\r\n      \"officeCode\": \"BLR-1\",\r\n      \"shiftCode\": \"S1\",\r\n      \"status\": \"ACTIVE\"\r\n    },\r\n    {\r\n      \"eventId\": \"feed-6-1\",\r\n      \"type\": \"CREATE\",\r\n      \"employeeId\": \"D{{runId}}_F0006\",\r\n      \"version\": 1,\r\n      \"name\": \"Fixture Employee 6\",\r\n      \"email\": \"f0006@example.test\",\r\n      \"phone\": \"+919800000001\",\r\n      \"officeCode\": \"BLR-1\",\r\n      \"shiftCode\": \"S1\",\r\n      \"status\": \"ACTIVE\"\r\n    },\r\n    {\r\n      \"eventId\": \"feed-7-1\",\r\n      \"type\": \"CREATE\",\r\n      \"employeeId\": \"D{{runId}}_F0007\",\r\n      \"version\": 1,\r\n      \"name\": \"Fixture Employee 7\",\r\n      \"email\": \"f0007@example.test\",\r\n      \"phone\": \"+919800000001\",\r\n      \"officeCode\": \"BLR-1\",\r\n      \"shiftCode\": \"S1\",\r\n      \"status\": \"ACTIVE\"\r\n    },\r\n    {\r\n      \"eventId\": \"feed-8-1\",\r\n      \"type\": \"CREATE\",\r\n      \"employeeId\": \"D{{runId}}_F0008\",\r\n      \"version\": 1,\r\n      \"name\": \"Fixture Employee 8\",\r\n      \"email\": \"f0008@example.test\",\r\n      \"phone\": \"+919800000001\",\r\n      \"officeCode\": \"BLR-1\",\r\n      \"shiftCode\": \"S1\",\r\n      \"status\": \"ACTIVE\"\r\n    },\r\n    {\r\n      \"eventId\": \"feed-9-1\",\r\n      \"type\": \"CREATE\",\r\n      \"employeeId\": \"D{{runId}}_F0009\",\r\n      \"version\": 1,\r\n      \"name\": \"Fixture Employee 9\",\r\n      \"email\": \"f0009@example.test\",\r\n      \"phone\": \"+919800000001\",\r\n      \"officeCode\": \"BLR-1\",\r\n      \"shiftCode\": \"S1\",\r\n      \"status\": \"ACTIVE\"\r\n    },\r\n    {\r\n      \"eventId\": \"feed-10-1\",\r\n      \"type\": \"CREATE\",\r\n      \"employeeId\": \"D{{runId}}_F0010\",\r\n      \"version\": 1,\r\n      \"name\": \"Fixture Employee 10\",\r\n      \"email\": \"f0010@example.test\",\r\n      \"phone\": \"+919800000001\",\r\n      \"officeCode\": \"BLR-1\",\r\n      \"shiftCode\": \"S1\",\r\n      \"status\": \"ACTIVE\"\r\n    },\r\n    {\r\n      \"eventId\": \"feed-4-2\",\r\n      \"type\": \"UPDATE\",\r\n      \"employeeId\": \"D{{runId}}_F0004\",\r\n      \"version\": 2,\r\n      \"name\": \"Fixture Employee 4\",\r\n      \"email\": \"f0004@example.test\",\r\n      \"phone\": \"+919800000001\",\r\n      \"officeCode\": \"BLR-1\",\r\n      \"shiftCode\": \"S2\",\r\n      \"status\": \"ACTIVE\"\r\n    },\r\n    {\r\n      \"eventId\": \"feed-5-2\",\r\n      \"type\": \"UPDATE\",\r\n      \"employeeId\": \"D{{runId}}_F0005\",\r\n      \"version\": 2,\r\n      \"name\": \"Fixture Employee 5\",\r\n      \"email\": \"f0005@example.test\",\r\n      \"phone\": \"+919800000001\",\r\n      \"officeCode\": \"BLR-1\",\r\n      \"shiftCode\": \"S2\",\r\n      \"status\": \"ACTIVE\"\r\n    },\r\n    {\r\n      \"eventId\": \"feed-6-2\",\r\n      \"type\": \"UPDATE\",\r\n      \"employeeId\": \"D{{runId}}_F0006\",\r\n      \"version\": 2,\r\n      \"name\": \"Fixture Employee 6\",\r\n      \"email\": \"f0006@example.test\",\r\n      \"phone\": \"+919800000001\",\r\n      \"officeCode\": \"BLR-1\",\r\n      \"shiftCode\": \"S2\",\r\n      \"status\": \"ACTIVE\"\r\n    },\r\n    {\r\n      \"eventId\": \"feed-7-2\",\r\n      \"type\": \"UPDATE\",\r\n      \"employeeId\": \"D{{runId}}_F0007\",\r\n      \"version\": 2,\r\n      \"name\": \"Fixture Employee 7\",\r\n      \"email\": \"f0007@example.test\",\r\n      \"phone\": \"+919800000001\",\r\n      \"officeCode\": \"BLR-1\",\r\n      \"shiftCode\": \"S2\",\r\n      \"status\": \"ACTIVE\"\r\n    },\r\n    {\r\n      \"eventId\": \"feed-8-2\",\r\n      \"type\": \"UPDATE\",\r\n      \"employeeId\": \"D{{runId}}_F0008\",\r\n      \"version\": 2,\r\n      \"name\": \"Fixture Employee 8\",\r\n      \"email\": \"f0008@example.test\",\r\n      \"phone\": \"+919800000001\",\r\n      \"officeCode\": \"BLR-1\",\r\n      \"shiftCode\": \"S2\",\r\n      \"status\": \"ACTIVE\"\r\n    },\r\n    {\r\n      \"eventId\": \"feed-9-2\",\r\n      \"type\": \"UPDATE\",\r\n      \"employeeId\": \"D{{runId}}_F0009\",\r\n      \"version\": 2,\r\n      \"name\": \"Fixture Employee 9\",\r\n      \"email\": \"f0009@example.test\",\r\n      \"phone\": \"+919800000001\",\r\n      \"officeCode\": \"BLR-1\",\r\n      \"shiftCode\": \"S2\",\r\n      \"status\": \"ACTIVE\"\r\n    },\r\n    {\r\n      \"eventId\": \"feed-10-2\",\r\n      \"type\": \"UPDATE\",\r\n      \"employeeId\": \"D{{runId}}_F0010\",\r\n      \"version\": 2,\r\n      \"name\": \"Fixture Employee 10\",\r\n      \"email\": \"f0010@example.test\",\r\n      \"phone\": \"+919800000001\",\r\n      \"officeCode\": \"BLR-1\",\r\n      \"shiftCode\": \"S2\",\r\n      \"status\": \"ACTIVE\"\r\n    },\r\n    {\r\n      \"eventId\": \"feed-1-3\",\r\n      \"type\": \"DEACTIVATE\",\r\n      \"employeeId\": \"D{{runId}}_F0001\",\r\n      \"version\": 3\r\n    },\r\n    {\r\n      \"eventId\": \"feed-2-3\",\r\n      \"type\": \"DEACTIVATE\",\r\n      \"employeeId\": \"D{{runId}}_F0002\",\r\n      \"version\": 3\r\n    },\r\n    {\r\n      \"eventId\": \"feed-3-3\",\r\n      \"type\": \"DEACTIVATE\",\r\n      \"employeeId\": \"D{{runId}}_F0003\",\r\n      \"version\": 3\r\n    },\r\n    {\r\n      \"eventId\": \"feed-4-3\",\r\n      \"type\": \"DEACTIVATE\",\r\n      \"employeeId\": \"D{{runId}}_F0004\",\r\n      \"version\": 3\r\n    },\r\n    {\r\n      \"eventId\": \"feed-5-3\",\r\n      \"type\": \"DEACTIVATE\",\r\n      \"employeeId\": \"D{{runId}}_F0005\",\r\n      \"version\": 3\r\n    },\r\n    {\r\n      \"eventId\": \"feed-6-3\",\r\n      \"type\": \"DEACTIVATE\",\r\n      \"employeeId\": \"D{{runId}}_F0006\",\r\n      \"version\": 3\r\n    },\r\n    {\r\n      \"eventId\": \"feed-7-3\",\r\n      \"type\": \"DEACTIVATE\",\r\n      \"employeeId\": \"D{{runId}}_F0007\",\r\n      \"version\": 3\r\n    },\r\n    {\r\n      \"eventId\": \"feed-8-3\",\r\n      \"type\": \"DEACTIVATE\",\r\n      \"employeeId\": \"D{{runId}}_F0008\",\r\n      \"version\": 3\r\n    },\r\n    {\r\n      \"eventId\": \"feed-9-3\",\r\n      \"type\": \"DEACTIVATE\",\r\n      \"employeeId\": \"D{{runId}}_F0009\",\r\n      \"version\": 3\r\n    },\r\n    {\r\n      \"eventId\": \"feed-10-3\",\r\n      \"type\": \"DEACTIVATE\",\r\n      \"employeeId\": \"D{{runId}}_F0010\",\r\n      \"version\": 3\r\n    },\r\n    {\r\n      \"eventId\": \"feed-1-4\",\r\n      \"type\": \"UPDATE\",\r\n      \"employeeId\": \"D{{runId}}_F0001\",\r\n      \"version\": 4,\r\n      \"name\": \"Fixture Employee 1\",\r\n      \"email\": \"f0001@example.test\",\r\n      \"phone\": \"+919800000001\",\r\n      \"officeCode\": \"BLR-1\",\r\n      \"shiftCode\": \"S2\",\r\n      \"status\": \"ACTIVE\"\r\n    },\r\n    {\r\n      \"eventId\": \"feed-2-4\",\r\n      \"type\": \"UPDATE\",\r\n      \"employeeId\": \"D{{runId}}_F0002\",\r\n      \"version\": 4,\r\n      \"name\": \"Fixture Employee 2\",\r\n      \"email\": \"f0002@example.test\",\r\n      \"phone\": \"+919800000001\",\r\n      \"officeCode\": \"BLR-1\",\r\n      \"shiftCode\": \"S2\",\r\n      \"status\": \"ACTIVE\"\r\n    },\r\n    {\r\n      \"eventId\": \"feed-3-4\",\r\n      \"type\": \"UPDATE\",\r\n      \"employeeId\": \"D{{runId}}_F0003\",\r\n      \"version\": 4,\r\n      \"name\": \"Fixture Employee 3\",\r\n      \"email\": \"f0003@example.test\",\r\n      \"phone\": \"+919800000001\",\r\n      \"officeCode\": \"BLR-1\",\r\n      \"shiftCode\": \"S2\",\r\n      \"status\": \"ACTIVE\"\r\n    },\r\n    {\r\n      \"eventId\": \"feed-4-4\",\r\n      \"type\": \"UPDATE\",\r\n      \"employeeId\": \"D{{runId}}_F0004\",\r\n      \"version\": 4,\r\n      \"name\": \"Fixture Employee 4\",\r\n      \"email\": \"f0004@example.test\",\r\n      \"phone\": \"+919800000001\",\r\n      \"officeCode\": \"BLR-1\",\r\n      \"shiftCode\": \"S2\",\r\n      \"status\": \"ACTIVE\"\r\n    },\r\n    {\r\n      \"eventId\": \"feed-5-4\",\r\n      \"type\": \"UPDATE\",\r\n      \"employeeId\": \"D{{runId}}_F0005\",\r\n      \"version\": 4,\r\n      \"name\": \"Fixture Employee 5\",\r\n      \"email\": \"f0005@example.test\",\r\n      \"phone\": \"+919800000001\",\r\n      \"officeCode\": \"BLR-1\",\r\n      \"shiftCode\": \"S2\",\r\n      \"status\": \"ACTIVE\"\r\n    },\r\n    {\r\n      \"eventId\": \"feed-6-4\",\r\n      \"type\": \"UPDATE\",\r\n      \"employeeId\": \"D{{runId}}_F0006\",\r\n      \"version\": 4,\r\n      \"name\": \"Fixture Employee 6\",\r\n      \"email\": \"f0006@example.test\",\r\n      \"phone\": \"+919800000001\",\r\n      \"officeCode\": \"BLR-1\",\r\n      \"shiftCode\": \"S2\",\r\n      \"status\": \"ACTIVE\"\r\n    },\r\n    {\r\n      \"eventId\": \"feed-7-4\",\r\n      \"type\": \"UPDATE\",\r\n      \"employeeId\": \"D{{runId}}_F0007\",\r\n      \"version\": 4,\r\n      \"name\": \"Fixture Employee 7\",\r\n      \"email\": \"f0007@example.test\",\r\n      \"phone\": \"+919800000001\",\r\n      \"officeCode\": \"BLR-1\",\r\n      \"shiftCode\": \"S2\",\r\n      \"status\": \"ACTIVE\"\r\n    },\r\n    {\r\n      \"eventId\": \"feed-1-5\",\r\n      \"type\": \"UPDATE\",\r\n      \"employeeId\": \"D{{runId}}_F0001\",\r\n      \"version\": 5,\r\n      \"name\": \"Fixture Employee 1\",\r\n      \"email\": \"f0001@example.test\",\r\n      \"phone\": \"+919800000001\",\r\n      \"officeCode\": \"BLR-2\",\r\n      \"shiftCode\": \"S3\",\r\n      \"status\": \"ACTIVE\"\r\n    },\r\n    {\r\n      \"eventId\": \"feed-2-5\",\r\n      \"type\": \"UPDATE\",\r\n      \"employeeId\": \"D{{runId}}_F0002\",\r\n      \"version\": 5,\r\n      \"name\": \"Fixture Employee 2\",\r\n      \"email\": \"f0002@example.test\",\r\n      \"phone\": \"+919800000001\",\r\n      \"officeCode\": \"BLR-2\",\r\n      \"shiftCode\": \"S3\",\r\n      \"status\": \"ACTIVE\"\r\n    },\r\n    {\r\n      \"eventId\": \"feed-3-5\",\r\n      \"type\": \"UPDATE\",\r\n      \"employeeId\": \"D{{runId}}_F0003\",\r\n      \"version\": 5,\r\n      \"name\": \"Fixture Employee 3\",\r\n      \"email\": \"f0003@example.test\",\r\n      \"phone\": \"+919800000001\",\r\n      \"officeCode\": \"BLR-2\",\r\n      \"shiftCode\": \"S3\",\r\n      \"status\": \"ACTIVE\"\r\n    },\r\n    {\r\n      \"eventId\": \"feed-4-5\",\r\n      \"type\": \"UPDATE\",\r\n      \"employeeId\": \"D{{runId}}_F0004\",\r\n      \"version\": 5,\r\n      \"name\": \"Fixture Employee 4\",\r\n      \"email\": \"f0004@example.test\",\r\n      \"phone\": \"+919800000001\",\r\n      \"officeCode\": \"BLR-2\",\r\n      \"shiftCode\": \"S3\",\r\n      \"status\": \"ACTIVE\"\r\n    },\r\n    {\r\n      \"eventId\": \"feed-5-5\",\r\n      \"type\": \"UPDATE\",\r\n      \"employeeId\": \"D{{runId}}_F0005\",\r\n      \"version\": 5,\r\n      \"name\": \"Fixture Employee 5\",\r\n      \"email\": \"f0005@example.test\",\r\n      \"phone\": \"+919800000001\",\r\n      \"officeCode\": \"BLR-2\",\r\n      \"shiftCode\": \"S3\",\r\n      \"status\": \"ACTIVE\"\r\n    },\r\n    {\r\n      \"eventId\": \"feed-6-5\",\r\n      \"type\": \"UPDATE\",\r\n      \"employeeId\": \"D{{runId}}_F0006\",\r\n      \"version\": 5,\r\n      \"name\": \"Fixture Employee 6\",\r\n      \"email\": \"f0006@example.test\",\r\n      \"phone\": \"+919800000001\",\r\n      \"officeCode\": \"BLR-2\",\r\n      \"shiftCode\": \"S3\",\r\n      \"status\": \"ACTIVE\"\r\n    },\r\n    {\r\n      \"eventId\": \"feed-7-5\",\r\n      \"type\": \"UPDATE\",\r\n      \"employeeId\": \"D{{runId}}_F0007\",\r\n      \"version\": 5,\r\n      \"name\": \"Fixture Employee 7\",\r\n      \"email\": \"f0007@example.test\",\r\n      \"phone\": \"+919800000001\",\r\n      \"officeCode\": \"BLR-2\",\r\n      \"shiftCode\": \"S3\",\r\n      \"status\": \"ACTIVE\"\r\n    },\r\n    {\r\n      \"eventId\": \"feed-8-5\",\r\n      \"type\": \"UPDATE\",\r\n      \"employeeId\": \"D{{runId}}_F0008\",\r\n      \"version\": 5,\r\n      \"name\": \"Fixture Employee 8\",\r\n      \"email\": \"f0008@example.test\",\r\n      \"phone\": \"+919800000001\",\r\n      \"officeCode\": \"BLR-2\",\r\n      \"shiftCode\": \"S3\",\r\n      \"status\": \"ACTIVE\"\r\n    },\r\n    {\r\n      \"eventId\": \"feed-9-5\",\r\n      \"type\": \"UPDATE\",\r\n      \"employeeId\": \"D{{runId}}_F0009\",\r\n      \"version\": 5,\r\n      \"name\": \"Fixture Employee 9\",\r\n      \"email\": \"f0009@example.test\",\r\n      \"phone\": \"+919800000001\",\r\n      \"officeCode\": \"BLR-2\",\r\n      \"shiftCode\": \"S3\",\r\n      \"status\": \"ACTIVE\"\r\n    },\r\n    {\r\n      \"eventId\": \"feed-10-5\",\r\n      \"type\": \"UPDATE\",\r\n      \"employeeId\": \"D{{runId}}_F0010\",\r\n      \"version\": 5,\r\n      \"name\": \"Fixture Employee 10\",\r\n      \"email\": \"f0010@example.test\",\r\n      \"phone\": \"+919800000001\",\r\n      \"officeCode\": \"BLR-2\",\r\n      \"shiftCode\": \"S3\",\r\n      \"status\": \"ACTIVE\"\r\n    },\r\n    {\r\n      \"eventId\": \"feed-1-2\",\r\n      \"type\": \"UPDATE\",\r\n      \"employeeId\": \"D{{runId}}_F0001\",\r\n      \"version\": 2,\r\n      \"name\": \"Fixture Employee 1\",\r\n      \"email\": \"f0001@example.test\",\r\n      \"phone\": \"+919800000001\",\r\n      \"officeCode\": \"BLR-1\",\r\n      \"shiftCode\": \"S2\",\r\n      \"status\": \"ACTIVE\"\r\n    },\r\n    {\r\n      \"eventId\": \"feed-2-2\",\r\n      \"type\": \"UPDATE\",\r\n      \"employeeId\": \"D{{runId}}_F0002\",\r\n      \"version\": 2,\r\n      \"name\": \"Fixture Employee 2\",\r\n      \"email\": \"f0002@example.test\",\r\n      \"phone\": \"+919800000001\",\r\n      \"officeCode\": \"BLR-1\",\r\n      \"shiftCode\": \"S2\",\r\n      \"status\": \"ACTIVE\"\r\n    },\r\n    {\r\n      \"eventId\": \"feed-3-2\",\r\n      \"type\": \"UPDATE\",\r\n      \"employeeId\": \"D{{runId}}_F0003\",\r\n      \"version\": 2,\r\n      \"name\": \"Fixture Employee 3\",\r\n      \"email\": \"f0003@example.test\",\r\n      \"phone\": \"+919800000001\",\r\n      \"officeCode\": \"BLR-1\",\r\n      \"shiftCode\": \"S2\",\r\n      \"status\": \"ACTIVE\"\r\n    },\r\n    {\r\n      \"eventId\": \"feed-1-1\",\r\n      \"type\": \"CREATE\",\r\n      \"employeeId\": \"D{{runId}}_F0001\",\r\n      \"version\": 1,\r\n      \"name\": \"Fixture Employee 1\",\r\n      \"email\": \"f0001@example.test\",\r\n      \"phone\": \"+919800000001\",\r\n      \"officeCode\": \"BLR-1\",\r\n      \"shiftCode\": \"S1\",\r\n      \"status\": \"ACTIVE\"\r\n    },\r\n    {\r\n      \"eventId\": \"feed-2-1\",\r\n      \"type\": \"CREATE\",\r\n      \"employeeId\": \"D{{runId}}_F0002\",\r\n      \"version\": 1,\r\n      \"name\": \"Fixture Employee 2\",\r\n      \"email\": \"f0002@example.test\",\r\n      \"phone\": \"+919800000001\",\r\n      \"officeCode\": \"BLR-1\",\r\n      \"shiftCode\": \"S1\",\r\n      \"status\": \"ACTIVE\"\r\n    },\r\n    {\r\n      \"eventId\": \"feed-3-1\",\r\n      \"type\": \"CREATE\",\r\n      \"employeeId\": \"D{{runId}}_F0003\",\r\n      \"version\": 1,\r\n      \"name\": \"Fixture Employee 3\",\r\n      \"email\": \"f0003@example.test\",\r\n      \"phone\": \"+919800000001\",\r\n      \"officeCode\": \"BLR-1\",\r\n      \"shiftCode\": \"S1\",\r\n      \"status\": \"ACTIVE\"\r\n    }\r\n  ]\r\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "5 Bad batch",
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/api/v1/hr/events",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{hrToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\r\n  \"events\": [\r\n    {\r\n      \"type\": \"CREATE\",\r\n      \"employeeId\": \"D{{runId}}_B0001\",\r\n      \"version\": 1,\r\n      \"name\": \"Fixture Batch 1\",\r\n      \"email\": \"batch1@example.test\",\r\n      \"phone\": \"+919800000001\",\r\n      \"officeCode\": \"BLR-1\",\r\n      \"shiftCode\": \"S1\"\r\n    },\r\n    {\r\n      \"type\": \"CREATE\",\r\n      \"employeeId\": \"D{{runId}}_B0002\",\r\n      \"version\": 1,\r\n      \"name\": \"Fixture Batch 2\",\r\n      \"email\": \"batch2@example.test\",\r\n      \"phone\": \"+919800000001\",\r\n      \"officeCode\": \"BLR-1\",\r\n      \"shiftCode\": \"S1\"\r\n    },\r\n    {\r\n      \"type\": \"CREATE\",\r\n      \"employeeId\": \"D{{runId}}_B0003\",\r\n      \"version\": 1,\r\n      \"name\": \"Fixture Batch 3\",\r\n      \"email\": \"batch3@example.test\",\r\n      \"phone\": \"+919800000001\",\r\n      \"officeCode\": \"BLR-1\",\r\n      \"shiftCode\": \"S1\"\r\n    },\r\n    {\r\n      \"type\": \"CREATE\",\r\n      \"employeeId\": \"D{{runId}}_B0004\",\r\n      \"version\": 1,\r\n      \"name\": \"Fixture Batch 4\",\r\n      \"email\": \"batch4@example.test\",\r\n      \"phone\": \"+91 9800-001\",\r\n      \"officeCode\": \"BLR-1\",\r\n      \"shiftCode\": \"S1\"\r\n    },\r\n    {\r\n      \"type\": \"CREATE\",\r\n      \"employeeId\": \"D{{runId}}_B0005\",\r\n      \"version\": 1,\r\n      \"name\": \"Fixture Batch 5\",\r\n      \"email\": \"batch5@example.test\",\r\n      \"phone\": \"+919800000001\",\r\n      \"officeCode\": \"MARS-1\",\r\n      \"shiftCode\": \"S1\"\r\n    }\r\n  ]\r\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "6 Transport ownership",
+          "request": {
+            "method": "PATCH",
+            "url": "{{baseUrl}}/api/v1/employees/{{employeeId}}/transport-fields",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{adminToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\"pickupPoint\":\"Gate 3\",\"specialAssistance\":\"WHEELCHAIR\"}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "6 HR update ignores pickupPoint",
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/api/v1/hr/events",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{hrToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\r\n  \"events\": [\r\n    {\r\n      \"type\": \"UPDATE\",\r\n      \"version\": 8,\r\n      \"email\": \"demo@example.test\",\r\n      \"officeCode\": \"BLR-2\",\r\n      \"shiftCode\": \"S2\",\r\n      \"phone\": \"+919800000101\",\r\n      \"status\": \"ACTIVE\",\r\n      \"managerId\": \"E1001\",\r\n      \"name\": \"Demo User\",\r\n      \"employeeId\": \"{{employeeId}}\",\r\n      \"pickupPoint\": \"ignored\"\r\n    }\r\n  ]\r\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        }
+      ],
+      "name": "Events and ownership"
+    },
+    {
+      "item": [
+        {
+          "name": "7 Seed 200k",
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/api/v1/dev/seed-employees?count=200000",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{opsToken}}"
+              }
+            ]
+          },
+          "response": []
+        },
+        {
+          "name": "7 Export healthy CSV (save response as full.csv)",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/api/v1/dev/export.csv?mutatePercent=1&dropPercent=0.5&seed=20261030",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{opsToken}}"
+              }
+            ]
+          },
+          "response": []
+        },
+        {
+          "name": "8 Export truncated CSV (save as cut.csv)",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/api/v1/dev/export.csv?truncateAt=120000",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{opsToken}}"
+              }
+            ]
+          },
+          "response": []
+        },
+        {
+          "name": "List runs / cleanup prior awaiting runs",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/api/v1/reconciliation/runs?size=200",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{opsToken}}"
+              }
+            ]
+          },
+          "response": []
+        },
+        {
+          "name": "Upload CSV (choose file and set asOf)",
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/api/v1/reconciliation/runs",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{hrToken}}"
+              }
+            ],
+            "body": {
+              "formdata": [
+                {
+                  "key": "file",
+                  "src": "full.csv",
+                  "type": "file"
+                },
+                {
+                  "key": "asOf",
+                  "type": "text",
+                  "value": "{{asOf}}"
+                }
+              ],
+              "mode": "formdata"
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Upload accepted\", () => pm.response.to.have.status(202));",
+                  "pm.environment.set(\"runIdToInspect\",pm.response.json().runId);"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "Inspect run",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/api/v1/reconciliation/runs/{{runIdToInspect}}",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{opsToken}}"
+              }
+            ]
+          },
+          "response": []
+        },
+        {
+          "name": "Inspect bad rows",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/api/v1/reconciliation/runs/{{runIdToInspect}}/rejections",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{opsToken}}"
+              }
+            ]
+          },
+          "response": []
+        },
+        {
+          "name": "Approve ALL (awaiting only)",
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/api/v1/reconciliation/runs/{{runIdToInspect}}/approve",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{opsToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\"mode\":\"ALL\",\"note\":\"reviewed\"}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Reject (awaiting only)",
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/api/v1/reconciliation/runs/{{runIdToInspect}}/reject",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{opsToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\"note\":\"truncated export\"}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Threshold demonstration",
+          "request": {
+            "method": "PUT",
+            "url": "{{baseUrl}}/api/v1/settings/reconciliation",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{opsToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\"maxMissingRatio\":0.5}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Restore default threshold",
+          "request": {
+            "method": "PUT",
+            "url": "{{baseUrl}}/api/v1/settings/reconciliation",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{opsToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\"maxMissingRatio\":0.3}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        }
+      ],
+      "name": "Reconciliation"
+    },
+    {
+      "item": [
+        {
+          "name": "Offices",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/api/v1/offices",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{adminToken}}"
+              }
+            ]
+          },
+          "response": []
+        },
+        {
+          "name": "Ops summary",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/api/v1/ops/summary",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{opsToken}}"
+              }
+            ]
+          },
+          "response": []
+        },
+        {
+          "name": "Outbox",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/api/v1/ops/outbox",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{opsToken}}"
+              }
+            ]
+          },
+          "response": []
+        },
+        {
+          "name": "Alerts",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/api/v1/ops/alerts",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{opsToken}}"
+              }
+            ]
+          },
+          "response": []
+        },
+        {
+          "name": "Alert acknowledge",
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/api/v1/ops/alerts/{{alertId}}/ack",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{opsToken}}"
+              }
+            ]
+          },
+          "response": []
+        },
+        {
+          "name": "Retry DEAD outbox row",
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/api/v1/ops/outbox/{{outboxId}}/retry",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{opsToken}}"
+              }
+            ]
+          },
+          "response": []
+        },
+        {
+          "name": "Armed faults",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/api/v1/dev/faults",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{opsToken}}"
+              }
+            ]
+          },
+          "response": []
+        },
+        {
+          "name": "Clear faults",
+          "request": {
+            "method": "DELETE",
+            "url": "{{baseUrl}}/api/v1/dev/faults",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{opsToken}}"
+              }
+            ]
+          },
+          "response": []
+        },
+        {
+          "name": "9 Arm one-shot HALT (manual crash demo)",
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/api/v1/dev/faults",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{opsToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\"point\":\"OUTBOX_BEFORE_DISPATCH\",\"mode\":\"HALT\"}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        }
+      ],
+      "name": "Operations and manual fault demo"
+    },
+    {
+      "item": [
+        {
+          "name": "10 Bookings",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/api/v1/employees/E1002/bookings",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{adminToken}}"
+              }
+            ]
+          },
+          "response": []
+        },
+        {
+          "name": "10 Create future booking",
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/api/v1/bookings",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{adminToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\"employeeId\":\"E1002\",\"pickupAt\":\"{{pickupAt}}\"}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "10 Deactivate E1002 (choose higher version)",
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/api/v1/hr/events",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{hrToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\"events\":[{\"type\":\"DEACTIVATE\",\"employeeId\":\"E1002\",\"version\":{{deactivateVersion}}}]}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "10 Route seats",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/api/v1/routes/R-BLR-07/seats",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{adminToken}}"
+              }
+            ]
+          },
+          "response": []
+        },
+        {
+          "name": "11 Cross-tenant employee (404)",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/api/v1/employees/{{employeeId}}",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{globexToken}}"
+              }
+            ]
+          },
+          "response": []
+        },
+        {
+          "name": "11 Self-access denied (404)",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/api/v1/employees/{{employeeId}}",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{employeeToken}}"
+              }
+            ]
+          },
+          "response": []
+        },
+        {
+          "name": "11 Own profile",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/api/v1/me",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{employeeToken}}"
+              }
+            ]
+          },
+          "response": []
+        }
+      ],
+      "name": "Bookings and access"
+    },
+    {
+      "item": [
+        {
+          "request": {
+            "url": "{{managementUrl}}/actuator/health/readiness",
+            "method": "GET"
+          },
+          "name": "Readiness"
+        },
+        {
+          "request": {
+            "url": "{{managementUrl}}/actuator/prometheus",
+            "method": "GET"
+          },
+          "name": "Prometheus"
+        }
+      ],
+      "name": "Management (loopback / SSM forwarding only)"
+    }
+  ]
+}
