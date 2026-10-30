@@ -3,6 +3,17 @@
 ## Phase 8 apply batching and lock scope
 Reconciliation locks the selected employee rows in external-ID order using one tenant-scoped PESSIMISTIC_WRITE query (PostgreSQL FOR NO KEY UPDATE). The locking query deliberately has no joined fetch: Hibernate otherwise separates the fetch and lock steps. Submitted offices are read and refreshed once per distinct code inside the chunk transaction, with no office lock and no application cache. Deactivation after that plain read remains the documented benign READ COMMITTED race.
 
+Commit `461da33` scopes this lock to employees in the chunk, not the tenant row, a table-wide blocking lock or an advisory lock. The captured Hibernate SQL for 40 IDs is exactly:
+
+```sql
+select ee1_0.id,ee1_0.created_at,ee1_0.deactivated_at,ee1_0.deactivation_source,ee1_0.email,ee1_0.external_id,ee1_0.hr_updated_at,ee1_0.hr_version,ee1_0.manager_external_id,ee1_0.name,ee1_0.office_id,ee1_0.phone,ee1_0.pickup_point,ee1_0.recon_bucket,ee1_0.shift_code,ee1_0.special_assistance,ee1_0.status,ee1_0.tenant_id,ee1_0.transport_updated_at,ee1_0.transport_version,ee1_0.updated_at
+from employee ee1_0
+where ee1_0.tenant_id=? and ee1_0.external_id in (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+order by ee1_0.external_id for no key update of ee1_0
+```
+
+`IN` binds the selected IDs individually, equivalent in scope to `external_id = ANY(?)`. `FOR NO KEY UPDATE` protects these rows' version/content writes while allowing ordinary foreign-key key-share checks. PostgreSQL still takes its normal compatible relation locks; unrelated employee updates are not serialized. `ReconciliationChunkIT` holds the chunk transaction open with a latch and proves both that a same-employee event waits and that an employee outside the chunk completes before release. The brief tenant-row lock for upload/watermark coordination and the demo-seeder advisory lock are separate paths, never the chunk/event apply lock.
+
 FlushMode.COMMIT is scoped to the chunk and restored in finally, preventing query-triggered flushes per action. One explicit employee flush precedes a JDBC outbox batch, one recon_action status UPDATE using id=ANY arrays, and one run-counter/heartbeat update. All share the same transaction; failure rolls back before individual-action fallback. API ingestion retains its per-record saveAndFlush/receipt behavior. Version advances still produce no business outbox event. The measured default chunk increases from 25 to 40; raw profiling results stay outside Git.
 
 Cancelling in-flight runs is deliberately left out: it would need cooperative cancellation between chunks and a CANCELLED state with defined partial-apply behavior. The re-runnable demo logs an active run's status every two seconds, waits at most 180 seconds, rejects it only at AWAITING_APPROVAL, and exits non-zero with runId/status on timeout.

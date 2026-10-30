@@ -17,10 +17,22 @@ import static org.awaitility.Awaitility.await;
 class ReconciliationBenchmarkIT extends AbstractReconciliationIntegrationTest {
     private static final UUID BENCH=UUID.fromString("00000000-0000-0000-0000-000000000003");
     @org.springframework.beans.factory.annotation.Autowired com.moveinsync.rostersync.config.RosterProperties properties;
+    @org.springframework.beans.factory.annotation.Autowired ReconciliationChunkApplier chunks;
     @Test void medianOfThree200kRunsWithA256MiBHeap() throws Exception {
         var memory=ManagementFactory.getMemoryMXBean();
         assertThat(memory.getHeapMemoryUsage().getMax()).as("benchmark must run with -Xmx256m").isEqualTo(256L*1024*1024);
         var results=new ArrayList<Sample>();
+        var chunkNanos=new ConcurrentLinkedQueue<Long>();
+        org.aopalliance.intercept.MethodInterceptor timing=invocation->{
+            if(!invocation.getMethod().getName().equals("applyNext"))return invocation.proceed();
+            long start=System.nanoTime();Object result=invocation.proceed();
+            if((int)result>0)chunkNanos.add(System.nanoTime()-start);
+            return result;
+        };
+        // Outermost advice includes transaction commit. No timing collection is added to production.
+        var proxy=(org.springframework.aop.framework.Advised)chunks;
+        proxy.addAdvice(0,timing);
+        try {
         for(int iteration=1;iteration<=3;iteration++){
             resetDatabase();seedUsersAndOffices();
             jdbc.update("INSERT INTO tenant(id,code,name) VALUES (?,'bench','Benchmark')",BENCH);
@@ -46,7 +58,14 @@ class ReconciliationBenchmarkIT extends AbstractReconciliationIntegrationTest {
                 results.add(new Sample(iteration,seedMs,truth.written(),truth.updates(),truth.dropped(),truth.creates(),wallMs,dry.timings().diffMs(),applied.timings().applyMs(),peak.get()/1048576.0,(peak.get()-baseline)/1048576.0));
             }finally{sampler.shutdownNow();}
         }
+        } finally { proxy.removeAdvice(timing); }
+        var sortedChunks=chunkNanos.stream().mapToDouble(value->value/1_000_000.0).sorted().toArray();
+        assertThat(sortedChunks).isNotEmpty();
+        double chunkP50=percentile(sortedChunks,.5),chunkP99=percentile(sortedChunks,.99),chunkMax=sortedChunks[sortedChunks.length-1];
         var report=new LinkedHashMap<String,Object>();report.put("heapLimitMiB",256);report.put("java",System.getProperty("java.runtime.version"));report.put("os",System.getProperty("os.name")+" "+System.getProperty("os.version"));
+        report.put("chunkP50Ms",chunkP50);report.put("chunkP99Ms",chunkP99);report.put("chunkMaximumMs",chunkMax);
+        report.put("chunkCount",sortedChunks.length);report.put("chunkDurationsMs",chunkNanos.stream().map(value->value/1_000_000.0).toList());
+        report.put("chunkMethod","nearest-rank over all nonempty committed chunks, including cold chunks; outer advice includes commit");
         report.put("chunkSize",properties.reconciliation().chunkSize());report.put("maxChunkMs",applier.longestChunkMillis());
         report.put("logicalProcessors",Runtime.getRuntime().availableProcessors());report.put("samples",results);
         var machine=machineSpec();report.put("machine",machine);
@@ -57,6 +76,8 @@ class ReconciliationBenchmarkIT extends AbstractReconciliationIntegrationTest {
         System.out.printf(Locale.ENGLISH,"| %s | %s | %.2f GiB | %s | %s | 200,000 | 256 MiB | %.0f ms | %.0f ms | %.1f MiB |%n",
                 machine.get("cpu"),machine.get("logicalCores"),((Number)machine.get("ramBytes")).doubleValue()/1073741824,
                 report.get("os"),report.get("java"),report.get("medianDiffWallMs"),report.get("medianApplyMs"),report.get("medianPeakHeapMiB"));
+        assertThat(chunkP99).as("chunk p99 below 1s").isLessThan(1000);
+        assertThat(chunkMax).as("chunk max below half the 5s lock_timeout").isLessThan(2500);
     }
     private ReconciliationQueryService.RunView awaitRun(UUID id){
         await().atMost(Duration.ofSeconds(150)).until(()->Set.of("PLANNED","COMPLETED","FAILED","AWAITING_APPROVAL").contains(runs.get(BENCH,id).status()) && !queue.active(id));
@@ -68,6 +89,7 @@ class ReconciliationBenchmarkIT extends AbstractReconciliationIntegrationTest {
         assertThat(run.plan().unchanged()).isEqualTo(truth.existing()-truth.dropped()-truth.updates());assertThat(run.brake().tripped()).isFalse();
     }
     private static double median(double[] values){Arrays.sort(values);return values[values.length/2];}
+    private static double percentile(double[] sorted,double percentile){return sorted[(int)Math.ceil(percentile*sorted.length)-1];}
     private Map<String,Object> machineSpec(){
         var result=new LinkedHashMap<String,Object>();result.put("logicalCores",Runtime.getRuntime().availableProcessors());
         result.put("ramBytes",((com.sun.management.OperatingSystemMXBean)ManagementFactory.getOperatingSystemMXBean()).getTotalMemorySize());

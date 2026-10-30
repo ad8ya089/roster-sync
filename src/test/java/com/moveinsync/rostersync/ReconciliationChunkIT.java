@@ -54,4 +54,23 @@ class ReconciliationChunkIT extends AbstractReconciliationIntegrationTest {
         }finally{release.countDown();}
         assertThat(version("A")).isEqualTo(3);assertThat(jdbc.queryForObject("SELECT shift_code FROM employee WHERE tenant_id=? AND external_id='A'",String.class,JwtTestTokens.ACME)).isEqualTo("S2");
     }
+    @Test void unrelatedEmployeeEventCompletesWhileTheChunkTransactionIsHeld() throws Exception {
+        UUID run=planned();send(event("C",1,"CREATE","BLR-1","S1"));
+        var locked=new CountDownLatch(1);var release=new CountDownLatch(1);
+        com.moveinsync.rostersync.application.ingest.EmployeeChangeApplier target=org.springframework.test.util.AopTestUtils.getUltimateTargetObject(snapshotApplier);
+        doAnswer(call->{locked.countDown();if(!release.await(10,TimeUnit.SECONDS))throw new IllegalStateException("Lock test timeout");return call.callRealMethod();})
+                .when(target).applySnapshot(eq(JwtTestTokens.ACME),any(ReconActionDao.Action.class),any(EmployeeEntity.class),anyMap(),anyList());
+        try(var pool=Executors.newFixedThreadPool(2)){
+            var chunk=pool.submit(()->chunks.applyNext(JwtTestTokens.ACME,run,40,"ALL"));
+            assertThat(locked.await(10,TimeUnit.SECONDS)).isTrue();
+            try {
+                var unrelated=pool.submit(()->send(event("C",2,"UPDATE","BLR-1","S3")));
+                assertThat(unrelated.get(5,TimeUnit.SECONDS).summary().applied()).isEqualTo(1);
+                assertThat(version("C")).isEqualTo(2);
+                assertThat(release.getCount()).as("the chunk transaction is still held").isEqualTo(1);
+                assertThat(chunk.isDone()).isFalse();
+            } finally { release.countDown(); }
+            assertThat(chunk.get(10,TimeUnit.SECONDS)).isEqualTo(2);
+        } finally { release.countDown(); }
+    }
 }
