@@ -8,6 +8,10 @@ import org.springframework.data.jpa.repository.*;
 import org.springframework.data.repository.Repository;
 
 public interface EmployeeRepository extends Repository<EmployeeEntity, Long>, EmployeeRepositoryWrites {
+    @Lock(LockModeType.PESSIMISTIC_READ)
+    @Query("select employee from EmployeeEntity employee where employee.tenantId=:tenantId and employee.externalId=:externalId")
+    Optional<EmployeeEntity> findForShare(UUID tenantId, String externalId);
+
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("select employee from EmployeeEntity employee where employee.tenantId=:tenantId and employee.externalId=:externalId")
     Optional<EmployeeEntity> findForUpdate(UUID tenantId, String externalId);
