@@ -95,7 +95,7 @@ Higher-version identical snapshots, including DEACTIVATE on INACTIVE employees o
 Event apply: O(log M) index lookup, O(1) memory. Reconciliation: O(N + M) time, O(N/B) heap with B = 256 buckets, O(N) temp disk. First scaling limits: single Postgres writer, single outbox poller, table growth, per-row apply for mass changes.
 
 ## Tests _(counts filled in Phase 8)_
-Full `./mvnw -B verify` passes 138 unit/property/architecture tests and 105 PostgreSQL integration tests (243 total), with no failures, errors or skips. Two jqwik properties each run 1,000 trials with fixed seeds `2026103001` and `2026103002`, including maximum-version preservation across deactivations and identical snapshots. JaCoCo reports domain coverage at `target/site/jacoco/index.html`, without a gate. Integration tests prove migrations, health, auth/tenancy, per-record ingestion, replay, ordering, rollback, ownership and concurrency. Phase 5 adds real application-context restart recovery, concurrent publisher, timeout/retry, retention and rehire proof. Later phases add reconciliation benchmarks and k6 load tests.
+Full `./mvnw -B verify` passes 141 unit/property/architecture tests and 131 PostgreSQL integration tests (272 total), with no failures, errors or skips. Two jqwik properties each run 1,000 trials with fixed seeds `2026103001` and `2026103002`, including maximum-version preservation across deactivations and identical snapshots. JaCoCo reports domain coverage at `target/site/jacoco/index.html`, without a gate. Integration tests prove migrations, health, auth/tenancy, per-record ingestion, replay, ordering, rollback, ownership and concurrency. Phases 5–6 add real application-context restart recovery, concurrent publishing/reconciliation, timeout/retry, retention, rehire, CSV parsing and 200k safety-brake proof. Later phases add reconciliation benchmarks and k6 load tests.
 
 ## Demo video
 _link here_
@@ -106,7 +106,7 @@ Verified on 2026-10-30 with Docker Desktop's Linux/WSL2 engine: clean-volume `do
 
 Host Maven and Maven inside the build image reach Maven Central directly. The plain Docker build succeeds without HTTP_PROXY/HTTPS_PROXY build arguments, and Docker client automatic proxy defaults were unset. No proxy URLs, credentials, or network-specific defaults are committed. The temporary Maven settings used during initial setup remain outside the repository. First builds download images and dependencies; subsequent builds reuse the Maven build layers.
 
-Domain line coverage after the Phase 2 correction and Phase 3 is 99.44% (354/356 lines, no gate).
+Domain line coverage after Phase 6 is 99.45% (359/361 lines, no gate).
 
 ## Event ingestion and replay
 
@@ -129,3 +129,10 @@ Run `./scripts/demo-crash.sh` from Linux or Git Bash on Windows (curl, jq and Do
 Each publisher tick handles up to OUTBOX_BATCH_SIZE rows (default 100), each in its own transaction with FOR UPDATE SKIP LOCKED. Sink calls use four threads, queue 100 and OUTBOX_SINK_TIMEOUT (default 2s). A timeout does not cancel the sink: late completion and redelivery are possible. Consumers deduplicate `(sink,event_id)` and check current state. Retry delays start at 1s and double to 300s; OUTBOX_MAX_ATTEMPTS (default 10) ends in DEAD with one alert. OPERATOR can inspect tenant-scoped outbox/alerts and retry DEAD rows. Acknowledgement is idempotent. Delayed rows do not block newer events.
 
 Deactivation cancels only future SCHEDULED bookings and frees seats, in an independent consumer transaction. The employee FOR UPDATE lock serializes the status check with rehire; booking creation uses FOR SHARE and rejects inactive employees. Retention runs in 5,000-row transactions at RETENTION_CRON. A single scheduler instance is assumed; multi-instance retention would need ShedLock. Graceful shutdown stops claims and allows 20 seconds per phase.
+
+## Nightly reconciliation
+POST multipart `/api/v1/reconciliation/runs` with file and asOf returns 202 after synchronous header validation. Parsing spills into 256 binary buckets; the pure differ compares one bucket at a time. The safety brake stops all changes when a truncated export appears to omit too many active employees. OPERATOR may approve ALL, approve SKIP_DEACTIVATIONS or reject; dry runs are terminal PLANNED runs. Whole-file ordering rejects asOf at/before the last completed export.
+
+Explicit ADVANCE actions preserve higher identical versions without business events. Apply rechecks planned versions under employee locks, has no receipts or nested event retries, and commits configured chunks (default 25 after measured tuning). Failed chunks roll back before per-action fallback. Startup resumes APPLYING runs, fails interrupted planning and preserves awaiting approvals; a heartbeat watchdog avoids failing live work. Multi-instance deployment would need leases and shared upload storage.
+
+Demo OPERATOR endpoints seed S000001… fixtures with Java CRC32/COPY and stream deterministic CSV exports with seed/mutation/drop/new/truncation options. Seed fixtures intentionally bypass outbox/receipts. Export uses a read-only PostgreSQL cursor with fetchSize=1000. See the run JSON contracts in [API.md](docs/API.md) and the algorithm in [RECONCILIATION.md](docs/RECONCILIATION.md).

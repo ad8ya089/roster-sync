@@ -218,7 +218,7 @@ All dev endpoints require OPERATOR. The interview deployment intentionally enabl
 
 | Endpoint | Purpose |
 |---|---|
-| `POST /dev/seed-employees?count=200000` | bulk-insert active employees for the caller's tenant via `generate_series` (seconds) |
+| `POST /dev/seed-employees?count=200000` | bulk-insert active employees for the caller's tenant via Java CRC32 and streaming COPY |
 | `GET /dev/export.csv?truncateAt=120000&mutatePercent=1&dropPercent=0.5` | stream a CSV "HR export" of the current DB, optionally cut short / with changed rows / with missing rows, plus a correct trailer unless truncated |
 | `POST /dev/faults {"point":"OUTBOX_BEFORE_MARK_PUBLISHED","mode":"HALT"}` | arm a one-shot fault (HALT = `Runtime.halt(137)`, i.e. kill -9 semantics; THROW; DELAY_MS) |
 | `DELETE /dev/faults` | disarm |
@@ -243,3 +243,15 @@ The receipt payload hash includes event type plus normalized, ownership-filtered
 - Sink delivery is at least once. Timeout does not stop work; consumers must deduplicate and check current state/version. Only future SCHEDULED bookings are cancelled, and a delayed deactivation skips an employee who is ACTIVE again.
 
 Phase 6 upload ordering: empty uploads and asOf more than five minutes in the future return 400 VALIDATION_FAILED before any run is created. Invalid/duplicate CSV headers return 400 INVALID_CSV_HEADER, delete the saved upload and create no run. An asOf at or before the tenant's latest COMPLETED export returns 409 RECON_EXPORT_STALE. Ordering applies to whole files too. The completed watermark check and upload acceptance serialize on the tenant row; one active run remains enforced by ux_recon_one_active. ADVANCE is exposed separately as plan.advances and changes only the HR version/timestamp.
+
+Phase 6 CSV/apply details:
+- The nine documented header names are required; BOM is accepted and unknown extra columns are ignored. Duplicate header names are invalid. Only a last record starting with #TRAILER is a trailer; an earlier occurrence is a rejected data row. Malformed CSV sets FAILED / failureReason MALFORMED_CSV, with only its record number in the rejection audit.
+- Duplicate ids select the highest version. Every extra row is audited as DUPLICATE_ROW_IN_FILE. Same-version conflicting normalized content makes the id present-but-invalid: it is neither updated nor deactivated. Invalid ids are never echoed; valid employee identifiers may be audited, with field/code pairs only.
+- Approve/reject are compare-and-set transitions from AWAITING_APPROVAL. Concurrent approvals return one 202 and one 409 INVALID_RUN_STATE. PLANNED dry runs cannot be approved. SKIP_DEACTIVATIONS marks those actions SKIPPED.
+- Snapshot actions re-check the planned employee version under lock. An intervening higher real-time version supersedes the planned action. No receipt is written. Existing accepted event receipts remain unchanged and retain their event replay/hash rules even after a snapshot HEAL.
+- Dev seed uses Java CRC32 and direct streaming COPY for an empty seed range, skips a complete repeat, and uses temporary staging plus conflict-safe insertion for partial repeats. It intentionally bypasses receipts/outbox. Export is a tenant-scoped read-only cursor (fetchSize 1000, autocommit off), with deterministic seed, truncateAt, mutatePercent, dropPercent and newPercent. A truncated export omits the trailer.
+- Fault arming additionally accepts afterHits (1–1000000, default 1). RECON_AFTER_N_ACTIONS counts action hits; a failure rolls back that chunk, preserving earlier committed chunks for recovery.
+
+Measured Phase 6 apply tuning: RECON_CHUNK_SIZE defaults to 25 after the initial 500-action measurement exceeded lock_timeout. Chunks still process external_id order and re-check under row locks. An apply-time rejection after chunk rollback is audited in record_rejection with codes only; the failed action is marked FAILED while other actions continue in independent transactions.
+
+asOf is canonicalized to PostgreSQL microsecond precision before watermark comparison and persistence. An identical request containing finer nanosecond digits remains stale after completion; sub-microsecond differences cannot create a new export ordering position.

@@ -38,12 +38,14 @@ PASS 1  — stream the file once (commons-csv, never materialize the whole file)
          if r.employeeId is syntactically valid: mark "present-but-invalid" (it still counts as present → never deactivated)
          continue
      snapshot = normalize(r);  h = RecordHasher.hash(snapshot)
-     append "id \t version \t h \t <normalized fields>" to spill file bucket(id)    // 256 BufferedWriters, 8 KB each ≈ 2 MB
+     append binary record (row number, id, version, validity, hash, fields) to bucket(id)
+     // DataOutputStream, length-prefixed UTF-8, -1 null marker; 256 x 8 KB buffers ≈ 2 MB
   close all writers
 
 PASS 2  — per bucket
   for b in 0..B-1:
-     fileRows = read spill file b into HashMap<id, FileRow>         // ~800 rows; duplicate id → DUPLICATE_ROW_IN_FILE (keep first)
+     fileRows = read spill file b into HashMap<id, FileRow>         // ~800 rows; highest duplicate version wins
+     // each extra row is DUPLICATE_ROW_IN_FILE; same-version/different-hash makes the id present-but-invalid
      dbRows   = SELECT external_id, hr_version, status, hr_updated_at, <HR columns>
                 FROM employee WHERE tenant_id = ? AND recon_bucket = b
      actions  = BucketDiffer.diff(fileRows, dbRows, asOf, hasher)   // PURE FUNCTION
@@ -62,7 +64,8 @@ APPLY   — only if not tripped (or after approval), see §6
 |---|---|---|---|
 | yes | no | — | `CREATE` (with file version) |
 | yes | yes | hash equal, versions equal | `UNCHANGED` (status is part of the hash) |
-| yes | yes | `file.version > db.hr_version`, any hash | `UPDATE` (same hash becomes version-only `NO_CHANGE` at apply time) |
+| yes | yes | `file.version > db.hr_version`, different hash | `UPDATE` |
+| yes | yes | `file.version > db.hr_version`, equal hash | `ADVANCE` (version/timestamp only, no outbox) |
 | yes | yes | hash differs, `file.version == db.hr_version` | `HEAL` (same version, different content — the snapshot is authoritative; e.g. a `DEACTIVATE` carried over older fields) |
 | yes | yes | `file.version < db.hr_version`, any hash | `STALE_SKIP` (a real-time event after the export already moved us ahead) |
 | present-but-invalid | yes | — | nothing (counts as present) |
@@ -72,7 +75,7 @@ APPLY   — only if not tripped (or after approval), see §6
 
 Note the asymmetry with real-time events: for an **event**, same version + different content is a `CONFLICT` (two different messages claim the same version — suspicious, reject). For the **snapshot**, it is a `HEAL` (the export is the authoritative state of HR at that version). Being able to explain this asymmetry is a strong interview point.
 
-Version comparison precedes the equal-hash shortcut. Planned updates include higher-version identical content: the shared decider returns `VersionAdvanced`, advancing the version/timestamp without an Employee outbox event. Only equal-version identical content is unchanged; this keeps the same source high-water guarantee for events and files.
+Version comparison precedes the equal-hash shortcut. ADVANCE has a separate planned_advances counter and API plan.advances field. The shared decider returns VersionAdvanced, advancing the version/timestamp without an Employee outbox event. Only equal-version identical content is unchanged; this keeps the same source high-water guarantee for events and files.
 
 ## 4. Safety brake
 
@@ -98,7 +101,7 @@ TRIP if any of:
 
 Threshold comparisons use BigDecimal against the original integer counts, without rounding a ratio first. Multiple reasons are exposed in this order: `ROW_COUNT_MISMATCH`, `MISSING_RATIO`, `MISSING_COUNT`; the first is the primary reason. Zero active employees skips only the missing ratio/count guards. A trailer or expected-row-count mismatch still trips, in either direction.
 
-The missing-ratio message follows the API example exactly with Locale.ENGLISH, thousands separators, and one decimal percentage. Count-only and row-count failures keep the same missing-employee prefix and explicitly identify the count threshold or file-row mismatch. `BucketDiffer` follows its table: equal content is UNCHANGED even if the file version differs; unlike `ChangeDecider`, it does not create a version-only action for equal hashes.
+The missing-ratio message follows the API example exactly with Locale.ENGLISH, thousands separators, and one decimal percentage. Count-only and row-count failures keep the same missing-employee prefix and explicitly identify the count threshold or file-row mismatch. ADVANCE is metadata work and never contributes to missingActive or the brake.
 
 ## 5. Run state machine
 
@@ -124,17 +127,17 @@ A partial unique index allows only one non-terminal run per tenant (`UPLOADED`, 
 
 ## 6. Apply phase
 
-- Read `recon_action` where `status='PENDING'` in id order, chunks of 500.
+- Read `recon_action` where `status='PENDING'` in external_id order, chunks of the configured size (default 25).
 - Each chunk runs in one transaction for throughput; if the chunk throws, it is retried **action by action** (one transaction each) so one bad action can't block the rest.
 - Every action goes through the **same** `EmployeeChangeApplier` as real-time events (same row lock and `ChangeDecider`). Apply emits exactly one business outbox event; VersionAdvanced changes only the HR version/timestamp and emits none. Reconciliation cannot bypass ownership or version ordering.
 - Re-check at apply time (state may have moved since planning):
-  - `CREATE/UPDATE/HEAL`: decider runs in *snapshot mode* (`>=` for HEAL, `>` otherwise); if the employee's `hr_version` is now higher → `SUPERSEDED`.
+  - `CREATE/UPDATE/HEAL/ADVANCE`: lock the employee, then SUPERSEDE if its version moved past expected_db_version (or a CREATE now finds a row). Otherwise run the shared decider in snapshot mode. This preserves real-time work that overtook planning even when the file version is higher.
   - `DEACTIVATE`: only if still `ACTIVE` **and** `hr_version == expected_db_version`; otherwise `SUPERSEDED`. Recon deactivation does not bump `hr_version` (it is not an HR version — "absent from a snapshot" is weaker evidence than a versioned event) and sets `deactivation_source='RECON'`.
 - Recon changes do **not** write `hr_event_receipt` rows (they are not events). If the real event for an already-healed version arrives later, the version check classifies it (`DUPLICATE` if content matches, else `CONFLICT`).
 
 ## 7. Crash recovery
 
-On `ApplicationReadyEvent` (and every 5 min by a watchdog):
+On ApplicationReadyEvent every old non-terminal worker is orphaned in this single-instance deployment, except AWAITING_APPROVAL, which remains waiting. Every 5 minutes the watchdog considers only heartbeat_at older than two minutes and skips locally queued/running work, so a live slow run is not failed. Multi-instance recovery requires a durable lease.
 - runs in `UPLOADED`/`DIFFING` whose worker is gone → `FAILED` with `failure_reason='INTERRUPTED'` (diffing has no side effects, so re-upload is safe);
 - runs in `APPLYING` → resubmitted; only `PENDING` actions are processed; each re-checks under lock, so double-apply is impossible.
 
@@ -162,5 +165,7 @@ Hashing: SHA-256 of ~150 bytes per row ≈ 1 µs → 0.2 s for 200k. The expecte
 - `ReconciliationRecoveryIT` — fault at `RECON_AFTER_N_ACTIONS` → restart → completes, no duplicates.
 - `ReconciliationBenchmarkIT` (tag `benchmark`, run with `-Xmx256m`) — 200k-row DB + 200k-row file (1 % changed, 0.5 % missing) → diff wall time < 60 s, asserts peak heap delta, prints numbers for the README.
 
-## Reserved Phase 6 design question (proposal, no code/migration now)
-Higher-version identical file rows must advance the source watermark. Propose explicit ActionType.ADVANCE and recon_action.action='ADVANCE', with a V3 migration extending its CHECK constraint (after Phase 5's V2 consumer-deduplication migration). The applier would update HR version/timestamp without outbox, through VersionAdvanced. The Phase 6 plan must settle a separate planned_advances/API count so business updates and metadata advances are distinguishable. Until then the existing pure differ schedules such rows as UPDATE and the shared decider distinguishes VersionAdvanced; Phase 4 makes no recon implementation changes.
+## Phase 6 input and scheduling details
+Upload rejects empty content, a future asOf beyond five minutes and an export at/before the last COMPLETED asOf. MultipartFile.transferTo saves the file; synchronous first-line header validation requires the nine documented columns and forbids duplicate names. Invalid headers leave no run or saved upload. UTF-8 BOM is stripped. A trailer is recognized only as the last CSV record; malformed CSV fails with MALFORMED_CSV and a record number, never row contents. Generated binary spill directories are deleted in finally on success or failure. Header/transport extras are ignored with a run-level warning.
+
+All status transitions compare the expected status in their UPDATE and return INVALID_RUN_STATE on zero affected rows. Counter/heartbeat writes commit per bucket and per apply chunk. An approval arriving during spill cleanup is retained as a follow-up worker job. RECON_AFTER_N_ACTIONS supports optional afterHits (default 1), permitting a crash after earlier chunks committed. Chunk failure rolls back the whole chunk before individual-action fallback; no event-style retries run inside a chunk transaction.

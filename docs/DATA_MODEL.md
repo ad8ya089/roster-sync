@@ -291,3 +291,6 @@ Non-PII values are included so consumers (routing, rostering) can act without a 
 
 Receipt reservation uses provisional PROCESSING inside the record transaction. Final stored outcomes are APPLIED, STALE, NO_CHANGE or DUPLICATE; conflicts roll back the reservation and write VERSION_CONFLICT through an independent rejection transaction. V1 has no receipt-outcome CHECK constraint; the writer enforces this final-outcome vocabulary without rewriting V1.
 
+
+## V3__reconciliation_advances.sql (Phase 6)
+The recon_action.action CHECK adds ADVANCE. recon_run adds planned_advances INTEGER NOT NULL DEFAULT 0 and nullable heartbeat_at TIMESTAMPTZ. The pending-action index (tenant_id,run_id,external_id), filtered to PENDING, supports ordered chunk claims. Earlier migrations stay unchanged. ADVANCE keeps a normalized snapshot payload for locked re-checking, advances only hr_version/hr_updated_at and writes no business outbox event. Run.applied counts processed actions, including advances; event-ingestion APPLIED remains the count matching Employee outbox events.
