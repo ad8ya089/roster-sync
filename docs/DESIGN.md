@@ -149,9 +149,13 @@ Details, edge cases, complexity and the brake formula are in `RECONCILIATION.md`
 
 ### 5.3 Outbox publish + deactivation side effects
 
-`OutboxPublisher` runs every 500 ms: in one transaction it claims up to 100 `PENDING` rows due now (`ORDER BY id ... FOR UPDATE SKIP LOCKED`), dispatches each to every `EventSink`, marks success `PUBLISHED`, or on failure increments `attempts` and sets `next_attempt_at = now + min(2^attempts s, 5 min)`; after 10 attempts the row becomes `DEAD` and an alert is raised. Delivery is **at-least-once**, so every sink is idempotent.
+`OutboxPublisher` runs every 500 ms and processes at most 100 rows per tick. Each row has its own short transaction: `WHERE status='PENDING' AND next_attempt_at <= :now ORDER BY id LIMIT 1 FOR UPDATE SKIP LOCKED`, dispatch that event, then mark PUBLISHED and commit. No batch transaction holds locks across different events. No due row ends the tick. Failures increment attempts and schedule `min(2^(attempts-1) seconds, 300 seconds)`; ten failures mark DEAD and create one OUTBOX_EVENT_DEAD alert for the event. Clock supplies all runtime timestamps. Manual retry is tenant-scoped and only accepts DEAD rows, resetting attempts to zero.
 
-`DeactivationSideEffectHandler` (a sink) handles `EmployeeDeactivated`: it first re-reads the employee and **skips if the employee is ACTIVE again** (a re-hire overtook the event), otherwise cancels `cab_booking` rows with `status='SCHEDULED' AND pickup_at > now()` and clears `route_seat.employee_external_id`. Both statements are naturally idempotent.
+Sinks run on four threads with a bounded queue of 100 and `CompletableFuture.orTimeout` (two seconds). Queue rejection counts as failure. A timeout does not stop the sink: it may commit later, followed by redelivery. A single production poller uses id order among ready rows; delayed retries do not block later ids, so consumers must check current state/version. Delivery is **at-least-once**. Graceful shutdown stops claims, lets the current row complete or roll back, and allows 20 seconds per shutdown phase.
+
+`DeactivationSideEffectHandler` handles `EmployeeDeactivated` in REQUIRES_NEW, independent of the publisher's transaction. It inserts `(sink,event_id)` into processed_event first; an existing key returns immediately. It locks the employee FOR UPDATE, skips if ACTIVE again (reason=reactivated), otherwise cancels SCHEDULED bookings strictly after Clock.now and frees seats. The consumer commit can survive a publisher rollback; redelivery hits the dedupe key. Booking creation locks the employee FOR SHARE and rejects INACTIVE with EMPLOYEE_INACTIVE. These employee locks close the rehire/new-booking race. The handler does not require a version bump, so reconciliation uses the same event type.
+
+Retention uses separate transactions of at most 5,000 rows, looped for receipts (30 days), published outbox (7 days) and processed_event (7 days). Its cron is configurable. The deployment assumes a single scheduler instance; multiple instances would need ShedLock or equivalent leader coordination.
 
 ## 6. Failure-mode table
 

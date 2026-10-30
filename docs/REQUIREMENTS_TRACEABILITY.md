@@ -50,10 +50,10 @@ Every sentence of the case-study PDF, mapped to design, code and proof. Agents m
 
 | # | PDF requirement | Design / code | Proof | Status |
 |---|---|---|---|---|
-| D1 | Publish a change event for every applied change | one outbox row per APPLIED decision, same transaction | `ReplayIdempotencyIT` (outbox count = applied count), `ConcurrentEventsIT` | partial — atomic Employee outbox writes equal APPLIED count; NO_CHANGE emits none; publishing arrives in Phase 5 |
-| D2 | …using the outbox pattern, so the DB update and the event can never disagree | `outbox_event` + `OutboxPublisher` | `OutboxCrashRecoveryIT` (all three crash points) | |
-| D3 | Leaver's future cab bookings cancelled | `DeactivationSideEffectHandler` | `DeactivationIT` | |
-| D4 | …and their seat freed | same handler, `route_seat` | `DeactivationIT` | |
+| D1 | Publish a change event for every applied change | one outbox row per APPLIED decision, same transaction | `ReplayIdempotencyIT` (outbox count = applied count), `ConcurrentEventsIT` | done — Phase 5 publisher, restart recovery and deactivation proof pass |
+| D2 | …using the outbox pattern, so the DB update and the event can never disagree | `outbox_event` + `OutboxPublisher` | `OutboxCrashRecoveryIT` (all three crash points) | done — Phase 5 restart recovery and side-effect proof pass |
+| D3 | Leaver's future cab bookings cancelled | `DeactivationSideEffectHandler` | `DeactivationIT` | done — Phase 5 restart recovery and side-effect proof pass |
+| D4 | …and their seat freed | same handler, `route_seat` | `DeactivationIT` | done — Phase 5 restart recovery and side-effect proof pass |
 
 ## Example use cases
 
@@ -71,16 +71,16 @@ Every sentence of the case-study PDF, mapped to design, code and proof. Agents m
 | K3 | Safety brake threshold configurable | property `BRAKE_MAX_MISSING_RATIO`, per-tenant `PUT /settings/reconciliation` | `SafetyBrakeTest`, `ReconciliationFlowIT.thresholdChangeTakesEffect` | partial — configurable exact brake thresholds unit-tested; tenant settings API arrives in Phase 6 |
 | K4 | Never write personal data into logs or error reports. Use employee IDs | `SECURITY.md §4` | `ErrorHandlingIT`, `PiiLeakIT` | partial — ingest/transport/error/outbox canaries pass; reconciliation PII proof arrives later |
 | K5 | Diff a 200,000-row snapshot in under 60 s with bounded memory | `ReconciliationBenchmarkIT` | README benchmark table | |
-| K6 | Run a test that crashes the process between the DB write and the event publish | `OutboxCrashRecoveryIT.crashAfterCommitBeforePublish` (+ live kill -9 demo) | itself | |
+| K6 | Run a test that crashes the process between the DB write and the event publish | `OutboxCrashRecoveryIT.crashAfterCommitBeforePublish` (+ live kill -9 demo) | itself | done — Phase 5 restart recovery and side-effect proof pass |
 
 ## Plus points (overall evaluation criteria)
 
 | # | Plus point | Where | Proof | Status |
 |---|---|---|---|---|
 | X1 | Authentication + role-based access (employee vs admin vs operator) | `SECURITY.md §1–2` | `AuthorizationIT`, `SecuredEndpointsTest`, `JwtTokenServiceTest`, `LoginTimingTest` | done for current endpoints — JWT/RBAC matrix and automatic future-handler guards pass |
-| X1b | Tenant isolation — one client can never read another's data | `SECURITY.md §3` | `TenantIsolationIT`, `ArchitectureTest`, `TenantContextFilterTest` | partial — office/employee/receipt/self isolation and tenant repository guards pass; future resources extend tests |
+| X1b | Tenant isolation — one client can never read another's data | `SECURITY.md §3` | `TenantIsolationIT`, `ArchitectureTest`, `TenantContextFilterTest` | partial — offices/employees/bookings/seats/outbox/alerts isolated and endpoint guards pass; recon resources arrive in Phase 6 |
 | X2 | Time & space complexity of core logic + small benchmark; where it stops scaling and why | `RECONCILIATION.md §8`, `DECISIONS.md` "Where the system stops scaling", README complexity section | `ReconciliationBenchmarkIT`, k6 | |
-| X3 | Fault tolerance: crashes, timeouts, duplicate & out-of-order messages, partial failures; ≥ 1 failure-injection test | `DESIGN.md §6`, `FaultInjector` | `OutboxCrashRecoveryIT`, `OutboxRetryIT` (timeouts), `ReconciliationRecoveryIT` (partial failure) | |
+| X3 | Fault tolerance: crashes, timeouts, duplicate & out-of-order messages, partial failures; ≥ 1 failure-injection test | `DESIGN.md §6`, `FaultInjector` | `OutboxCrashRecoveryIT`, `OutboxRetryIT` (timeouts), `ReconciliationRecoveryIT` (partial failure) | partial — publisher crash/retry/timeout/rehire proof complete; reconciliation recovery arrives in Phase 6 |
 | X4 | OOP: encapsulation, inheritance, polymorphism; controller/service/repository layering | `docs/DESIGN.md` layering and entity/command hierarchies | `ArchitectureTest` + code review | partial — sealed commands, composed rules and domain/API ArchUnit checks pass; entity encapsulation arrives later |
 | X5 | Trade-offs: consistency vs availability vs latency; what was left out | `DECISIONS.md` | — | |
 | X6 | Metrics + structured logging; 3 AM counters: lag, error rate, rejections, retries, queue depth | `OBSERVABILITY.md` | `MetricsIT` | |

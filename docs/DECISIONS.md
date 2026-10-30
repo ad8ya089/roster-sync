@@ -13,11 +13,13 @@ Short ADRs. Each: decision → why → what we gave up → when we'd revisit. Th
 - **Revisit:** if a source can only send deltas → buffer per employee until the gap is filled, with a timeout, or rely on nightly heal.
 
 ## ADR-003 No message broker; transactional outbox in Postgres + poller
+- **Transaction scope:** one claimed row per transaction, including its bounded dispatch; never one transaction across the batch. One production poller selects due rows by id; retries scheduled for later do not block newer rows. Multiple pollers are safe with SKIP LOCKED, but neither retries nor multiple pollers promise global delivery order.
 - **Why:** the brief wants one-command run; the outbox gives the "DB update and event can never disagree" guarantee with zero extra infrastructure. `FOR UPDATE SKIP LOCKED` makes the poller safe even with several instances.
 - **Gave up:** latency (≤ poll interval, 500 ms) and DB load from polling; no fan-out to external consumers out of the box.
 - **Revisit:** many consumers or > ~1k events/s → keep the outbox table and relay it to Kafka (poller or Debezium CDC on the WAL). The `EventSink` interface is the seam.
 
 ## ADR-004 At-least-once delivery + idempotent consumers (not "exactly once")
+- **Timeout and reordering:** a timed-out sink keeps running and may commit after the publisher records a failure. Consumers deduplicate `(sink,event_id)` in their own transaction and check current employee state/version. A delayed deactivation skips ACTIVE employees after rehire; event versions need not change for reconciliation deactivation. The handler locks employees FOR UPDATE; booking creation uses FOR SHARE. Never infer current state from arrival order alone.
 - **Why:** exactly-once across a DB and a broker needs distributed transactions; at-least-once + `eventId` dedupe + version-aware consumers gives the same observable result.
 - **Gave up:** consumers must be written idempotently (ours are: cancel-if-scheduled, free-seat-if-held).
 
@@ -97,7 +99,7 @@ Kafka/RabbitMQ, Debezium, Redis, Kubernetes, an OIDC provider, refresh tokens, P
 ## Phase 4 transaction choices
 - Receipt INSERT reserves a key before locking the employee. Unique-create collisions abort PostgreSQL transactions; retry the entire apply call once from the non-transactional ingestion service. Lock failures get up to three retries (four total attempts), with 20–100 ms jitter outside transactions.
 - Rejections/conflicts are audited through REQUIRES_NEW only after the failed apply transaction has rolled back. Conflict payloads never replace accepted receipt hashes.
-- Office activity is checked under a shared lock and refreshed explicitly: a query returning an already-managed office may otherwise retain stale first-level-cache fields. DEACTIVATE carries existing office references and does not introduce/revalidate a submitted office.
+- Office activity is checked with a plain READ COMMITTED read and refreshed explicitly without a lock: a query returning an already-managed office may otherwise retain stale first-level-cache fields. DEACTIVATE carries existing office references and does not introduce/revalidate a submitted office.
 - The APPLY_AFTER_EMPLOYEE_WRITE hook runs after employee flush and outbox insertion but before commit, allowing one fault to prove JPA/JDBC/receipt atomicity. It remains inert in deployed code during Phase 4.
 - Outbox JSONB is serialized with Boot's Jackson 3 JsonMapper and bound using CAST(? AS jsonb) on the JpaTransactionManager connection.
 
@@ -105,3 +107,9 @@ For early JSON body rejection, Tomcat drains at most 4 MiB (OVERSIZE_SWALLOW_LIM
 
 ## Office-read follow-up (Phase 5 entry)
 The previous office mode was JPA PESSIMISTIC_READ (PostgreSQL FOR SHARE), including refresh. It is now a plain READ COMMITTED lookup/refresh with LockModeType.NONE: office rows are not locked by ingestion. A deactivation just after the read is a benign race; the FK guarantees existence and the next event observes the inactive office. This avoids per-office contention and multixact overhead. Employee version/order locks remain unchanged.
+
+## Phase 5 operational limits
+- The scheduled production poller is single-instance and uses id order among due rows. SKIP LOCKED permits concurrent publishers, proved with 500 rows, but retries deliberately allow later ids through. Consumers cannot rely on global delivery order.
+- Retention is looped in 5,000-row REQUIRES_NEW transactions to release locks between batches. One scheduler instance is assumed; use ShedLock or equivalent coordination before multi-instance scheduling. Runtime timestamps come from Clock; SQL defaults remain schema defaults only.
+- Demo faults are instance-wide diagnostics, not tenant data. HALT is enabled only with demo and requires OPERATOR; prod alone has no dev controllers. Outbox/alert access and mutations always scope by the caller's tenant.
+- Bookings/seats remain a deliberately small JDBC-backed transport stub; bulk cancellation/free-seat operations share the consumer transaction. Employee access stays through tenant-explicit JPA repositories and their row locks.

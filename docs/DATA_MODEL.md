@@ -235,6 +235,7 @@ CREATE TABLE processed_event (
   processed_at TIMESTAMPTZ NOT NULL DEFAULT now(),
   PRIMARY KEY (sink, event_id)
 );
+CREATE INDEX ix_processed_event_retention ON processed_event (processed_at);
 ```
 A sink inserts `(sink, event_id)` first in its own transaction; if the row already exists the event was handled before and the sink returns immediately.
 

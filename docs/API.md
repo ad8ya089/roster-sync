@@ -222,6 +222,7 @@ All dev endpoints require OPERATOR. The interview deployment intentionally enabl
 | `GET /dev/export.csv?truncateAt=120000&mutatePercent=1&dropPercent=0.5` | stream a CSV "HR export" of the current DB, optionally cut short / with changed rows / with missing rows, plus a correct trailer unless truncated |
 | `POST /dev/faults {"point":"OUTBOX_BEFORE_MARK_PUBLISHED","mode":"HALT"}` | arm a one-shot fault (HALT = `Runtime.halt(137)`, i.e. kill -9 semantics; THROW; DELAY_MS) |
 | `DELETE /dev/faults` | disarm |
+| `GET /dev/faults` | list armed faults, ordered by point |
 
 ### Receipt replay and conflicts
 
@@ -233,3 +234,10 @@ The receipt payload hash includes event type plus normalized, ownership-filtered
 - GET /employees returns PageResponse {items,page,size,totalElements}; page >= 0, size 1–200. Receipt history uses the same DTO, version descending, exposing only version/type/outcome/receivedAt.
 - Transport PATCH parses a Map: null clears, absent retains, and unchanged values produce no transport version bump or outbox event. It is allowed for INACTIVE employees. HR-owned keys -> 400 FIELD_NOT_OWNED_BY_SOURCE; unknown keys -> 400 UNKNOWN_FIELD.
 - HR outbox events use source API and aggregate_version=new hr_version. TransportProfileUpdated uses source TRANSPORT_ADMIN and the current HR aggregate version; its changedFields contain names only and values is empty. Its separate transport version is returned in the employee view.
+
+## Phase 5 delivery and operations
+- POST /bookings returns 201 with {id,employeeId,pickupAt,status,cancelReason}. An INACTIVE employee returns 409 EMPLOYEE_INACTIVE. GET /employees/{id}/bookings is TRANSPORT_ADMIN or EMPLOYEE (self); other employees/cross-tenant ids return 404. GET /routes/{routeCode}/seats is TRANSPORT_ADMIN, ordered by seat number; missing/cross-tenant routes return 404.
+- GET /ops/outbox returns PageResponse {items,page,size,totalElements}, newest id first, size 1–200. Status accepts PENDING, PUBLISHED or DEAD. Items expose metadata and exception class names, never payload values. POST /ops/outbox/{id}/retry returns 204 only for DEAD; other states return 409 INVALID_OUTBOX_STATE, missing/cross-tenant ids 404.
+- GET /ops/alerts?acknowledged=false returns at most 200 recent alerts. POST /ops/alerts/{id}/ack returns 204; repeated acknowledgement preserves its original timestamp/user. Both are tenant-scoped and OPERATOR-only.
+- Faults are demo-instance-wide diagnostic controls, all OPERATOR-only; they are absent with prod alone. POST /dev/faults accepts point, mode, optional oneShot (default true), delayMs (0–60000, default 1000). HALT is refused outside demo with 409 INVALID_STATE even if called internally. GET lists armed faults; DELETE disarms all. Arming is in memory, so restart clears it. DELAY_MS pauses the selected fault point; a sink-delay test exercises the separate dispatch timeout.
+- Sink delivery is at least once. Timeout does not stop work; consumers must deduplicate and check current state/version. Only future SCHEDULED bookings are cancelled, and a delayed deactivation skips an employee who is ACTIVE again.

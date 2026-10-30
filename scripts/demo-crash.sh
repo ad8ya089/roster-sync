@@ -20,6 +20,10 @@ for ((attempt=0;attempt<60;attempt++)); do
   sleep 0.2
 done
 echo "$STATE"; docker compose ps -a
+# A fast restart can finish between polls. Docker's retained die event proves exit 137.
+docker events --since 2m --until "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+  --filter "container=$(docker compose ps -aq app)" --filter event=die \
+  --format 'container.die exitCode={{index .Actor.Attributes "exitCode"}}'
 for ((attempt=0;attempt<90;attempt++)); do
   if curl --fail --silent "${BASE%/api/v1}/actuator/health/readiness" >/dev/null; then break; fi
   sleep 1

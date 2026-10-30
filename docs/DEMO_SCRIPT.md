@@ -102,7 +102,7 @@ curl -s $BASE/hr/events -H "authorization: Bearer $HR" -H 'content-type: applica
  {"type":"UPDATE","employeeId":"E2001","version":9,"name":"Demo User","email":"demo.user@acme.test","phone":"+919800000101",
   "managerId":"E1001","officeCode":"BLR-1","shiftCode":"S2","status":"ACTIVE"}]}' | jq '.results[0].outcome'   # APPLIED
 docker compose ps            # app restarting (exit 137)
-sleep 20; docker compose logs app | grep -c '"outbox.published"'   # event for E2001 v9 published after restart
+sleep 20; docker compose logs app | grep 'outbox.published' | grep 'employeeId=E2001 version=9'   # shows its eventId after restart
 curl -s $BASE/ops/summary -H "authorization: Bearer $OPS" | jq .outbox   # pending 0
 ```
 Narrate: the employee row and outbox row committed together; the process died before publishing; on restart the poller found the PENDING row. Automated version: `OutboxCrashRecoveryIT`.
@@ -129,6 +129,10 @@ curl -s localhost:8080/actuator/prometheus -H "authorization: Bearer $OPS" | gre
 ```
 Close with the README benchmark table and test count (`mvn verify` summary screenshot).
 
-Phase 4 note for step 4: `/ops/summary` arrives in Phase 7. Until then compare outbox counts using `docker compose exec -T db psql -U roster -d rostersync -At -c 'SELECT count(*) FROM outbox_event'` before/after replay. This checks the same invariant without adding a premature ops endpoint. Publishing and booking side effects remain Phase 5 work.
+Phase 4 note for step 4: `/ops/summary` arrives in Phase 7. Until then compare outbox counts using `docker compose exec -T db psql -U roster -d rostersync -At -c 'SELECT count(*) FROM outbox_event'` before/after replay. This checks the same invariant without adding a premature ops endpoint. Publishing and booking side effects are implemented in Phase 5.
 
 The mixed feed remains 50 events: first send yields 44 APPLIED, 3 STALE (delayed v2 after v5) and 3 in-batch DUPLICATE; replay yields 50 DUPLICATE with originalOutcome APPLIED/STALE. Three v4 events are replaced by duplicates, keeping the fixture at 50 records.
+
+For a repeatable standalone step 9 on Linux or Git Bash/Windows, run `./scripts/demo-crash.sh` (curl + jq required). It uses a unique employee id, shows `docker compose ps -a` plus exit/restart metadata, then prints the exact eventId's published line. HALT is one-shot and arming disappears on restart. Check outbox status directly with psql until /ops/summary arrives in Phase 7. Step 10 keeps the past booking untouched, cancels both future scheduled bookings and clears seat 2; a delayed old deactivation after rehire is skipped.
+
+Phase 5 clean-volume verification (2026-10-30): the portable crash script returned APPLIED, Docker retained `container.die exitCode=137`, restart count reached 2 after two intentional smoke runs, and the restarted process published eventId `9a80d461-9239-42b3-ba32-d4d0dda2869e`. Both Compose services became healthy. Step 10 returned APPLIED, changed the two future bookings to CANCELLED / EMPLOYEE_DEACTIVATED, retained the completed past booking and freed seat 2. The mixed feed produced 44 applied / 3 stale / 3 duplicate; replay produced 50 duplicate and the pending outbox returned zero.

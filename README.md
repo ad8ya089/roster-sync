@@ -95,14 +95,14 @@ Higher-version identical snapshots, including DEACTIVATE on INACTIVE employees o
 Event apply: O(log M) index lookup, O(1) memory. Reconciliation: O(N + M) time, O(N/B) heap with B = 256 buckets, O(N) temp disk. First scaling limits: single Postgres writer, single outbox poller, table growth, per-row apply for mass changes.
 
 ## Tests _(counts filled in Phase 8)_
-Full `./mvnw -B verify` passes 136 unit/property/architecture tests and 92 PostgreSQL integration tests (228 total), with no failures, errors or skips. Two jqwik properties each run 1,000 trials with fixed seeds `2026103001` and `2026103002`, including maximum-version preservation across deactivations and identical snapshots. JaCoCo reports domain coverage at `target/site/jacoco/index.html`, without a gate. Integration tests prove migrations, health, auth/tenancy, per-record ingestion, replay, ordering, rollback, ownership and concurrency. Later phases add publisher crash recovery, reconciliation benchmarks and k6 load tests.
+Full `./mvnw -B verify` passes 138 unit/property/architecture tests and 105 PostgreSQL integration tests (243 total), with no failures, errors or skips. Two jqwik properties each run 1,000 trials with fixed seeds `2026103001` and `2026103002`, including maximum-version preservation across deactivations and identical snapshots. JaCoCo reports domain coverage at `target/site/jacoco/index.html`, without a gate. Integration tests prove migrations, health, auth/tenancy, per-record ingestion, replay, ordering, rollback, ownership and concurrency. Phase 5 adds real application-context restart recovery, concurrent publisher, timeout/retry, retention and rehire proof. Later phases add reconciliation benchmarks and k6 load tests.
 
 ## Demo video
 _link here_
 
 ## Local verification status
 
-Verified on 2026-10-30 with Docker Desktop's Linux/WSL2 engine: clean-volume `docker compose up --build -d` succeeds. Readiness became UP in 33.36 seconds, and in 22.63 seconds after restarting the app. All 13 core tables plus Flyway history exist; demo fixture counts are correct and unchanged after restart. All 30 captured application log lines were ECS JSON without fixture PII or sample secrets. Correlation headers and liveness pass. The container runs Temurin 21.0.13 as UID 10001 with writable `/data`.
+Verified on 2026-10-30 with Docker Desktop's Linux/WSL2 engine: clean-volume `docker compose up --build -d` succeeds. Readiness became UP in 33.36 seconds, and in 22.63 seconds after restarting the app. V1 defines 13 core tables; Phase 5 V2 adds processed_event alongside Flyway history; demo fixture counts are correct and unchanged after restart. All 30 captured application log lines were ECS JSON without fixture PII or sample secrets. Correlation headers and liveness pass. The container runs Temurin 21.0.13 as UID 10001 with writable `/data`.
 
 Host Maven and Maven inside the build image reach Maven Central directly. The plain Docker build succeeds without HTTP_PROXY/HTTPS_PROXY build arguments, and Docker client automatic proxy defaults were unset. No proxy URLs, credentials, or network-specific defaults are committed. The temporary Maven settings used during initial setup remain outside the repository. First builds download images and dependencies; subsequent builds reuse the Maven build layers.
 
@@ -116,9 +116,16 @@ curl --fail-with-body localhost:8080/api/v1/hr/events \
   -H 'Content-Type: application/json' --data-binary @samples/feed.json
 ```
 
-The 50-event fixture creates/updates/deactivates/reactivates ten employees. Replaying it returns 50 DUPLICATE results, preserving employee row contents, receipts and outbox counts. Each duplicate includes originalOutcome. `samples/bad-batch.json` returns three APPLIED and two REJECTED results; rejected keys remain available for correction. Conflicts are audited with VERSION_CONFLICT and never keep a new receipt.
+The 50-event fixture creates/updates/deactivates/reactivates ten employees; its first send reports 44 APPLIED, 3 STALE and 3 in-batch DUPLICATE. Replaying it returns 50 DUPLICATE results, preserving employee row contents, receipts and outbox counts. Each duplicate includes originalOutcome. `samples/bad-batch.json` returns three APPLIED and two REJECTED results; rejected keys remain available for correction. Conflicts are audited with VERSION_CONFLICT and never keep a new receipt.
 
 GET `/api/v1/employees`, `/employees/{id}`, `/employees/{id}/events` and `/me` enforce role, tenant and employee self-access. Lists return `{items,page,size,totalElements}` with size 1–200. PATCH `/employees/{id}/transport-fields` distinguishes null (clear) from absent (retain), supports inactive employees, and leaves versions/outbox untouched on a no-op. Only transport-owned fields are accepted.
 
-HR batches contain 1–1000 records and at most 2 MiB (2,097,152 bytes). Both Content-Length and chunked bodies are bounded. Accepted event content is hashed with its type; eventId/occurredAt are excluded. Higher identical content advances the HR version/timestamp with NO_CHANGE and no Employee event. Publishing is deliberately deferred to Phase 5, so current outbox rows remain PENDING.
+HR batches contain 1–1000 records and at most 2 MiB (2,097,152 bytes). Both Content-Length and chunked bodies are bounded. Accepted event content is hashed with its type; eventId/occurredAt are excluded. Higher identical content advances the HR version/timestamp with NO_CHANGE and no Employee event. The Phase 5 publisher delivers committed outbox rows asynchronously, one transaction per row, with bounded sink execution, retries and consumer deduplication.
 
+
+## Outbox crash and side effects
+Run `./scripts/demo-crash.sh` from Linux or Git Bash on Windows (curl, jq and Docker CLI required). It arms a demo-only one-shot HALT, sends a unique employee event, shows the exit/restart and prints that eventId's published log line after readiness returns. Demo credentials come from the ignored .env or environment. Tokens and passwords are not printed.
+
+Each publisher tick handles up to OUTBOX_BATCH_SIZE rows (default 100), each in its own transaction with FOR UPDATE SKIP LOCKED. Sink calls use four threads, queue 100 and OUTBOX_SINK_TIMEOUT (default 2s). A timeout does not cancel the sink: late completion and redelivery are possible. Consumers deduplicate `(sink,event_id)` and check current state. Retry delays start at 1s and double to 300s; OUTBOX_MAX_ATTEMPTS (default 10) ends in DEAD with one alert. OPERATOR can inspect tenant-scoped outbox/alerts and retry DEAD rows. Acknowledgement is idempotent. Delayed rows do not block newer events.
+
+Deactivation cancels only future SCHEDULED bookings and frees seats, in an independent consumer transaction. The employee FOR UPDATE lock serializes the status check with rehire; booking creation uses FOR SHARE and rejects inactive employees. Retention runs in 5,000-row transactions at RETENTION_CRON. A single scheduler instance is assumed; multi-instance retention would need ShedLock. Graceful shutdown stops claims and allows 20 seconds per phase.
