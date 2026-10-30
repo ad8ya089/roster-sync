@@ -38,7 +38,7 @@ Rules every agent must follow:
 - **Logs** contain IDs, codes, counts, durations — never PII values, never request/response bodies. Structured fields: `tenantId`, `correlationId`, `employeeId`, `runId`, `eventId`, `outcome`, `errorCodes`.
 - **Error responses and per-record reports** contain field names and codes — never the rejected value.
 - **`record_rejection`, `ops_alert`, `outbox_event.last_error`** — codes and IDs only.
-- **Java records** that hold PII (`HrSnapshot`, request DTOs, `EmployeeView`) override `toString()` to print only `employeeId` and non-PII fields. (Records auto-generate a `toString` with every field — the most common accidental leak.)
+- **Java records** that hold PII override `toString()`. `HrSnapshot` prints only manager/office/shift/status, without an employee ID; credential/token DTOs redact credentials and tokens. Employee views expose only permitted non-PII metadata in their string representation. Default record string output would include every field.
 - **Exceptions:** Postgres messages can contain rejected values. `GlobalExceptionHandler` forwards no persistence/parse messages and logs unexpected failures once using exception class and correlation ID only. Duplicate offices are recognized by structured PostgreSQL constraint name and SQLSTATE, never by message text. Jackson failures map to generic `MALFORMED_JSON`. Validation exposes only field names and codes. Problem instances use fixed `/api/v1`, avoiding request-path leaks.
 - **SQL logging:** `spring.jpa.show-sql=false`; Hibernate bind-parameter logging (`org.hibernate.orm.jdbc.bind`) must stay at `INFO` or above.
 - Hibernate SQL exception diagnostics are disabled because driver messages can contain values; the handler records safe metadata instead.

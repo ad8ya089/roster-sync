@@ -35,8 +35,10 @@ Rules: never echo the rejected **value**; never include stack traces, SQL, const
 | 401 | `UNAUTHENTICATED`, `TOKEN_EXPIRED` |
 | 403 | `FORBIDDEN` |
 | 404 | `NOT_FOUND` (also for another tenant's resources) |
-| 409 | `RECON_RUN_ALREADY_ACTIVE`, `INVALID_RUN_STATE`, `CONCURRENT_MODIFICATION` |
+| 405 | `METHOD_NOT_ALLOWED` |
+| 409 | `OFFICE_CODE_EXISTS`, `RECON_RUN_ALREADY_ACTIVE`, `INVALID_RUN_STATE`, `CONCURRENT_MODIFICATION` |
 | 413 | `PAYLOAD_TOO_LARGE` |
+| 415 | `UNSUPPORTED_MEDIA_TYPE` |
 | 503 | `DEPENDENCY_UNAVAILABLE` (DB down) |
 | 500 | `INTERNAL_ERROR` (message is generic; details only in logs, by correlationId) |
 
@@ -55,6 +57,8 @@ Warnings (record still applied): `FIELD_NOT_OWNED_BY_SOURCE` (e.g. HR sent `pick
 → 200 { "accessToken": "eyJ…", "tokenType": "Bearer", "expiresIn": 3600, "role": "HR_SYSTEM", "tenant": "acme" }
 ```
 Wrong credentials → 401 `UNAUTHENTICATED` (same message for unknown user and wrong password). JWT (HS256) claims: `sub`, `tid` (tenant UUID), `tcode`, `role`, `emp` (employee id, EMPLOYEE only), `iat`, `exp`.
+
+Disabled users also receive the same 401. Login performs one BCrypt match even for unknown accounts. Tokens expire after one hour by default, with a 30-second clock allowance; expired tokens return `TOKEN_EXPIRED` using a distinct validator error code. Unknown roles, missing tenant/identity claims or EMPLOYEE tokens without `emp` return `UNAUTHENTICATED`. Validation is stateless: disabling an account prevents new tokens, while an existing token remains valid until expiry.
 
 ---
 
@@ -130,7 +134,16 @@ Employee response:
 ```
 
 ## Offices
-`GET /offices`, `POST /offices {code, name}`, `PATCH /offices/{code} {name, active}` — TRANSPORT_ADMIN. Writes evict the office cache.
+| Method & path | Roles | Response |
+|---|---|---|
+| `GET /offices?includeInactive=true` | TRANSPORT_ADMIN, OPERATOR | 200, array of `{code, name, active}`, sorted by code; false excludes inactive offices |
+| `GET /offices/{code}` | TRANSPORT_ADMIN, OPERATOR | 200, `{code, name, active}` |
+| `POST /offices {code, name}` | TRANSPORT_ADMIN | 201, `{code, name, active: true}` |
+| `PATCH /offices/{code} {name, active}` | TRANSPORT_ADMIN | 200, updated office; omitted properties retain their values |
+
+Codes match `^[A-Z0-9-]{1,32}$`; names contain 1–200 characters and cannot be blank. Duplicate code within a tenant returns 409 `OFFICE_CODE_EXISTS`; the same code may exist in different tenants. A cross-tenant or missing office returns 404. Role authorization runs before the resource lookup, so a disallowed role receives 403 for both existing and absent offices.
+
+Deactivation is allowed: existing employees keep their office references; future HR records using that office fail validation with `INACTIVE_OFFICE`. The database-backed `OfficeLookup` port is the cache seam; Phase 7 adds caching and write eviction. Invalid path/query types return 400 `VALIDATION_FAILED` with field names and codes only. Error instances use the fixed `/api/v1` URI so malformed request paths cannot leak input values.
 
 ## Bookings (stub transport domain, for side effects)
 `POST /bookings {employeeId, pickupAt}` — TRANSPORT_ADMIN; rejects inactive employees (`409 EMPLOYEE_INACTIVE`).

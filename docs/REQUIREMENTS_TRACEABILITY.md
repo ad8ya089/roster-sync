@@ -20,7 +20,7 @@ Every sentence of the case-study PDF, mapped to design, code and proof. Agents m
 |---|---|---|---|---|
 | I1 | Create, update and deactivate events | `HrCommand` sealed hierarchy (`CreateEmployee`, `UpdateEmployee`, `DeactivateEmployee`) + `HrEventType` enum | `ChangeDeciderTest`, `DeactivationIT` | |
 | I2 | …each with the source system's version or timestamp | `version` (long); timestamp sources send epoch millis — documented in README/API.md | `RecordValidatorTest` (version ≤ 0 rejected) | |
-| I3 | Reject invalid records (malformed phone, unknown office code) | E.164 phone rule, office lookup via cache + in-tx check | `RecordValidatorTest`, `BatchIsolationIT` | |
+| I3 | Reject invalid records (malformed phone, unknown office code) | E.164 phone rule, office lookup via cache + in-tx check | `RecordValidatorTest`, `BatchIsolationIT` | partial — pure validation and database-backed office status checks pass; ingest transaction/cache checks arrive later |
 | I4 | …with a per-record error report | response `results[i].errors[{field, code}]`; `record_rejection` table; `/reconciliation/runs/{id}/rejections` | `BatchIsolationIT`, `ReconciliationFlowIT.badRows` | |
 | I5 | One bad record must never fail a whole batch | per-record transaction (`EmployeeChangeApplier` separate bean, `@Transactional`), file rows rejected individually | `BatchIsolationIT`, `ReconciliationFlowIT.badRows` | |
 
@@ -69,7 +69,7 @@ Every sentence of the case-study PDF, mapped to design, code and proof. Agents m
 | K1 | Define the idempotency key and the version comparison | README + `API.md` + `DESIGN.md §2` | — | |
 | K2 | Show a test that replays the same feed twice and changes nothing | `ReplayIdempotencyIT` | itself | |
 | K3 | Safety brake threshold configurable | property `BRAKE_MAX_MISSING_RATIO`, per-tenant `PUT /settings/reconciliation` | `SafetyBrakeTest`, `ReconciliationFlowIT.thresholdChangeTakesEffect` | partial — configurable exact brake thresholds unit-tested; tenant settings API arrives in Phase 6 |
-| K4 | Never write personal data into logs or error reports. Use employee IDs | `SECURITY.md §4` | `PiiLeakIT` | |
+| K4 | Never write personal data into logs or error reports. Use employee IDs | `SECURITY.md §4` | `ErrorHandlingIT`, `PiiLeakIT` | partial — auth/office error and log canaries pass; full ingest/recon PII proof comes with those flows |
 | K5 | Diff a 200,000-row snapshot in under 60 s with bounded memory | `ReconciliationBenchmarkIT` | README benchmark table | |
 | K6 | Run a test that crashes the process between the DB write and the event publish | `OutboxCrashRecoveryIT.crashAfterCommitBeforePublish` (+ live kill -9 demo) | itself | |
 
@@ -77,15 +77,15 @@ Every sentence of the case-study PDF, mapped to design, code and proof. Agents m
 
 | # | Plus point | Where | Proof | Status |
 |---|---|---|---|---|
-| X1 | Authentication + role-based access (employee vs admin vs operator) | `SECURITY.md §1–2` | `AuthorizationIT` | |
-| X1b | Tenant isolation — one client can never read another's data | `SECURITY.md §3` | `TenantIsolationIT`, `ArchitectureTest` | |
+| X1 | Authentication + role-based access (employee vs admin vs operator) | `SECURITY.md §1–2` | `AuthorizationIT`, `SecuredEndpointsTest`, `JwtTokenServiceTest`, `LoginTimingTest` | done for current endpoints — JWT/RBAC matrix and automatic future-handler guards pass |
+| X1b | Tenant isolation — one client can never read another's data | `SECURITY.md §3` | `TenantIsolationIT`, `ArchitectureTest`, `TenantContextFilterTest` | partial — office reads/writes, repository tenant parameters and thread cleanup proven; later resources extend isolation tests |
 | X2 | Time & space complexity of core logic + small benchmark; where it stops scaling and why | `RECONCILIATION.md §8`, `DECISIONS.md` "Where the system stops scaling", README complexity section | `ReconciliationBenchmarkIT`, k6 | |
 | X3 | Fault tolerance: crashes, timeouts, duplicate & out-of-order messages, partial failures; ≥ 1 failure-injection test | `DESIGN.md §6`, `FaultInjector` | `OutboxCrashRecoveryIT`, `OutboxRetryIT` (timeouts), `ReconciliationRecoveryIT` (partial failure) | |
 | X4 | OOP: encapsulation, inheritance, polymorphism; controller/service/repository layering | `docs/DESIGN.md` layering and entity/command hierarchies | `ArchitectureTest` + code review | partial — sealed commands, composed rules and domain/API ArchUnit checks pass; entity encapsulation arrives later |
 | X5 | Trade-offs: consistency vs availability vs latency; what was left out | `DECISIONS.md` | — | |
 | X6 | Metrics + structured logging; 3 AM counters: lag, error rate, rejections, retries, queue depth | `OBSERVABILITY.md` | `MetricsIT` | |
 | X7 | Caching for hot data, eviction policy, what can be stale / how long / how bounded | `CACHING.md` | `CachingIT` | |
-| X8 | Error handling framework, meaningful non-leaking messages, no PII in logs or error responses | `SECURITY.md §5` | `ErrorHandlingIT`, `PiiLeakIT` | partial — safe error/correlation foundation tested; full mappings and PII-flow proof arrive later |
+| X8 | Error handling framework, meaningful non-leaking messages, no PII in logs or error responses | `SECURITY.md §5` | `ErrorHandlingIT`, `PiiLeakIT` | partial — complete current HTTP mappings, auth errors, real DB conflict and malformed-input canaries pass; full-flow PII proof arrives later |
 
 ## Advanced track
 
@@ -94,7 +94,7 @@ Every sentence of the case-study PDF, mapped to design, code and proof. Agents m
 | A1 | Every hard rule has an automated test, incl. ≥ 1 concurrency and ≥ 1 failure test | this file + `TESTING.md` | |
 | A2 | Load test / benchmark with throughput and p50/p99, in README with the machine | `TESTING.md` benchmark + k6; README "Benchmarks" | |
 | A3 | Design note (1–2 pages): architecture diagram, sequence diagram for hardest flow, failure-mode table | `docs/DESIGN.md` | |
-| A4 | One-command run incl. DB/broker | `docker compose up` | done — clean-volume Compose build/run verified; readiness 33.36 s; schema/seed/log/restart checks pass |
+| A4 | One-command run incl. DB/broker | `docker compose up` | done — fresh-volume Phase 3 build/run healthy; curl login succeeds for all seven demo users and office lists remain tenant-scoped |
 
 ## Instructions
 

@@ -31,7 +31,8 @@ class ArchitectureTest {
         for (var type : CLASSES) {
             if (type.isInterface() && type.getPackageName().contains(".infrastructure.persistence")
                     && (type.getSimpleName().endsWith("Repository") || type.getSimpleName().endsWith("RepositoryWrites"))) {
-                for (var method : type.getMethods()) {
+                for (var method : type.getAllMethods()) {
+                    if (method.getOwner().isEquivalentTo(Object.class)) continue;
                     if (type.getSimpleName().equals("AppUserRepository") && method.getName().equals("findByUsername")
                             && method.getRawParameterTypes().size() == 1
                             && method.getRawParameterTypes().getFirst().isEquivalentTo(String.class)) continue;

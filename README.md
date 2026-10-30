@@ -2,7 +2,7 @@
 
 MoveInSync Backend Case Study 5 (Advanced Track). Java 21 · Spring Boot 4.1 · PostgreSQL 17 · one `docker compose up`.
 
-> Status: **Phases 1–2 implemented and verified locally**. The scaffold, schema, demo seed, health/error foundation and pure Java domain core are present. Business APIs arrive in later phases. Benchmark results will be measured in Phase 8.
+> Status: **Phases 1–3 implemented and verified locally**. JWT login, role authorization, tenant-scoped offices and safe HTTP errors are available alongside the schema, demo fixtures and pure Java domain core. Employee ingestion starts in Phase 4. Benchmark results will be measured in Phase 8.
 
 ## Target behavior
 
@@ -32,15 +32,27 @@ Local builds require JDK 21 or newer; JDK 22 is supported with `maven.compiler.r
 
 In PowerShell, replace `./mvnw` with `.\mvnw.cmd`. Docker and CI use Temurin 21. A network proxy, if required by your machine, belongs in your local Maven settings rather than the repository.
 
-Phase 1 provides public `/actuator/health/liveness` and `/actuator/health/readiness` probes. Readiness includes database connectivity. Other routes fail closed until JWT authentication and RBAC are implemented in Phase 3. Both demo and production logging use ECS JSON; correlation IDs are returned in `X-Correlation-Id`.
+Public `/actuator/health/liveness` and `/actuator/health/readiness` probes include database connectivity in readiness. POST `/api/v1/auth/token` is the only other public route. Other routes require a signed bearer token; API controller methods declare their allowed roles. Both demo and production logging use ECS JSON; correlation IDs appear in `X-Correlation-Id` and error bodies, including 401/403 responses.
 
 The `demo` profile seeds tenants `acme` and `globex`, offices `BLR-1`, `BLR-2`, inactive `BLR-3`, and `HYD-1`. Seeded usernames are `acme.hr`, `acme.admin`, `acme.operator`, `E1001`, `globex.hr`, `globex.admin` and `globex.operator`; their password comes from `DEMO_PASSWORD`. Acme has employees `E1001`–`E1005`, two future bookings and one completed booking for `E1002`, and route `R-BLR-07` with four seats. Restarting preserves existing data.
 
 Compose defaults to `demo`. Ordinary production uses `prod` alone, without demo fixtures or dev endpoints. The interview deployment intentionally enables `prod,demo`; its future dev endpoints require OPERATOR authentication. Change all example credentials before exposing an interview deployment publicly.
 
+Log in using the `DEMO_PASSWORD` chosen in `.env`, then pass the returned `accessToken`:
+
+```bash
+curl --fail-with-body localhost:8080/api/v1/auth/token \
+  -H 'Content-Type: application/json' \
+  -d '{"username":"acme.admin","password":"<your DEMO_PASSWORD>"}'
+curl --fail-with-body localhost:8080/api/v1/offices \
+  -H 'Authorization: Bearer <accessToken>'
+```
+
+Office reads allow TRANSPORT_ADMIN and OPERATOR; writes require TRANSPORT_ADMIN. Globex admins see their own offices, and accessing an Acme office returns 404. JWTs use HS256 with a secret of at least 32 UTF-8 bytes, expire after one hour by default, and allow 30 seconds of clock skew. Disabling a user prevents new tokens; existing tokens remain valid until expiry because validation is stateless. Details and response contracts are in [`docs/API.md`](docs/API.md) and [`docs/SECURITY.md`](docs/SECURITY.md).
+
 ## The rules, stated precisely
 
-**Idempotency key:** `(tenantId, employeeId, version)`. **Version comparison** (per employee, under a row lock): `incoming > current` → apply · `incoming < current` → `STALE` (ignored) · equal → `DUPLICATE` if the payload hash matches, else `CONFLICT`. Events carry the **full HR-owned state** at that version, so the final state never depends on arrival order.
+**Idempotency key:** `(tenantId, employeeId, version)`. **Version comparison** (per employee, under a row lock): newer version → `APPLIED` when content changes, `NO_CHANGE` when identical · older → `STALE` · equal → `DUPLICATE` if the payload hash matches, else `CONFLICT`. CREATE/UPDATE carry the **full HR-owned state** at that version, so their final state never depends on arrival order.
 
 Higher-version identical snapshots, including DEACTIVATE on INACTIVE employees or tombstones, produce `VersionAdvanced` with outcome `NO_CHANGE`: advance the HR version/timestamp and write no outbox event. `Apply` requires non-empty changed fields and exactly one Employee outbox event. Equal versions with the same content remain `DUPLICATE`. The full rules are in `docs/API.md`.
 
@@ -83,7 +95,7 @@ Higher-version identical snapshots, including DEACTIVATE on INACTIVE employees o
 Event apply: O(log M) index lookup, O(1) memory. Reconciliation: O(N + M) time, O(N/B) heap with B = 256 buckets, O(N) temp disk. First scaling limits: single Postgres writer, single outbox poller, table growth, per-row apply for mass changes.
 
 ## Tests _(counts filled in Phase 8)_
-Full `./mvnw -B verify` passes 99 unit/property/architecture tests and 7 PostgreSQL integration tests (106 total), with no failures, errors or skips. The jqwik property runs 1,000 trials with fixed seed `2026103001`. Domain line coverage is 99.40% (JaCoCo, no gate). Integration tests prove migrations, health and demo seeding. Later phases add concurrency, failure-injection, reconciliation benchmarks and k6 load tests.
+Full `./mvnw -B verify` passes 125 unit/property/architecture tests and 58 PostgreSQL integration tests (183 total), with no failures, errors or skips. Two jqwik properties each run 1,000 trials with fixed seeds `2026103001` and `2026103002`, including maximum-version preservation across deactivations and identical snapshots. JaCoCo reports domain coverage at `target/site/jacoco/index.html`, without a gate. Integration tests prove migrations, health, seeding, role authorization, tenant isolation and safe errors. Later phases add ingestion concurrency, failure injection, reconciliation benchmarks and k6 load tests.
 
 ## Demo video
 _link here_
@@ -93,3 +105,5 @@ _link here_
 Verified on 2026-10-30 with Docker Desktop's Linux/WSL2 engine: clean-volume `docker compose up --build -d` succeeds. Readiness became UP in 33.36 seconds, and in 22.63 seconds after restarting the app. All 13 core tables plus Flyway history exist; demo fixture counts are correct and unchanged after restart. All 30 captured application log lines were ECS JSON without fixture PII or sample secrets. Correlation headers and liveness pass. The container runs Temurin 21.0.13 as UID 10001 with writable `/data`.
 
 Host Maven and Maven inside the build image reach Maven Central directly. The plain Docker build succeeds without HTTP_PROXY/HTTPS_PROXY build arguments, and Docker client automatic proxy defaults were unset. No proxy URLs, credentials, or network-specific defaults are committed. The temporary Maven settings used during initial setup remain outside the repository. First builds download images and dependencies; subsequent builds reuse the Maven build layers.
+
+Domain line coverage after the Phase 2 correction and Phase 3 is 99.43% (349/351 lines, no gate).

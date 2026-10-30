@@ -12,7 +12,7 @@
 | Benchmark | JUnit `@Tag("benchmark")` IT, `-Xmx256m` | `mvn verify -Pbenchmark` | ~1–2 min |
 | Load test | k6 in Docker against `docker compose up` | `./scripts/loadtest.sh` | 1–2 min |
 
-One shared `AbstractIntegrationTest` starts a single Postgres container per JVM (static, reused across test classes) and truncates tables between tests (`TRUNCATE … RESTART IDENTITY CASCADE`, keeping seed tenants/offices).
+One shared `AbstractIntegrationTest` starts a single Postgres container per JVM (static, reused across test classes) and truncates all business tables between tests (`TRUNCATE … RESTART IDENTITY CASCADE`). Auth/office tests reseed their demo fixtures after truncation.
 
 ## Test catalogue (agents create exactly these; names are referenced in README and traceability)
 
@@ -109,3 +109,18 @@ JaCoCo attaches to Surefire and Failsafe, and its report is bound to `verify` wi
 Full `./mvnw -B verify` passes 99 unit/property/architecture tests and all 7 PostgreSQL integration tests, with zero failures, errors or skips. The fixed-seed property still completes 1,000 trials; domain line coverage remains 99.40%.
 
 Clean-volume Compose startup passes: readiness UP in 33.36 seconds; after app restart, UP in 22.63 seconds with fixture counts unchanged. Verified 13 core tables plus Flyway history, 2 tenants, 4 offices, 7 users, 5 employees, 3 bookings (2 future scheduled, 1 past completed), and 4 seats with E1002 in seat 2. Thirty captured application log lines parse as JSON and contain no seeded PII or sample secrets. Temurin 21.0.13 runs as UID 10001 and `/data` is writable. No proxy build arguments were needed.
+
+## Phase 3 proof (2026-10-30)
+
+`./mvnw -B verify` passes 125 unit/property/architecture tests and 58 PostgreSQL integration tests (183 total), with zero failures, errors or skips. The Phase 2 follow-up adds a second fixed-seed jqwik property: each property executes 1,000 trials (seeds `2026103001`, `2026103002`). Mixed deactivations and identical snapshots preserve the maximum source version after every arrival. The tombstone v5 → DEACTIVATE v8 → CREATE v6 → CREATE v9 regression produces NO_CHANGE → STALE → CREATED at the decision boundary; transactional receipt/timestamp/outbox assertions belong to Phase 4.
+
+- `JwtTokenServiceTest`: HS256 issuance, all roles/claims, EMPLOYEE identity, exact 30-second expiry allowance, missing/invalid claims, signature tampering, wrong key, short secret and UTF-8 byte counting.
+- `LoginTimingTest`: one real BCrypt match per unknown/wrong-password attempt, verified by a spy; disabled and malformed EMPLOYEE accounts fail generically.
+- `TenantContextFilterTest`: authenticated, failing, anonymous and second-tenant requests on the same thread cannot retain ThreadLocal/MDC state.
+- `SecuredEndpointsTest` and `AuthorizationIT`: reflected method authorization, all registered protected mappings without tokens, role × office endpoint matrix, invalid JWT cases, role-before-lookup semantics, stateless account disabling, filter order and framework anonymous-route regression.
+- `TenantIsolationIT`: cross-tenant GET/PATCH 404, same code in two tenants, duplicate 409, office/name boundaries, deactivation preserving existing employees, and INACTIVE_OFFICE through the database lookup port.
+- `ErrorHandlingIT`: malformed JSON, invalid DTO/path/query input, 404/405/413/415/500/503, real PostgreSQL unique violation, 401/403 correlation and canary-free responses/logs. Test-only fault routes are absent from the packaged application.
+
+Fresh-volume Compose build/run passes on Temurin 21. Curl obtains tokens for all seven demo accounts; acme.admin lists BLR-1/BLR-2/BLR-3, globex.admin lists HYD-1, and globex accessing BLR-1 returns 404. Anonymous offices, logout and OAuth metadata requests return 401. Domain coverage is rendered by JaCoCo at verify, without a gate.
+
+Measured Phase 3 domain line coverage is 99.43% (349/351 lines). The final repository guard also checks inherited repository methods, excluding only java.lang.Object methods and the exact login-by-username exception; inheriting an unscoped CRUD query therefore fails the guard.

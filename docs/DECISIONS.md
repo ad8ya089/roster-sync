@@ -61,6 +61,8 @@ Short ADRs. Each: decision → why → what we gave up → when we'd revisit. Th
 ## ADR-013 Our own JWTs (HS256), users in our DB
 - **Why:** demonstrable auth with roles and tenant claims without running Keycloak in compose.
 - **Gave up:** key rotation, refresh tokens, SSO, MFA. Production: an OIDC provider and RS256 with JWKS; the resource-server config barely changes.
+- **Account disabling:** bearer validation is stateless and performs no user lookup. A disabled user's existing token stays valid until its one-hour expiry (plus the 30-second clock allowance). New logins fail immediately. A short TTL limits this window; production would add a revocation list or an IdP with centrally managed sessions/revocation.
+- **Expiry classification:** use a dedicated validator error code and typed exception causes, avoiding fragile matching of library exception messages.
 
 ## ADR-014 Tenant isolation in the application layer
 - **Why:** tenant comes from the token into a request-scoped `TenantContext`; every repository method takes `tenantId`; cross-tenant reads return 404. Tests prove it per endpoint.
