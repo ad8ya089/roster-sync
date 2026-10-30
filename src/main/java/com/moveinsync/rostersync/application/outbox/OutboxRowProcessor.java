@@ -1,7 +1,6 @@
 package com.moveinsync.rostersync.application.outbox;
 import com.moveinsync.rostersync.domain.outbox.BackoffPolicy;
 import com.moveinsync.rostersync.infrastructure.fault.*;
-import io.micrometer.core.instrument.MeterRegistry;
 import java.sql.Timestamp;
 import java.time.Clock;
 import java.util.*;
@@ -19,9 +18,8 @@ public class OutboxRowProcessor {
     private final BackoffPolicy backoff;
     private final FaultInjector faults;
     private final Clock clock;
-    private final MeterRegistry metrics;
-    public OutboxRowProcessor(JdbcClient jdbc,SinkDispatcher dispatcher,BackoffPolicy backoff,FaultInjector faults,Clock clock,MeterRegistry metrics) {
-        this.jdbc=jdbc; this.dispatcher=dispatcher; this.backoff=backoff; this.faults=faults; this.clock=clock; this.metrics=metrics;
+    public OutboxRowProcessor(JdbcClient jdbc,SinkDispatcher dispatcher,BackoffPolicy backoff,FaultInjector faults,Clock clock) {
+        this.jdbc=jdbc; this.dispatcher=dispatcher; this.backoff=backoff; this.faults=faults; this.clock=clock;
     }
     @Transactional(propagation=Propagation.REQUIRES_NEW)
     public boolean processNext() {
@@ -38,7 +36,7 @@ public class OutboxRowProcessor {
         try { dispatcher.dispatch(event); }
         catch(RuntimeException failed) {
             Throwable cause=failed;
-            while((cause instanceof CompletionException || cause instanceof ExecutionException) && cause.getCause()!=null) cause=cause.getCause();
+            while((cause instanceof SinkDispatchException || cause instanceof CompletionException || cause instanceof ExecutionException) && cause.getCause()!=null) cause=cause.getCause();
             int attempts=event.attempts()+1; boolean dead=backoff.dead(attempts); var now=clock.instant();
             jdbc.sql("UPDATE outbox_event SET attempts=?,status=?,next_attempt_at=?,last_error=? WHERE tenant_id=? AND id=?")
                     .params(attempts,dead?"DEAD":"PENDING",Timestamp.from(now.plus(backoff.delay(attempts))),cause.getClass().getSimpleName(),event.tenantId(),event.id()).update();
@@ -50,7 +48,6 @@ public class OutboxRowProcessor {
                         """).params(event.tenantId(),event.eventId().toString(),"Outbox event exhausted retries: "+event.eventId(),Timestamp.from(now),
                                 event.tenantId(),event.eventId().toString()).update();
             }
-            metrics.counter("outbox.publish.failures","event_type",event.eventType()).increment();
             LOG.warn("outbox.failed eventId={} attempts={} status={} errorClass={}",event.eventId(),attempts,dead?"DEAD":"PENDING",cause.getClass().getSimpleName());
             return true;
         }
@@ -58,7 +55,6 @@ public class OutboxRowProcessor {
         faults.hit(FaultPoint.OUTBOX_BEFORE_MARK_PUBLISHED);
         jdbc.sql("UPDATE outbox_event SET status='PUBLISHED',published_at=?,last_error=NULL WHERE tenant_id=? AND id=?")
                 .params(Timestamp.from(clock.instant()),event.tenantId(),event.id()).update();
-        metrics.counter("outbox.published","event_type",event.eventType()).increment();
         return true;
     }
 }

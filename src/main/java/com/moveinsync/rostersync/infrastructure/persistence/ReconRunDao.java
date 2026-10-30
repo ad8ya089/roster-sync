@@ -13,7 +13,8 @@ import org.springframework.transaction.annotation.Transactional;
 @Repository
 public class ReconRunDao {
     private final JdbcClient jdbc;private final Clock clock;private final OutboxWriter outbox;
-    public ReconRunDao(JdbcClient jdbc,Clock clock,OutboxWriter outbox){this.jdbc=jdbc;this.clock=clock;this.outbox=outbox;}
+    private final com.moveinsync.rostersync.infrastructure.metrics.RosterMetrics metrics;
+    public ReconRunDao(JdbcClient jdbc,Clock clock,OutboxWriter outbox,com.moveinsync.rostersync.infrastructure.metrics.RosterMetrics metrics){this.jdbc=jdbc;this.clock=clock;this.outbox=outbox;this.metrics=metrics;}
     @Transactional
     public void create(UUID tenantId,UUID id,Path file,long bytes,Instant asOf,Integer expected,boolean dryRun,String username) {
         // PostgreSQL stores microseconds. Canonicalize before comparing AND persisting so
@@ -28,6 +29,7 @@ public class ReconRunDao {
                 INSERT INTO recon_run(id,tenant_id,status,dry_run,file_path,file_size_bytes,as_of,expected_row_count,created_by,created_at,heartbeat_at)
                 VALUES (?,?,'UPLOADED',?,?,?,?,?,?,?,?)
                 """).params(id,tenantId,dryRun,file.toString(),bytes,Timestamp.from(asOf),expected,username,Timestamp.from(clock.instant()),Timestamp.from(clock.instant())).update();
+        metrics.run("UPLOADED");
     }
     public Run get(UUID tenantId,UUID id) {
         return jdbc.sql("SELECT * FROM recon_run WHERE tenant_id=? AND id=?").params(tenantId,id).query((row,n)->new Run(id,tenantId,row.getString("status"),row.getBoolean("dry_run"),
@@ -48,6 +50,7 @@ public class ReconRunDao {
                 WHERE tenant_id=? AND id=? AND status=?
                 """).params(next,now(),terminal,now(),next,now(),tenantId,id,expected).update();
         if(changed==0) throw new InvalidStateException();
+        metrics.run(next);
     }
     @Transactional
     public void settings(UUID tenantId,UUID id,BrakeSettings settings) {
@@ -69,6 +72,7 @@ public class ReconRunDao {
                 .params(brake.ratio(),brake.tripped(),brake.reason(),now(),now(),tenantId,id).update();
         String next=dryRun?"PLANNED":brake.tripped()?"AWAITING_APPROVAL":"APPLYING";
         transition(tenantId,id,"DIFFING",next);
+        if(brake.tripped())metrics.brake(brake.reason());
         if(brake.tripped() && !dryRun) {
             jdbc.sql("INSERT INTO ops_alert(tenant_id,alert_type,reference_id,message,created_at) VALUES (?,'RECON_BRAKE_TRIPPED',?,?,?)")
                     .params(tenantId,id.toString(),brake.message(),now()).update();

@@ -12,10 +12,12 @@ public class ReconciliationApplier implements ReconApplyWork {
     private static final Logger LOG=LoggerFactory.getLogger(ReconciliationApplier.class);
     private final ReconRunDao runs;private final ReconActionDao actions;private final ReconciliationChunkApplier chunks;private final int size;
     private final AtomicLong longestChunkNanos=new AtomicLong();
-    public ReconciliationApplier(ReconRunDao runs,ReconActionDao actions,ReconciliationChunkApplier chunks,RosterProperties properties) {
-        this.runs=runs;this.actions=actions;this.chunks=chunks;size=properties.reconciliation().chunkSize();
+    private final com.moveinsync.rostersync.infrastructure.metrics.RosterMetrics metrics;
+    public ReconciliationApplier(ReconRunDao runs,ReconActionDao actions,ReconciliationChunkApplier chunks,RosterProperties properties,com.moveinsync.rostersync.infrastructure.metrics.RosterMetrics metrics) {
+        this.runs=runs;this.actions=actions;this.chunks=chunks;size=properties.reconciliation().chunkSize();this.metrics=metrics;
     }
     public void resume(UUID tenantId,UUID runId) {
+        long phaseStarted=System.nanoTime();
         String mode=runs.get(tenantId,runId).approvalMode();
         try {
             while(!Thread.currentThread().isInterrupted()) {
@@ -38,6 +40,7 @@ public class ReconciliationApplier implements ReconApplyWork {
                 if(processed==0){runs.transition(tenantId,runId,"APPLYING","COMPLETED");LOG.info("recon.apply.completed runId={} longestChunkMs={}",runId,longestChunkMillis());return;}
             }
         } catch(SimulatedCrashException crashed) {LOG.warn("recon.apply.interrupted runId={}",runId);}
+        finally {metrics.phase("apply",System.nanoTime()-phaseStarted);}
     }
     public long longestChunkMillis(){return longestChunkNanos.get()/1000000;}
 }

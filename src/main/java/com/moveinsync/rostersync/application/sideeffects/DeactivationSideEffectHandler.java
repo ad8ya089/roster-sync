@@ -2,7 +2,7 @@ package com.moveinsync.rostersync.application.sideeffects;
 
 import com.moveinsync.rostersync.application.outbox.*;
 import com.moveinsync.rostersync.infrastructure.persistence.EmployeeRepository;
-import io.micrometer.core.instrument.MeterRegistry;
+import com.moveinsync.rostersync.infrastructure.metrics.RosterMetrics;
 import java.sql.Timestamp;
 import java.time.Clock;
 import org.springframework.core.annotation.Order;
@@ -15,8 +15,8 @@ public class DeactivationSideEffectHandler implements EventSink {
     private final JdbcClient jdbc;
     private final EmployeeRepository employees;
     private final Clock clock;
-    private final MeterRegistry metrics;
-    public DeactivationSideEffectHandler(JdbcClient jdbc,EmployeeRepository employees,Clock clock,MeterRegistry metrics) {
+    private final RosterMetrics metrics;
+    public DeactivationSideEffectHandler(JdbcClient jdbc,EmployeeRepository employees,Clock clock,RosterMetrics metrics) {
         this.jdbc=jdbc; this.employees=employees; this.clock=clock; this.metrics=metrics;
     }
     public String name() { return "deactivation"; }
@@ -30,7 +30,7 @@ public class DeactivationSideEffectHandler implements EventSink {
         var employee=employees.findForUpdate(event.tenantId(),event.aggregateId());
         if(employee.isEmpty()) return;
         if(!"INACTIVE".equals(employee.get().snapshot().status())) {
-            metrics.counter("sideeffects.skipped","reason","reactivated").increment(); return;
+            RosterMetrics.committed(()->metrics.skipped("reactivated")); return;
         }
         // FOR UPDATE closes the rehire race: reactivation and booking's FOR SHARE cannot
         // interleave between this status check and cancellation. Recon need not bump a version.
@@ -39,8 +39,8 @@ public class DeactivationSideEffectHandler implements EventSink {
                 UPDATE cab_booking SET status='CANCELLED',cancel_reason='EMPLOYEE_DEACTIVATED',updated_at=?
                 WHERE tenant_id=? AND employee_external_id=? AND status='SCHEDULED' AND pickup_at>?
                 """).params(now,event.tenantId(),event.aggregateId(),now).update();
-        jdbc.sql("UPDATE route_seat SET employee_external_id=NULL,updated_at=? WHERE tenant_id=? AND employee_external_id=?")
+        int freed=jdbc.sql("UPDATE route_seat SET employee_external_id=NULL,updated_at=? WHERE tenant_id=? AND employee_external_id=?")
                 .params(now,event.tenantId(),event.aggregateId()).update();
-        metrics.counter("sideeffects.bookings.cancelled").increment(cancelled);
+        RosterMetrics.committed(()->metrics.sideEffects(cancelled,freed));
     }
 }

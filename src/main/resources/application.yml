@@ -37,6 +37,16 @@ server:
       enabled: false
 
 management:
+  metrics:
+    distribution:
+      percentiles-histogram:
+        roster.apply.duration: true
+        roster.ingest.lag: true
+        http.server.requests: true
+      percentiles:
+        roster.apply.duration: 0.5,0.99
+        roster.ingest.lag: 0.5,0.99
+        http.server.requests: 0.5,0.99
   endpoints:
     web:
       exposure:

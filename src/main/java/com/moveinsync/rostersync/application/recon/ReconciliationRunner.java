@@ -23,9 +23,9 @@ public class ReconciliationRunner {
     private final RosterCsvReader csv;private final FieldOwnershipPolicy ownership;private final RecordHasher hasher;
     private final SettingsService settings;private final RosterProperties properties;private final JdbcClient jdbc;
     private final ObjectProvider<ReconApplyWork> applier;
-    private final io.micrometer.core.instrument.MeterRegistry metrics;
+    private final com.moveinsync.rostersync.infrastructure.metrics.RosterMetrics metrics;
     public ReconciliationRunner(ReconRunDao runs,ReconActionDao actions,EmployeeBucketDao employees,RosterCsvReader csv,FieldOwnershipPolicy ownership,RecordHasher hasher,
-                                SettingsService settings,RosterProperties properties,JdbcClient jdbc,ObjectProvider<ReconApplyWork> applier,io.micrometer.core.instrument.MeterRegistry metrics) {
+                                SettingsService settings,RosterProperties properties,JdbcClient jdbc,ObjectProvider<ReconApplyWork> applier,com.moveinsync.rostersync.infrastructure.metrics.RosterMetrics metrics) {
         this.runs=runs;this.actions=actions;this.employees=employees;this.csv=csv;this.ownership=ownership;this.hasher=hasher;this.settings=settings;this.properties=properties;this.jdbc=jdbc;this.applier=applier;this.metrics=metrics;
     }
     public void run(UUID tenantId,UUID runId) {
@@ -50,6 +50,7 @@ public class ReconciliationRunner {
             }).list();
             var rejects=new ArrayList<ReconActionDao.RejectedRow>();long[] parsed={0,0};
             RosterCsvReader.ReadSummary summary;
+            long parseStarted=System.nanoTime();
             int buckets=properties.reconciliation().buckets();
             try(var spills=new BucketSpillWriter(directory,buckets,hasher)) {
                 summary=csv.read(run.file(),tenantId,ownership,(ignored,code)->offices.getOrDefault(code,OfficeLookup.Status.UNKNOWN),row->{
@@ -63,6 +64,7 @@ public class ReconciliationRunner {
                 });
             }
             flushRejects(tenantId,runId,rejects,true);
+            metrics.phase("parse",System.nanoTime()-parseStarted);long diffStarted=System.nanoTime();
             var counts=DiffCounters.zero();long duplicates=0;var differ=new BucketDiffer(hasher);
             for(int bucket=0;bucket<buckets;bucket++) {
                 if(Thread.currentThread().isInterrupted()) throw new IllegalStateException("INTERRUPTED");
@@ -77,10 +79,11 @@ public class ReconciliationRunner {
                 flushRejects(tenantId,runId,rejects,true);
                 runs.progress(tenantId,runId,summary.total(),summary.valid()-duplicates,summary.trailerCount(),counts);Files.deleteIfExists(file);
             }
+            metrics.phase("diff",System.nanoTime()-diffStarted);
             var brake=new SafetyBrake().evaluate(new BrakeInput(counts.activeBefore(),counts.missingActive(),summary.total(),summary.trailerCount(),
                     run.expectedRowCount()==null?null:run.expectedRowCount().longValue()),brakeSettings);
             runs.finishDiff(tenantId,runId,brake,run.dryRun());
-            if(brake.tripped()) {metrics.counter("recon.brake.tripped").increment();LOG.warn("recon.run.brake_tripped runId={} activeBefore={} missingActive={}",runId,counts.activeBefore(),counts.missingActive());}
+            if(brake.tripped()) LOG.warn("recon.run.brake_tripped runId={} activeBefore={} missingActive={}",runId,counts.activeBefore(),counts.missingActive());
             if(!run.dryRun() && !brake.tripped()) applier.getObject().resume(tenantId,runId);
         } catch(RosterCsvReader.MalformedCsv malformed) {
             actions.rejections(tenantId,runId,List.of(new ReconActionDao.RejectedRow(malformed.number(),null,"record:MALFORMED_CSV")));

@@ -13,7 +13,8 @@ import tools.jackson.databind.json.JsonMapper;
 @Repository
 public class ReconActionDao {
     private final JdbcTemplate jdbc;private final JdbcClient client;private final JsonMapper mapper;private final Clock clock;
-    public ReconActionDao(JdbcTemplate jdbc,JdbcClient client,JsonMapper mapper,Clock clock){this.jdbc=jdbc;this.client=client;this.mapper=mapper;this.clock=clock;}
+    private final com.moveinsync.rostersync.infrastructure.metrics.RosterMetrics metrics;
+    public ReconActionDao(JdbcTemplate jdbc,JdbcClient client,JsonMapper mapper,Clock clock,com.moveinsync.rostersync.infrastructure.metrics.RosterMetrics metrics){this.jdbc=jdbc;this.client=client;this.mapper=mapper;this.clock=clock;this.metrics=metrics;}
     @Transactional
     public void insert(UUID tenantId,UUID runId,List<PlannedAction> actions) {
         jdbc.batchUpdate("INSERT INTO recon_action(tenant_id,run_id,external_id,action,file_version,expected_db_version,payload) VALUES (?,?,?,?,?,?,CAST(? AS jsonb))",
@@ -24,6 +25,9 @@ public class ReconActionDao {
     public void rejections(UUID tenantId,UUID runId,List<RejectedRow> rejected) {
         jdbc.batchUpdate("INSERT INTO record_rejection(tenant_id,source,run_id,row_number,external_id,error_codes,created_at) VALUES (?,'FILE',?,?,?,?,?)",
                 rejected.stream().map(row->new Object[]{tenantId,runId,row.number(),row.employeeId(),row.codes(),Timestamp.from(clock.instant())}).toList());
+        com.moveinsync.rostersync.infrastructure.metrics.RosterMetrics.committed(()->rejected.forEach(row->{
+            metrics.fileRowRejected();Arrays.stream(row.codes().split(",")).map(code->code.substring(code.lastIndexOf(':')+1)).distinct().forEach(code->metrics.rejection(code,"file"));
+        }));
     }
     public List<Action> pending(UUID tenantId,UUID runId,int size,boolean lock) {
         return client.sql("SELECT id,external_id,action,file_version,expected_db_version,payload::text FROM recon_action WHERE tenant_id=? AND run_id=? AND status='PENDING' ORDER BY external_id LIMIT ?"+(lock?" FOR UPDATE":""))

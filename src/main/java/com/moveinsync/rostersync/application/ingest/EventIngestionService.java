@@ -4,7 +4,7 @@ import com.moveinsync.rostersync.domain.model.IngestOutcome;
 import com.moveinsync.rostersync.domain.validation.FieldError;
 import com.moveinsync.rostersync.infrastructure.fault.SimulatedCrashException;
 import com.moveinsync.rostersync.infrastructure.persistence.PostgresConstraints;
-import io.micrometer.core.instrument.MeterRegistry;
+import com.moveinsync.rostersync.infrastructure.metrics.RosterMetrics;
 import java.util.*;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.locks.LockSupport;
@@ -18,8 +18,8 @@ public class EventIngestionService {
     private final HrEventInputParser parser;
     private final EmployeeChangeApplier applier;
     private final RejectionWriter rejections;
-    private final MeterRegistry metrics;
-    public EventIngestionService(HrEventInputParser parser, EmployeeChangeApplier applier, RejectionWriter rejections, MeterRegistry metrics) {
+    private final RosterMetrics metrics;
+    public EventIngestionService(HrEventInputParser parser, EmployeeChangeApplier applier, RejectionWriter rejections, RosterMetrics metrics) {
         this.parser=parser; this.applier=applier; this.rejections=rejections; this.metrics=metrics;
     }
 
@@ -32,9 +32,10 @@ public class EventIngestionService {
             var parsed = parser.parse(tenantId, inputs.get(index));
             if (parsed.employeeId() != null) MDC.put("employeeId", parsed.employeeId());
             try {
+                long started=System.nanoTime();
                 var result = process(tenantId, index, parsed);
                 results.add(result);
-                metrics.counter("roster.events", "outcome", result.outcome().metricTag(), "type", parsed.type()).increment();
+                metrics.event(result.outcome().metricTag(),parsed.type(),System.nanoTime()-started,parsed.command()==null?null:parsed.command().occurredAt());
                 if (result.outcome() == IngestOutcome.CONFLICT) LOG.warn("hr.event.conflict employeeId={} version={} currentVersion={}", parsed.employeeId(), parsed.version(), result.currentVersion());
                 else if (result.outcome() == IngestOutcome.APPLIED) LOG.info("hr.event.applied employeeId={} version={} outcome={}", parsed.employeeId(), parsed.version(), result.outcome());
             } finally { MDC.remove("employeeId"); }
@@ -63,10 +64,10 @@ public class EventIngestionService {
             } catch (DataIntegrityViolationException collision) {
                 if (!PostgresConstraints.uniqueViolation(collision, "employee_tenant_id_external_id_key")) throw collision;
                 if (createRetries++ >= 1) return retryable(index, parsed);
-                metrics.counter("roster.apply.retries", "reason", "unique_race").increment();
+                metrics.retry("unique_race");
             } catch (PessimisticLockingFailureException locked) {
                 if (lockRetries++ >= 3) return retryable(index, parsed);
-                metrics.counter("roster.apply.retries", "reason", "lock_timeout").increment();
+                metrics.retry("lock_timeout");
                 LockSupport.parkNanos(java.util.concurrent.TimeUnit.MILLISECONDS.toNanos(ThreadLocalRandom.current().nextInt(20,101)));
                 if (Thread.currentThread().isInterrupted()) return retryable(index, parsed);
             } catch (SimulatedCrashException failure) { return retryable(index, parsed); }

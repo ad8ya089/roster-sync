@@ -12,7 +12,8 @@ import org.springframework.transaction.annotation.*;
 public class RejectionWriter {
     private final JdbcClient jdbc;
     private final Clock clock;
-    public RejectionWriter(JdbcClient jdbc, Clock clock) { this.jdbc = jdbc; this.clock = clock; }
+    private final com.moveinsync.rostersync.infrastructure.metrics.RosterMetrics metrics;
+    public RejectionWriter(JdbcClient jdbc, Clock clock,com.moveinsync.rostersync.infrastructure.metrics.RosterMetrics metrics) { this.jdbc = jdbc; this.clock = clock;this.metrics=metrics; }
 
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void write(UUID tenantId, String employeeId, Long version, List<FieldError> errors) {
@@ -22,5 +23,6 @@ public class RejectionWriter {
         if (codes.length() > 500) codes = "record:VALIDATION_FAILED";
         jdbc.sql("INSERT INTO record_rejection(tenant_id,source,external_id,version,error_codes,created_at) VALUES(?,'API',?,?,?,?)")
                 .params(Arrays.asList(tenantId, safeId, version, codes, Timestamp.from(clock.instant()))).update();
+        errors.stream().map(FieldError::code).distinct().forEach(code->com.moveinsync.rostersync.infrastructure.metrics.RosterMetrics.committed(()->metrics.rejection(code,"api")));
     }
 }

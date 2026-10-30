@@ -16,7 +16,7 @@ class EventIngestionServiceTest {
     private final EmployeeChangeApplier applier=mock(EmployeeChangeApplier.class);
     private final RejectionWriter audit=mock(RejectionWriter.class);
     private final SimpleMeterRegistry metrics=new SimpleMeterRegistry();
-    private final EventIngestionService service=new EventIngestionService(parser,applier,audit,metrics);
+    private final EventIngestionService service=new EventIngestionService(parser,applier,audit,new com.moveinsync.rostersync.infrastructure.metrics.RosterMetrics(metrics,java.time.Clock.systemUTC()));
     private final UpdateEmployee command=new UpdateEmployee("E1",2,null,null,HrSnapshot.tombstone());
     private void prepare() {
         when(parser.parse(eq(tenant),any())).thenReturn(new HrEventInputParser.ParsedEvent(command,"E1",2,"UPDATE",new ValidationResult(List.of(),List.of())));
