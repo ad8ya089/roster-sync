@@ -125,7 +125,7 @@ Short ADRs. Each: decision → why → what we gave up → when we'd revisit. Th
 
 ## Deliberately left out
 
-Kafka/RabbitMQ, Debezium, Redis, Kubernetes, an OIDC provider, refresh tokens, Postgres RLS, application-level field encryption (for example pgcrypto), right-to-erasure workflow, SFTP/S3 ingestion (a scheduled folder poller is the stub), a UI, multi-region, rate limiting per client (would add Bucket4j). AWS EBS/S3 encryption at rest and SSM SecureString are implemented; they are distinct from field encryption. Each omitted component has a one-line "why not now" above.
+Kafka/RabbitMQ, Debezium, Redis, Kubernetes, an OIDC provider, refresh tokens, Postgres RLS, application-level field encryption (for example pgcrypto), right-to-erasure workflow, SFTP/S3 ingestion (a scheduled folder poller is the stub), multi-region, rate limiting per client (would add Bucket4j). AWS EBS/S3 encryption at rest and SSM SecureString are implemented; they are distinct from field encryption. Each omitted component has a one-line "why not now" above.
 
 ## Phase 4 transaction choices
 - Receipt INSERT reserves a key before locking the employee. Unique-create collisions abort PostgreSQL transactions; retry the entire apply call once from the non-transactional ingestion service. Lock failures get up to three retries (four total attempts), with 20–100 ms jitter outside transactions.

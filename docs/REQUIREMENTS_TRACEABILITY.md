@@ -1,6 +1,6 @@
 # Requirements Traceability Matrix
 
-Every sentence of the case-study PDF, mapped to design, code and proof. Agents must keep this file accurate: when a task is done, fill the **Status** column (`done` / `partial` + note). Interviewers grade against the PDF; this file is how you show nothing was skipped.
+Coverage of the two-page Case Study 5 brief, audited against the supplied PDF. Each row maps a requirement to the implementation and automated evidence. Partial items stay explicit; the video is a separate submission deliverable.
 
 ## Problem statement
 
@@ -11,7 +11,7 @@ Every sentence of the case-study PDF, mapped to design, code and proof. Agents m
 | P3 | Updates arrive twice | receipt idempotency key | `ReplayIdempotencyIT`, `ConcurrentEventsIT.sameEventManyTimes` | done — Phase 4 API/domain/integration proof passes |
 | P4 | …arrive out of order | version comparison under row lock | `OutOfOrderIT`, `ChangeDeciderPropertyTest` | done — Phase 4 API/domain/integration proof passes |
 | P5 | …contain bad data | `RecordValidator` at the boundary | `RecordValidatorTest`, `BatchIsolationIT` | done — Phase 4 API/domain/integration proof passes |
-| P6 | …are sometimes cut short | safety brake + trailer check | `SafetyBrakeTest`, `ReconciliationFlowIT.truncatedFile` | done — Phase 6 streaming upload/diff/brake/apply and 200k truncation proof |
+| P6 | …are sometimes cut short | safety brake + trailer check | `SafetyBrakeTest`, `ReconciliationFlowIT.truncatedFileBriefExample` | done — Phase 6 streaming upload/diff/brake/apply and 200k truncation proof |
 | P7 | Some fields belong to HR, some to the transport admin (e.g. preferred pickup point) | `FieldOwnershipPolicy`, `PATCH /employees/{id}/transport-fields` | `FieldOwnershipIT` | done — Phase 4 API/domain/integration proof passes |
 
 ## I. Ingest
@@ -21,8 +21,8 @@ Every sentence of the case-study PDF, mapped to design, code and proof. Agents m
 | I1 | Create, update and deactivate events | `HrCommand` sealed hierarchy (`CreateEmployee`, `UpdateEmployee`, `DeactivateEmployee`) + `HrEventType` enum | `ChangeDeciderTest`, `TombstoneIT`, `ReplayIdempotencyIT` | done — Phase 4 API/domain/integration proof passes |
 | I2 | …each with the source system's version or timestamp | `version` (long); timestamp sources send epoch millis — documented in README/API.md | `RecordValidatorTest` (version ≤ 0 rejected) | done — Phase 4 API/domain/integration proof passes |
 | I3 | Reject invalid records (malformed phone, unknown office code) | E.164 phone rule, office lookup via cache + in-tx check | `RecordValidatorTest`, `BatchIsolationIT` | done for events — invalid phone/office and in-tx active-office refresh tested; cache, no-negative-miss behavior and uncached in-tx office checks proved by CachingIT |
-| I4 | …with a per-record error report | response `results[i].errors[{field, code}]`; `record_rejection` table; `/reconciliation/runs/{id}/rejections` | `BatchIsolationIT`, `ReconciliationFlowIT.badRows` | done — per-record event isolation and file validation/audit with chunk rollback and per-action fallback |
-| I5 | One bad record must never fail a whole batch | per-record transaction (`EmployeeChangeApplier` separate bean, `@Transactional`), file rows rejected individually | `BatchIsolationIT`, `ReconciliationFlowIT.badRows` | done — per-record event isolation and file validation/audit with chunk rollback and per-action fallback |
+| I4 | …with a per-record error report | response `results[i].errors[{field, code}]`; `record_rejection` table; `/reconciliation/runs/{id}/rejections` | `BatchIsolationIT`, `ReconciliationFlowIT.badRowsAreReportedAndCountAsPresent` | done — per-record event isolation and file validation/audit with chunk rollback and per-action fallback |
+| I5 | One bad record must never fail a whole batch | per-record transaction (`EmployeeChangeApplier` separate bean, `@Transactional`), file rows rejected individually | `BatchIsolationIT`, `ReconciliationFlowIT.badRowsAreReportedAndCountAsPresent` | done — per-record event isolation and file validation/audit with chunk rollback and per-action fallback |
 
 ## II. Ordering, Idempotency & Ownership
 
@@ -34,16 +34,16 @@ Every sentence of the case-study PDF, mapped to design, code and proof. Agents m
 | O4 | HR owns name, email, manager, office | default policy (+ phone, shift, status as HR fields — documented) | `FieldOwnershipPolicyTest` | done — Phase 4 API/domain/integration proof passes |
 | O5 | Transport admin owns pickup point and special-assistance needs | default policy | `FieldOwnershipPolicyTest`, `FieldOwnershipIT` | done — Phase 4 API/domain/integration proof passes |
 | O6 | An HR update never overwrites a transport-owned field | HR snapshot filtered by policy; transport columns not in HR write path | `FieldOwnershipIT` | done — Phase 4 API/domain/integration proof passes |
-| O7 | The conflict rule is written down | `DECISIONS.md` ADR-006 + README section "Field ownership conflict rule" | review | done — Phase 4 API/domain/integration proof passes |
+| O7 | The conflict rule is written down | `DECISIONS.md` ADR-006 + README "Event contract and assumptions" | review | done — Phase 4 API/domain/integration proof passes |
 
 ## III. Nightly Reconciliation
 
 | # | PDF requirement | Design / code | Proof | Status |
 |---|---|---|---|---|
-| R1 | Compare the 200,000-row export with your store without loading both fully into memory | streaming parse + 256 hash buckets spilled to disk + per-bucket DB query | `ReconciliationBenchmarkIT` (`-Xmx256m`) | done — Phase 6 streaming upload/diff/brake/apply and 200k truncation proof |
+| R1 | Compare the 200,000-row export with your store without loading both fully into memory | streaming parse + 256 hash buckets spilled to disk + per-bucket DB query | `ReconciliationBenchmarkIT.exact200000RowSnapshotFits256MiBAnd60Seconds` (`-Xmx256m`) | done — Phase 6 streaming upload/diff/brake/apply and 200k truncation proof |
 | R2 | …e.g. hash per record and hashed buckets | `RecordHasher` (SHA-256), `BucketPartitioner` (CRC32 mod 256), `BucketDiffer` | `RecordHasherTest`, `BucketDifferTest` | done — Phase 6 streaming upload/diff/brake/apply and 200k truncation proof |
-| R3 | If tonight's export is missing 30 % of active employees… stop | `SafetyBrake`, run → `AWAITING_APPROVAL` | `SafetyBrakeTest`, `ReconciliationFlowIT.truncatedFile` | done — Phase 6 streaming upload/diff/brake/apply and 200k truncation proof |
-| R4 | …alert an operator | `ops_alert` row, outbox `ReconciliationBrakeTripped`, metric `recon_brake_tripped_total`, WARN log, `/ops/summary` | `ReconciliationFlowIT.truncatedFile` asserts alert + metric | done — Phase 6 streaming upload/diff/brake/apply and 200k truncation proof |
+| R3 | If tonight's export is missing 30 % of active employees… stop | `SafetyBrake`, run → `AWAITING_APPROVAL` | `SafetyBrakeTest`, `ReconciliationFlowIT.truncatedFileBriefExample` | done — Phase 6 streaming upload/diff/brake/apply and 200k truncation proof |
+| R4 | …alert an operator | `ops_alert` row, outbox `ReconciliationBrakeTripped`, metric `recon_brake_tripped_total`, WARN log, `/ops/summary` | `ReconciliationFlowIT.truncatedFileBriefExample` asserts alert + metric | done — Phase 6 streaming upload/diff/brake/apply and 200k truncation proof |
 | R5 | …deactivate nobody until a human approves | no action applied before `approve`; approve requires OPERATOR | `ReconciliationFlowIT` (count ACTIVE unchanged; approve/reject paths) | done — Phase 6 streaming upload/diff/brake/apply and 200k truncation proof |
 
 ## IV. Downstream Effects
@@ -70,7 +70,7 @@ Every sentence of the case-study PDF, mapped to design, code and proof. Agents m
 | K2 | Show a test that replays the same feed twice and changes nothing | `ReplayIdempotencyIT` | itself | done — Phase 4 API/domain/integration proof passes |
 | K3 | Safety brake threshold configurable | property `BRAKE_MAX_MISSING_RATIO`, per-tenant `PUT /settings/reconciliation` | `SafetyBrakeTest`, `ReconciliationFlowIT.thresholdChangeTakesEffect` | done — Phase 6 streaming upload/diff/brake/apply and 200k truncation proof |
 | K4 | Never write personal data into logs or error reports. Use employee IDs | `SECURITY.md §4` | `ErrorHandlingIT`, `PiiLeakIT` | done — PiiLeakIT covers API, auth, conflict, recon bad rows, publishing and operational stores |
-| K5 | Diff a 200,000-row snapshot in under 60 s with bounded memory | `ReconciliationBenchmarkIT` | README benchmark table | done — three-run 256 MiB benchmark; final median dry-run wall time 17.067s for 199,190 rows from 200k employees |
+| K5 | Diff a 200,000-row snapshot in under 60 s with bounded memory | `ReconciliationBenchmarkIT` | README benchmark table | done — exact 200,000-row snapshot: 16.571s wall, sampled peak104.84MiB at256MiB heap; mixed three-run proof retained |
 | K6 | Run a test that crashes the process between the DB write and the event publish | `OutboxCrashRecoveryIT.crashAfterCommitBeforePublish` (+ live kill -9 demo) | itself | done — Phase 5 restart recovery and side-effect proof pass |
 
 ## Plus points (overall evaluation criteria)
@@ -92,8 +92,8 @@ Every sentence of the case-study PDF, mapped to design, code and proof. Agents m
 | # | Requirement | Where | Status |
 |---|---|---|---|
 | A1 | Every hard rule has an automated test, incl. ≥ 1 concurrency and ≥ 1 failure test | this file + `TESTING.md` | done — hard-rule, concurrency and fault/restart tests mapped above |
-| A2 | Load test / benchmark with throughput and p50/p99, in README with the machine | `TESTING.md` benchmark + k6; README "Measured local performance" | done — three-run 256 MiB benchmark; batch-1 and batch-50 VU matrix with request/amortized-event latency, pool/commit diagnostics and machine specification |
-| A3 | Design note (1–2 pages): architecture diagram, sequence diagram for hardest flow, failure-mode table | `docs/DESIGN.md` | done — architecture/sequence diagrams and failure-mode table in the design note |
+| A2 | Load test / benchmark with throughput and p50/p99, in README with the machine | `TESTING.md` benchmark + k6; README "Performance" | done — three-run 256 MiB benchmark; batch-1 and batch-50 VU matrix with request/amortized-event latency, pool/commit diagnostics and machine specification |
+| A3 | Design note (1–2 pages): architecture diagram, sequence diagram for hardest flow, failure-mode table | `docs/DESIGN.pdf` + Markdown | done — exactly two rendered pages with original architecture/sequence diagrams and failure-mode table |
 | A4 | One-command run incl. DB/broker | `docker compose up` | done — fresh-volume Phase 3 build/run healthy; curl login succeeds for all seven demo users and office lists remain tenant-scoped |
 
 ## Instructions
@@ -115,8 +115,8 @@ Every sentence of the case-study PDF, mapped to design, code and proof. Agents m
 | Scope | Implementation / evidence | Status |
 |---|---|---|
 | Approved dispatch-board design | Styleguide + real Run detail; eight checkpoint captures reviewed before continuing | done — human approved the checkpoint |
-| Operations, runs/upload/settings, event scenarios, employees/transport/history, self profile, demo tools | frontend/src/pages; existing server role and tenant checks retained | done — local implementation; browser and accessibility verification documented in TESTING.md |
+| Operations, runs/upload/settings, event scenarios, employees/transport/history, self profile, demo tools | frontend/src/pages; existing server role and tenant checks retained | done — local15 browser cases plus6 live HTTPS cases; local48 and live36 axe scans pass |
 | Static delivery, cache/security headers, version precision, CI | Spring static resources; multi-stage Docker build; native source-text reviver; frontend CI job | done — sole API addition remains read-only createdAt |
-| Live console over HTTPS | Existing EC2/Caddy deployment; production build disables styleguide/hints | partial — pre-deploy review requested; no Phase 9 AWS deployment yet |
+| Live console over HTTPS | Existing EC2/Caddy deployment; production build disables styleguide/hints | done — deployed app/db/Caddy healthy; live roles, ordering and small-file brake/rejection verified |
 
 The PDF demo-video requirement remains partial as recorded above.
