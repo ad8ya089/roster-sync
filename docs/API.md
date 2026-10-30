@@ -222,3 +222,7 @@ All dev endpoints require OPERATOR. The interview deployment intentionally enabl
 | `GET /dev/export.csv?truncateAt=120000&mutatePercent=1&dropPercent=0.5` | stream a CSV "HR export" of the current DB, optionally cut short / with changed rows / with missing rows, plus a correct trailer unless truncated |
 | `POST /dev/faults {"point":"OUTBOX_BEFORE_MARK_PUBLISHED","mode":"HALT"}` | arm a one-shot fault (HALT = `Runtime.halt(137)`, i.e. kill -9 semantics; THROW; DELAY_MS) |
 | `DELETE /dev/faults` | disarm |
+
+### Receipt replay and conflicts
+
+The receipt payload hash includes event type plus normalized, ownership-filtered HR fields; eventId and occurredAt are informational and excluded. Same key and hash returns DUPLICATE with originalOutcome (APPLIED, STALE, NO_CHANGE or DUPLICATE). Same key with a different type/hash returns CONFLICT and currentVersion, preserves any existing receipt and writes a separate VERSION_CONFLICT audit. When a provisional receipt was inserted but the decider finds a same-version conflict, the transaction rolls it back before auditing. Correct content matching seeded/reconciled state can subsequently be accepted as DUPLICATE. Conflicts never keep a new receipt or modify employee/outbox state.

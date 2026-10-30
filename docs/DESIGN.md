@@ -187,3 +187,5 @@ See `REQUIREMENTS_TRACEABILITY.md` — every hard rule maps to an automated test
 ## 8. What is deliberately left out
 
 Kafka/RabbitMQ (seam: `EventSink`), CDC/Debezium, Redis (seam: Spring Cache), multi-instance scheduler locking (ShedLock), Postgres row-level security, SFTP ingestion, an identity provider (we mint our own JWTs), PII encryption at rest, a UI. Reasons in `DECISIONS.md`.
+
+Phase 4 receipt refinement: reserve the key using INSERT ON CONFLICT DO NOTHING with provisional PROCESSING, then lock/decide/write and finalize the receipt in the same transaction. A concurrent same-key insert waits for the first transaction: commit yields a conflict on insertion, rollback lets the waiting insert succeed. Replays return DUPLICATE plus the stored originalOutcome. CONFLICT never reserves content: roll back a newly inserted provisional receipt, leave existing receipts untouched, and audit VERSION_CONFLICT in a separate transaction. REJECTED keys are likewise unconsumed.

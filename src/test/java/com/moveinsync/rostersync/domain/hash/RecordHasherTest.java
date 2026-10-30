@@ -9,6 +9,15 @@ import static com.moveinsync.rostersync.domain.DomainFixtures.*;
 import static org.assertj.core.api.Assertions.*;
 
 class RecordHasherTest {
+    @org.junit.jupiter.api.Test
+    void receiptHashesIncludeTypeButExcludeInformationalMetadata() {
+        var hasher = new RecordHasher(com.moveinsync.rostersync.domain.ownership.FieldOwnershipPolicy.defaults());
+        var snapshot = new com.moveinsync.rostersync.domain.model.HrSnapshot("Name", "person@example.test", null, null, "BLR-1", "S1", "ACTIVE");
+        var first = new com.moveinsync.rostersync.domain.command.UpdateEmployee("E1", 7, "first", java.time.Instant.EPOCH, snapshot);
+        var replay = new com.moveinsync.rostersync.domain.command.UpdateEmployee("E1", 7, "new-id", java.time.Instant.EPOCH.plusSeconds(1), snapshot);
+        var create = new com.moveinsync.rostersync.domain.command.CreateEmployee("E1", 7, null, null, snapshot);
+        assertThat(hasher.hashEvent(first)).isEqualTo(hasher.hashEvent(replay)).isNotEqualTo(hasher.hashEvent(create));
+    }
     private final RecordHasher hasher = new RecordHasher(FieldOwnershipPolicy.defaults());
 
     @Test

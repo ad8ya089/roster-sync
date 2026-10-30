@@ -93,7 +93,7 @@ CREATE TABLE hr_event_receipt (
   event_id      VARCHAR(100),                 -- optional, supplied by HR, informational
   event_type    VARCHAR(12) NOT NULL CHECK (event_type IN ('CREATE','UPDATE','DEACTIVATE')),
   payload_hash  CHAR(64) NOT NULL,            -- SHA-256 hex of the canonical HR payload
-  outcome       VARCHAR(16) NOT NULL,         -- APPLIED | NO_CHANGE | STALE | DUPLICATE | CONFLICT (first processing result)
+  outcome       VARCHAR(16) NOT NULL,         -- APPLIED | NO_CHANGE | STALE | DUPLICATE (accepted content only)
   warnings      VARCHAR(200),                 -- comma-separated warning codes, never values
   received_at   TIMESTAMPTZ NOT NULL DEFAULT now(),
   UNIQUE (tenant_id, external_id, version)
@@ -263,7 +263,7 @@ roster:
 
 ## Canonical record hash
 
-`RecordHasher.hash(HrSnapshot)` = SHA-256 hex of the HR-owned field values in `EmployeeField` declaration order, joined with `\u001F` (unit separator), `\u0000` for null, strings trimmed, email lower-cased, office as its **code** (not DB id). Used for: receipt payload comparison (DUPLICATE vs CONFLICT) and reconciliation change detection. Transport-owned fields are never in the hash, so a transport edit never looks like an HR diff.
+`RecordHasher.hash(HrSnapshot)` = SHA-256 hex of the HR-owned field values in `EmployeeField` declaration order, joined with `\u001F` (unit separator), `\u0000` for null, strings trimmed, email lower-cased, office as its **code** (not DB id). Used for reconciliation and resolved-state decisions. Receipt hashes use SHA-256(eventType + unit separator + the same canonical HR-owned fields), excluding eventId/occurredAt. DEACTIVATE hashes its fixed inactive tombstone intent, not mutable stored HR values. Transport-owned fields are never in the hash, so a transport edit never looks like an HR diff.
 
 ## Outbox payload (no PII values)
 
@@ -287,3 +287,6 @@ Non-PII values are included so consumers (routing, rostering) can act without a 
 | `outbox_event` (PUBLISHED) | 7 days | nightly delete |
 | `recon_action` | 7 days after run finishes | nightly delete (contains PII payloads) |
 | uploaded files + spill files | deleted when run reaches a terminal state (file kept 7 days for audit) | run cleanup |
+
+Receipt reservation uses provisional PROCESSING inside the record transaction. Final stored outcomes are APPLIED, STALE, NO_CHANGE or DUPLICATE; conflicts roll back the reservation and write VERSION_CONFLICT through an independent rejection transaction. V1 has no receipt-outcome CHECK constraint; the writer enforces this final-outcome vocabulary without rewriting V1.
+
