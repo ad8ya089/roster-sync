@@ -29,7 +29,6 @@ public class ReconRunDao {
                 INSERT INTO recon_run(id,tenant_id,status,dry_run,file_path,file_size_bytes,as_of,expected_row_count,created_by,created_at,heartbeat_at)
                 VALUES (?,?,'UPLOADED',?,?,?,?,?,?,?,?)
                 """).params(id,tenantId,dryRun,file.toString(),bytes,Timestamp.from(asOf),expected,username,Timestamp.from(clock.instant()),Timestamp.from(clock.instant())).update();
-        metrics.run("UPLOADED");
     }
     public Run get(UUID tenantId,UUID id) {
         return jdbc.sql("SELECT * FROM recon_run WHERE tenant_id=? AND id=?").params(tenantId,id).query((row,n)->new Run(id,tenantId,row.getString("status"),row.getBoolean("dry_run"),

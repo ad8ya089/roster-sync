@@ -420,6 +420,40 @@
           "displayMode": "list"
         }
       }
+    },
+    {
+      "fieldConfig": {
+        "overrides": [],
+        "defaults": {
+          "unit": "ops"
+        }
+      },
+      "datasource": {
+        "uid": "prometheus",
+        "type": "prometheus"
+      },
+      "title": "Reconciliation decisions / 15 min",
+      "id": 13,
+      "type": "timeseries",
+      "targets": [
+        {
+          "refId": "A",
+          "legendFormat": "{{status}}",
+          "expr": "sum by (status) (increase(recon_runs_total{status=~\"PLANNED|AWAITING_APPROVAL|COMPLETED|REJECTED|FAILED\"}[15m]))"
+        }
+      ],
+      "gridPos": {
+        "w": 12,
+        "y": 48,
+        "x": 0,
+        "h": 8
+      },
+      "options": {
+        "legend": {
+          "placement": "bottom",
+          "displayMode": "list"
+        }
+      }
     }
   ],
   "version": 1,

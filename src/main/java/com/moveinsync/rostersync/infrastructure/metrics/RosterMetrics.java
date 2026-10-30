@@ -37,7 +37,11 @@ public class RosterMetrics {
     public void sinkRetry(String sink,String type){registry.counter("outbox.retries","sink",sink,"event_type",type).increment();}
     public void sideEffects(int bookings,int seats){registry.counter("side.effects.bookings.cancelled").increment(bookings);registry.counter("side.effects.seats.freed").increment(seats);}
     public void skipped(String reason){registry.counter("side.effects.skipped","reason",reason).increment();}
-    public void run(String status){committed(()->registry.counter("recon.runs","status",status).increment());}
+    public void run(String status){
+        // Count operator decisions and final outcomes, not worker progress transitions.
+        if(Set.of("PLANNED","AWAITING_APPROVAL","COMPLETED","REJECTED","FAILED").contains(status))
+            committed(()->registry.counter("recon.runs","status",status).increment());
+    }
     public void brake(String reason){committed(()->registry.counter("recon.brake.tripped","reason",reason).increment());}
     public void action(String action,String result){committed(()->registry.counter("recon.actions","action",action,"result",result).increment());}
     public void phase(String phase,long nanos){registry.timer("recon.phase.duration","phase",phase).record(nanos,TimeUnit.NANOSECONDS);}

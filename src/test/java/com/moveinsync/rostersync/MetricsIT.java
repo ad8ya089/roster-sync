@@ -53,6 +53,7 @@ class MetricsIT extends AbstractReconciliationIntegrationTest {
         double before=registry.find("recon.brake.tripped").tag("reason","MISSING_RATIO").counters().stream().mapToDouble(Counter::count).sum();
         var run=finished(upload(header()+row("ONLY_NEW",1,"S1"),false));assertThat(run.status()).isEqualTo("AWAITING_APPROVAL");
         assertThat(registry.get("recon.brake.tripped").tag("reason","MISSING_RATIO").counter().count()-before).isEqualTo(1);
+        assertThat(registry.find("recon.runs").counters()).allSatisfy(counter->assertThat(counter.getId().getTag("status")).isIn("PLANNED","AWAITING_APPROVAL","COMPLETED","REJECTED","FAILED"));
         send(event("GAUGE",1,"CREATE","BLR-1","S1"));gauges.refresh();
         assertThat(registry.get("outbox.pending").gauge().value()).isEqualTo(count("outbox_event"));
         assertThat(registry.get("recon.runs.awaiting.approval").gauge().value()).isEqualTo(1);

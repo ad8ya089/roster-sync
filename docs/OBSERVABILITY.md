@@ -26,7 +26,7 @@ Demo seed/export can take longer on Docker Desktop. Their transactions alone use
 | Publish results | `outbox_published_total`, `outbox_publish_failures_total`, `outbox_retries_total` | counter | `sink`, `event_type` |
 | Dead letters | `outbox_dead` | gauge | — |
 | Side effects | `side_effects_bookings_cancelled_total`, `side_effects_seats_freed_total`, `side_effects_skipped_total{reason}` | counter | |
-| Reconciliation | `recon_runs_total{status}`, `recon_brake_tripped_total{reason}`, `recon_runs_awaiting_approval` (gauge), `recon_phase_duration_seconds{phase=parse|diff|apply}`, `recon_actions_total{action,result}`, `recon_rows_rejected_total` | | |
+| Reconciliation | `recon_runs_total{status}`, `recon_brake_tripped_total{reason}`, `recon_runs_awaiting_approval` (gauge), `recon_phase_duration_seconds{phase=parse|diff|apply}`, `recon_actions_total{action,result}`, `recon_rows_rejected_total` | | status = PLANNED/AWAITING_APPROVAL/COMPLETED/REJECTED/FAILED only |
 | Cache | `cache_gets_total{cache,result}`, `cache_evictions_total{cache}`, `cache_size` | | |
 | JVM / pool | built-in `jvm_memory_used_bytes`, `hikaricp_connections_active/pending` | | |
 
@@ -60,6 +60,8 @@ Tags are finite enums or configured sink names. No metric has tenant IDs, employ
 Only OPERATOR can request the summary, and durable queries always use the token's tenant. The instance-wide label explicitly identifies the broader scope of counters and percentiles.
 
 ## Suggested alert rules (documented; `ops/prometheus/alerts.yml`)
+
+`recon_runs_total` counts entry into decision/terminal states only, after commit. UPLOADED, DIFFING and APPLYING do not increment it. A braked run later completed contributes once to AWAITING_APPROVAL and once to COMPLETED; summing all statuses is not a distinct-run count. The dashboard groups the 15-minute increase by status and filters to these five states.
 
 - `outbox_oldest_pending_age_seconds > 60` for 5 m — consumers/publisher stuck.
 - `outbox_dead > 0` — needs manual retry.
