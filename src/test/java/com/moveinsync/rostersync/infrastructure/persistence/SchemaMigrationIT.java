@@ -16,12 +16,12 @@ class SchemaMigrationIT extends AbstractIntegrationTest {
 
     @Test
     void appliesV1AndCreatesEveryCoreTable() {
-        assertThat(flyway.info().current().getVersion().getVersion()).isEqualTo("1");
+        assertThat(flyway.info().current().getVersion().getVersion()).isEqualTo("2");
         assertThat(flyway.validateWithResult().validationSuccessful).isTrue();
         var tables = jdbc.queryForList("SELECT tablename FROM pg_tables WHERE schemaname='public'", String.class);
         assertThat(tables).contains("tenant", "tenant_settings", "office", "app_user", "employee",
                 "hr_event_receipt", "record_rejection", "outbox_event", "recon_run", "recon_action",
-                "ops_alert", "cab_booking", "route_seat");
+                "ops_alert", "cab_booking", "route_seat", "processed_event");
     }
 
     @Test

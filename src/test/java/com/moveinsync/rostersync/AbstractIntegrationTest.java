@@ -29,7 +29,7 @@ public abstract class AbstractIntegrationTest {
 
     protected final void truncateBusinessTables() {
         jdbc.execute("""
-                TRUNCATE TABLE route_seat, cab_booking, ops_alert, recon_action, recon_run,
+                TRUNCATE TABLE processed_event, route_seat, cab_booking, ops_alert, recon_action, recon_run,
                   outbox_event, record_rejection, hr_event_receipt, employee,
                   app_user, office, tenant_settings, tenant RESTART IDENTITY CASCADE
                 """);
