@@ -13,7 +13,7 @@ tok() { curl -s $BASE/auth/token -H 'content-type: application/json' \
 ## 0. One command (30 s)
 ```bash
 docker compose down -v && docker compose up --build -d
-curl -s localhost:8080/actuator/health/readiness | jq
+curl -s 127.0.0.1:8081/actuator/health/readiness | jq
 ```
 Say: two containers, Postgres health-gated, Flyway schema, demo seed.
 
@@ -47,9 +47,9 @@ Expect: v6 `STALE` with `currentVersion: 7`; final BLR-2, S1, v7.
 ## 4. Replay the same feed twice (1 min)
 ```bash
 curl -s $BASE/hr/events -H "authorization: Bearer $HR" -H 'content-type: application/json' -d @samples/feed.json | jq .summary
-curl -s $BASE/ops/summary -H "authorization: Bearer $OPS" | jq .outbox
+curl -s $BASE/ops/summary -H "authorization: Bearer $OPS" | jq .durable.outbox
 curl -s $BASE/hr/events -H "authorization: Bearer $HR" -H 'content-type: application/json' -d @samples/feed.json | jq .summary
-curl -s $BASE/ops/summary -H "authorization: Bearer $OPS" | jq .outbox
+curl -s $BASE/ops/summary -H "authorization: Bearer $OPS" | jq .durable.outbox
 ```
 Expect: second summary all `duplicate`; outbox totals unchanged. Mention `ReplayIdempotencyIT` proves the same.
 
@@ -103,7 +103,7 @@ curl -s $BASE/hr/events -H "authorization: Bearer $HR" -H 'content-type: applica
   "managerId":"E1001","officeCode":"BLR-1","shiftCode":"S2","status":"ACTIVE"}]}' | jq '.results[0].outcome'   # APPLIED
 docker compose ps            # app restarting (exit 137)
 sleep 20; docker compose logs app | grep 'outbox.published' | grep 'employeeId=E2001 version=9'   # shows its eventId after restart
-curl -s $BASE/ops/summary -H "authorization: Bearer $OPS" | jq .outbox   # pending 0
+curl -s $BASE/ops/summary -H "authorization: Bearer $OPS" | jq .durable.outbox   # pending 0
 ```
 Narrate: the employee row and outbox row committed together; the process died before publishing; on restart the poller found the PENDING row. Automated version: `OutboxCrashRecoveryIT`.
 
@@ -125,15 +125,17 @@ curl -s $BASE/me -H "authorization: Bearer $EMP" | jq .employeeId               
 ## 12. Observability + close (45 s)
 ```bash
 curl -s $BASE/ops/summary -H "authorization: Bearer $OPS" | jq
-curl -s localhost:8080/actuator/prometheus -H "authorization: Bearer $OPS" | grep -E '^(roster_events_total|outbox_pending|recon_brake)'
+curl -s 127.0.0.1:8081/actuator/prometheus | grep -E '^(roster_events_total|outbox_pending|recon_brake)'
 ```
 Close with the README benchmark table and test count (`mvn verify` summary screenshot).
 
-Phase 4 note for step 4: `/ops/summary` arrives in Phase 7. Until then compare outbox counts using `docker compose exec -T db psql -U roster -d rostersync -At -c 'SELECT count(*) FROM outbox_event'` before/after replay. This checks the same invariant without adding a premature ops endpoint. Publishing and booking side effects are implemented in Phase 5.
+The summary is available: `.durable` is tenant-scoped SQL state and survives restart; `.sinceRestart` explicitly labels instance-wide Micrometer counters and rolling p99. Outbox pending is a current-state gauge and can fall while the publisher drains. Compare total SQL outbox rows for the replay invariant.
 
 The mixed feed remains 50 events: first send yields 44 APPLIED, 3 STALE (delayed v2 after v5) and 3 in-batch DUPLICATE; replay yields 50 DUPLICATE with originalOutcome APPLIED/STALE. Three v4 events are replaced by duplicates, keeping the fixture at 50 records.
 
-For a repeatable standalone step 9 on Linux or Git Bash/Windows, run `./scripts/demo-crash.sh` (curl + jq required). It uses a unique employee id, shows `docker compose ps -a` plus exit/restart metadata, then prints the exact eventId's published line. HALT is one-shot and arming disappears on restart. Check outbox status directly with psql until /ops/summary arrives in Phase 7. Step 10 keeps the past booking untouched, cancels both future scheduled bookings and clears seat 2; a delayed old deactivation after rehire is skipped.
+For a repeatable standalone step 9 on Linux or Git Bash/Windows, run `./scripts/demo-crash.sh` (curl + jq required). It uses a unique employee id, shows `docker compose ps -a` plus exit/restart metadata, then prints the exact eventId's published line. HALT is one-shot and arming disappears on restart. Readiness uses `${MANAGEMENT_URL:-http://127.0.0.1:8081}`; remote readiness must be checked privately over SSM. Step 10 keeps the past booking untouched, cancels both future scheduled bookings and clears seat 2; a delayed old deactivation after rehire is skipped.
+
+Optional dashboard: set `GRAFANA_ADMIN_PASSWORD` in `.env`; `docker compose --profile monitoring up -d`. Open Grafana at `http://127.0.0.1:3000`, log in as admin, then open **Roster Sync Operations**. Prometheus scrapes app:8081. The 12 panels show rates, outbox state, approval backlog, percentiles, retries/failures, cache hit ratios, heap and scrape reachability. `rate()`/`increase()` handle the deliberate crash's counter reset. No management path is exposed by production Caddy; port 8080 returns 404 for actuator paths.
 
 Phase 5 clean-volume verification (2026-10-30): the portable crash script returned APPLIED, Docker retained `container.die exitCode=137`, restart count reached 2 after two intentional smoke runs, and the restarted process published eventId `9a80d461-9239-42b3-ba32-d4d0dda2869e`. Both Compose services became healthy. Step 10 returned APPLIED, changed the two future bookings to CANCELLED / EMPLOYEE_DEACTIVATED, retained the completed past booking and freed seat 2. The mixed feed produced 44 applied / 3 stale / 3 duplicate; replay produced 50 duplicate and the pending outbox returned zero.
 
@@ -141,3 +143,18 @@ Phase 5 clean-volume verification (2026-10-30): the portable crash script return
 Fresh-volume final image: both app/db healthy, migrations through V3. The isolated 200k seed took19062ms (explicitly checked <20000ms). Seed20261030 export used mutatePercent1/dropPercent0.5. Healthy run71fcdf8a-b5b2-4006-aee7-27dda5d3ce01 completed: rows198995/valid198995/rejected0, updates1922, deactivations1010, unchanged197073, applied2932, diff12577ms/apply31073ms. The store includes five demo fixture employees in addition to200000 S-id fixtures.
 
 The subsequent120000-row file produced runf645c14d-8ffb-44a8-a59d-f3ec9aea9bbd, AWAITING_APPROVAL: activeBefore198995, missingActive79591 (40.0%), applied0, diff15916ms. Message: "File appears to be missing 79,591 of 198,995 active employees (40.0%). Threshold is 30.0%. No one has been deactivated. Approve or reject this run." ACTIVE count stayed198995 before/after. PUT maxMissingRatio0.5 returned0.500; reject returned REJECTED with applied0. Approval waiting time is not reported as apply time.
+
+## Phase 7 verified Compose evidence (2026-10-30)
+The fresh-volume build starts only app and db by default, with migrations through V4. Readiness on loopback 8081 is UP. Anonymous Prometheus returns 200 on 8081 and 404 on 8080.
+
+Steps 2–6: CREATE applied once; v7 applied before stale v6/currentVersion 7. The mixed feed returned 44 applied / 3 stale / 3 duplicate; replay returned 50 duplicate, with outbox rows 46 → 46 and unchanged employee/receipt contents. The bad batch returned 3 applied / 2 rejected. Transport ownership retained the pickup point. Disabled login/logout returned 404; the body limit returned 413.
+
+Steps 7–8: the healthy run read 199,008 valid rows and applied 1,923 updates plus 1,011 deactivations. Diff took 14,393 ms; apply took 28,586 ms. The truncated 120,000-row file reported 79,605 missing, left ACTIVE unchanged at 199,008, and took 13,821 ms to diff. The run was rejected after demonstrating the threshold change.
+
+One seed attempt hit the unchanged 30-second statement timeout while the large image download was active and rolled back completely (zero S-id rows). The later seed completed in 26,791 ms, above the earlier 20-second target; Phase 8 must profile this variation. The full integration suite measured 16,930 ms. These observations do not establish the cause of the slower runtime seed.
+
+Step 9: docker compose ps showed `restarting 137 1`, and Docker retained `container.die exitCode=137`. After restart the sink published event `4705a75e-0e9b-434c-bb9d-9e39a590bf2f`. SQL retained 50 applied receipts plus the crash event; Micrometer duplicates reset from 53 to 0 and the since timestamp changed. Step 10 applied once, cancelled both future bookings, retained the completed past booking and freed seat 2.
+
+Grafana 13.3.0 reports database OK and the provisioned **Roster Sync Operations** dashboard with 12 panels. Its Prometheus data source is healthy; all 13 panel expressions parse successfully (p50 and p99 use separate expressions). Retry/failure panels have no samples when no such events occur. Prometheus reports `http://app:8081/actuator/prometheus` UP with no scrape error.
+
+An extra safe brake demonstration after restart leaves generated demo run `81a26974-ce56-4e2c-86ab-4cdc88f3596c` awaiting approval, with 79,607 missing and zero actions applied. The dashboard shows pending/dead zero, approval backlog one, cache hit ratios, apply/lag percentiles, heap and scrape reachability. Management and monitoring UIs bind only to loopback; production exposure checks belong to Phase 8's deployment files.

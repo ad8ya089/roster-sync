@@ -1,6 +1,6 @@
 # API Contract
 
-Base path `/api/v1`. JSON everywhere except the CSV upload. All endpoints except `/auth/token`, `/actuator/health/**` require `Authorization: Bearer <JWT>`. The tenant is **always** taken from the token, never from the URL or body.
+Base path `/api/v1`. JSON everywhere except the CSV upload. All API endpoints except `/auth/token` require `Authorization: Bearer <JWT>`. Actuator is public on the separate management listener 8081, with no Actuator routes on 8080. The tenant is **always** taken from the token, never from the URL or body.
 
 ## Roles
 
@@ -143,7 +143,7 @@ Employee response:
 
 Codes match `^[A-Z0-9-]{1,32}$`; names contain 1–200 characters and cannot be blank. Duplicate code within a tenant returns 409 `OFFICE_CODE_EXISTS`; the same code may exist in different tenants. A cross-tenant or missing office returns 404. Role authorization runs before the resource lookup, so a disallowed role receives 403 for both existing and absent offices.
 
-Deactivation is allowed: existing employees keep their office references; future HR records using that office fail validation with `INACTIVE_OFFICE`. The database-backed `OfficeLookup` port is the cache seam; Phase 7 adds caching and write eviction. Invalid path/query types return 400 `VALIDATION_FAILED` with field names and codes only. Error instances use the fixed `/api/v1` URI so malformed request paths cannot leak input values.
+Deactivation is allowed: existing employees keep their office references; future HR records using that office fail validation with `INACTIVE_OFFICE`. OfficeLookup caches immutable office references without caching unknown codes; office writes evict after commit. The applier checks activity through an uncached plain read inside its transaction. Invalid path/query types return 400 `VALIDATION_FAILED` with field names and codes only. Error instances use the fixed `/api/v1` URI so malformed request paths cannot leak input values.
 
 ## Bookings (stub transport domain, for side effects)
 `POST /bookings {employeeId, pickupAt}` — TRANSPORT_ADMIN; rejects inactive employees (`409 EMPLOYEE_INACTIVE`).
@@ -202,13 +202,13 @@ Rejections list `rowNumber`, `employeeId`, `errorCodes` — never values.
 
 | Endpoint | Returns |
 |---|---|
-| `GET /ops/summary` | the 3 AM view: outbox pending/dead/oldest-age, events last 15 min by outcome, rejection rate, retries, runs awaiting approval, last run status — see `OBSERVABILITY.md` |
+| `GET /ops/summary` | `durable`: tenant-scoped SQL last-15-min applied/stale/noChange/rejected/conflict, current outbox state, runs and alerts. `sinceRestart`: instance-wide replay/retry/publish-failure counters and p99 estimates, labelled with `since` and `instanceWide: true`. See `OBSERVABILITY.md` for the exact shape. |
 | `GET /ops/alerts?acknowledged=false` | open alerts |
 | `POST /ops/alerts/{id}/ack` | acknowledge |
 | `GET /ops/outbox?status=PENDING\|DEAD&page=` | outbox rows (no payload values) |
 | `POST /ops/outbox/{id}/retry` | DEAD → PENDING, attempts reset |
 
-Actuator: `/actuator/health/liveness`, `/actuator/health/readiness` (public), `/actuator/prometheus` (OPERATOR, or open on an internal management port — see `OBSERVABILITY.md`).
+Actuator: all exposed endpoints (`health`, `info`, `prometheus`, `metrics`) are permitAll on management port 8081. Compose publishes it on loopback only; production does not publish it. Every `/actuator/**` request on API port 8080 returns 404.
 
 ---
 

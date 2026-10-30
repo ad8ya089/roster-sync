@@ -17,16 +17,16 @@ docker-compose.yml
          depends_on: db: condition: service_healthy
          restart: unless-stopped            ← makes the kill -9 demo self-heal
          env_file: .env
-         ports: 8080:8080
+         ports: 8080:8080, 127.0.0.1:8081:8081
          volume: appdata:/data              ← uploaded files + spill files
-         healthcheck: curl --fail --silent localhost:8080/actuator/health/readiness
+         healthcheck: curl --fail --silent 127.0.0.1:8081/actuator/health/readiness
 ```
 
 **Profiles:** local Compose defaults to `demo`. Ordinary production uses `prod` alone and excludes demo fixtures/dev endpoints. The interview environment deliberately runs `prod,demo`; dev endpoints are restricted to OPERATOR once implemented.
 
 **Dockerfile (multi-stage):**
 - Stage 1 `maven:3.9-eclipse-temurin-21` — copy `pom.xml` first and run `mvn -B -q dependency:go-offline` (layer cache), then copy `src` and `mvn -B -DskipTests package`.
-- Stage 2 `eclipse-temurin:21-jre` (multi-arch: works on x86 laptops and ARM/Graviton) — non-root user, `JAVA_OPTS="-XX:MaxRAMPercentage=75 -XX:+ExitOnOutOfMemoryError"`, `EXPOSE 8080`.
+- Stage 2 `eclipse-temurin:21-jre` (multi-arch: works on x86 laptops and ARM/Graviton) — non-root user, `JAVA_OPTS="-XX:MaxRAMPercentage=75 -XX:+ExitOnOutOfMemoryError"`, `EXPOSE 8080 8081`.
 - Nobody needs Java or Maven installed.
 
 The runtime image installs curl for its readiness check and runs as UID/GID 10001, which owns `/data`.
@@ -35,11 +35,11 @@ The runtime image installs curl for its readiness check and runs as UID/GID 1000
 ```bash
 cp .env.example .env        # defaults work for local
 docker compose up --build   # Flyway creates schema; demo seeder creates 2 tenants, offices, users, a few employees, bookings, seats
-curl localhost:8080/actuator/health/readiness
+curl 127.0.0.1:8081/actuator/health/readiness
 ```
 Tests need Docker (Testcontainers) — say so in the README. Before recording the video, verify on a clean machine or a clean clone with `docker compose down -v` first.
 
-Optional: `docker compose --profile monitoring up` adds Prometheus (scrapes `/actuator/prometheus`) and Grafana with a provisioned dashboard.
+Optional: set `GRAFANA_ADMIN_PASSWORD` in `.env`, then `docker compose --profile monitoring up -d`. Prometheus scrapes `app:8081/actuator/prometheus`; Grafana has the provisioned Roster Sync Operations dashboard. Their host ports 9090/3000 bind only to loopback. Default Compose starts only app and db. All actuator endpoints are permitAll on management 8081; none exist on API 8080.
 
 ---
 
@@ -91,14 +91,14 @@ So: Lambda is excellent for spiky, stateless, short handlers; this service is a 
 
 1. **Account hygiene:** create an AWS Budget alert (e.g. $10/month) before launching anything.
 2. **Launch** EC2 in `ap-south-1`: Ubuntu 24.04 LTS **arm64**, `t4g.small` (use `t4g.medium` if you want to run the 200k benchmark on the box), 20 GB gp3, an IAM role with `AmazonSSMManagedInstanceCore` (so you can use Session Manager instead of opening SSH) and `s3:PutObject` on a backup bucket.
-3. **Security group:** inbound 80 and 443 from anywhere; **no** 22 (use SSM Session Manager) — or 22 only from your IP. Postgres and 8080 are never exposed.
+3. **Security group:** inbound 80 and 443 from anywhere; **no** 22 (use SSM Session Manager) — or 22 only from your IP. Postgres, 8080 and 8081 are never exposed.
 4. **Elastic IP** (stable address for DNS). Note: every public IPv4 costs ~$0.005/hour whether attached or not — release it when you're done.
 5. **DNS:** point a free DuckDNS subdomain (or a domain you own) at the Elastic IP.
 6. **User data / bootstrap** (`deploy/aws-ec2/bootstrap.sh`): install Docker Engine + compose plugin, clone the repo, write `.env` from SSM Parameter Store SecureStrings (`/rostersync/JWT_SECRET`, `/rostersync/POSTGRES_PASSWORD`, `/rostersync/DEMO_PASSWORD`), `docker compose -f docker-compose.yml -f deploy/aws-ec2/compose.prod.yml up -d --build`.
-7. `compose.prod.yml` overrides: removes the 8080 host port, adds `caddy:2` (ports 80/443, `Caddyfile`: `{$DOMAIN} { reverse_proxy app:8080 }` → automatic Let's Encrypt HTTPS), sets `SPRING_PROFILES_ACTIVE=prod,demo` for the intentional interview-only exception (demo endpoints require OPERATOR auth so you can show the 200k flow live; ordinary production uses `prod` alone and has no dev endpoints), sets JVM to `-Xmx768m`, Postgres `shared_buffers=256MB`.
+7. Phase 8's `compose.prod.yml` must clear **both** inherited app port mappings (Compose `ports: !reset []`); 8081 is never host-published in production. Add Caddy on 80/443 with `{$DOMAIN} { reverse_proxy app:8080 }` for HTTPS. Caddy proxies only 8080, so actuator paths return 404 publicly. Enable `prod,demo` for the intentional interview exception (OPERATOR dev endpoints); ordinary production uses `prod` alone. Set JVM `-Xmx768m`, Postgres `shared_buffers=256MB`. Monitoring reaches 8081 only on the private container network.
 8. **Backups:** cron `pg_dump | gzip | aws s3 cp - s3://<bucket>/rostersync/$(date +%F).sql.gz` nightly.
 9. **Deploy updates:** `deploy/aws-ec2/deploy.sh` runs via SSM: `git pull && docker compose … up -d --build`. Optional GitHub Action that triggers it on tag.
-10. **Smoke test:** `curl https://<domain>/actuator/health/readiness` and run `scripts/demo.sh BASE_URL=https://<domain>`.
+10. **Smoke test:** over SSM, `docker compose exec app curl -fsS localhost:8081/actuator/health/readiness`. Public `/actuator/health/readiness` must return 404. Run the API demo through `BASE_URL=https://<domain>`; the internal readiness check remains private.
 11. **Cost control after interviews:** `docker compose down`, stop or terminate the instance, release the Elastic IP, delete snapshots.
 
 Optional (you already know CDK): `deploy/aws-cdk/` — a ~80-line CDK stack (default VPC, SG, role, EC2 with the bootstrap as user data, Elastic IP, S3 backup bucket, SSM params). Nice to show, not required.

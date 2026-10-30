@@ -1,5 +1,15 @@
 # Decisions & Trade-offs
 
+## ADR-018 State in SQL, time series in Prometheus
+The operational summary separates tenant-scoped durable database state from explicitly instance-wide `sinceRestart` counters and rolling p99 estimates. Receipts/rejections reconstruct accepted outcomes and audited failures for the last 15 minutes. They cannot reconstruct replay deliveries, lock retries or historical publisher failures, so those remain Micrometer counters. Prometheus rate/increase handles reset-aware windows. No minute-rollup hot row serializes ingestion. V4 adds only the requested SQL indexes. Gauges refresh into AtomicLongs every 15 seconds; scraping does no database work.
+
+Labels never contain tenant IDs, employee IDs or PII: finite outcome/reason/sink/type labels keep cardinality bounded even for 200k employees. Per-tenant views use the authenticated SQL endpoint. Only apply latency, ingest lag and HTTP requests have histograms and p50/p99. Negative clock-skew lag is ignored.
+
+## ADR-019 Management isolation and local immutable caches
+All actuator endpoints live on a separate public management listener 8081; API 8080 has no actuator handlers. Local Compose binds 8081 to loopback. Production must remove inherited app port mappings, proxy only 8080 through Caddy, and never open 8081 in the security group. Boot 4's child management context gets its own security configuration outside the application component scan, avoiding a permit-all chain in the API context.
+
+Caffeine caches immutable DTOs under tenant-inclusive record keys. Unknown offices are not cached; write decisions always use database state. Employee writes evict after commit, including version-only advances and every recon action. Rollback preserves cached data. Cross-instance invalidation remains bounded by TTL; shared invalidation is deferred until multi-instance deployment. Executor TaskDecorators propagate only correlationId, and workers scope their own IDs with finally cleanup.
+
 Short ADRs. Each: decision → why → what we gave up → when we'd revisit. This file answers plus-point **5 (Trade-offs)** and part of **2 (Cost estimation / where it stops scaling)**.
 
 ## ADR-001 Java 21 + Spring Boot 4.1, Maven

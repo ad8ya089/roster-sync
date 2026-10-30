@@ -22,12 +22,16 @@ Implementation: Spring Cache abstraction + Caffeine (`spring-boot-starter-cache`
 
 | Stale data | Where | Max staleness | Bound / mitigation |
 |---|---|---|---|
-| Newly created office not yet visible | other app instances (single instance: never, eviction is local) | 10 min | TTL. Effect: events for that office are rejected `UNKNOWN_OFFICE` and HR resends — no corruption. |
+| Newly created office | all instances | no negative-cache delay | Unknown codes are never cached. The next lookup queries the DB and sees the committed office. |
 | Deactivated office still accepted | other instances | 10 min | The FK guarantees the office still **exists**. The applier re-reads `office.active` inside its transaction before writing, so a deactivated office is rejected `INACTIVE_OFFICE` even if the cache says active. |
 | Employee profile shows old office/shift | other instances | 30 s | TTL; on the writing instance eviction happens in `TransactionSynchronization.afterCommit`, so a read right after the write is fresh. |
 | Employee profile cached **before** a concurrent write commits | writing instance | until next eviction or 30 s | eviction runs after commit, so the race window is "read started before commit, finished after" → bounded by the 30 s TTL. |
 
 Why evict *after commit* and not inside the transaction: evicting inside the transaction lets a concurrent reader re-populate the cache with the old row before the commit — the classic cache-aside race. After-commit eviction narrows it to the window above.
+
+`spring.cache.cache-names=offices,employeeView` declares both caches at startup. Each Caffeine cache records statistics and uses its own configured TTL/maximum. Keys are OfficeKey/EmployeeKey records; OfficeRef and EmployeeView are immutable DTO records, never attached JPA entities. Misses are not cached. An in-transaction office read always bypasses the cache and uses a plain READ COMMITTED read.
+
+AfterCommitCacheEvictor covers event Apply and VersionAdvanced, transport changes, every applied recon action (CREATE/UPDATE/HEAL/ADVANCE/DEACTIVATE), office writes, and clearing the employeeView cache after dev seeding. Without transaction synchronization eviction runs immediately; otherwise only afterCommit performs it. Rolled-back work leaves the prior cached DTO untouched. NO_CHANGE still invalidates because hrVersion and hrUpdatedAt are visible to readers.
 
 ## Multi-instance story (for the interview)
 
@@ -35,4 +39,4 @@ Caffeine is per JVM. With N instances, staleness on the non-writing instances is
 
 ## Tests
 
-`CachingIT`: second `GET /me` is a cache hit (stats); HR update → next `GET /me` returns new data immediately (after-commit eviction); office created → immediately usable on the same instance; brake settings change takes effect on the very next run (no cache).
+`CachingIT`: cache hit statistics, HR/transport freshness, VersionAdvanced, rollback preservation, immediate no-sync eviction, all recon action types, seed clearing, tenant/self isolation before lookup, no negative office entries, independent tenant office states, TTL/size policy and next-run settings freshness.

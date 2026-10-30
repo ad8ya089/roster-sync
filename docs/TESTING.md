@@ -1,5 +1,15 @@
 # Test Strategy
 
+## Phase 7 operational proof
+
+`MetricsIT` checks the 44 applied / 3 stale / 3 duplicate mixed feed, NO_CHANGE, conflicts and rejections against counters and tenant-scoped SQL. A fresh registry leaves durable counts intact while sinceRestart counters reset. The real Compose crash/restart also demonstrates this boundary. A JdbcClient spy proves a management scrape performs no SQL after an explicit gauge refresh; cached pending/approval gauges and brake counters are checked. Export registries are enabled explicitly with Boot 4's AutoConfigureMetrics in integration tests.
+
+`CachingIT` covers hit statistics, HR/transport writes, version-only advancement, rollback preserving the same cached DTO, immediate invalidation without synchronization, unknown-office misses, tenant/self isolation, TTL/max policy, every recon action type, seed clearing and uncached settings. `MdcTaskDecoratorTest` verifies correlation-only capture and worker-context restoration even on failure. `RosterMetricsTest` checks negative lag suppression and bounded rejection labels.
+
+`PiiLeakIT` runs ingest, replay/conflict, invalid input, transport, authentication failure, forced 500, malformed recon rows, real publishing and deactivation consumption. It scans captured logs, error bodies, outbox payloads, record_rejection and ops_alert rows for canaries. Legitimate employee/profile data is not included in the operational-store scan.
+
+`HealthIT` checks anonymous management health/Prometheus on a random separate port and 404 for the same paths on the API port. The dynamic security guard rejects any actuator registration on the API context and checks every protected API handler without a token. Management ports are random in tests, including manually restarted contexts, so cached contexts cannot contend for fixed 8081.
+
 "Advanced Track" requires: every hard rule has an automated test, at least one **concurrency** test and one **failure** test, plus a benchmark with throughput and p50/p99 reported with the machine spec.
 
 ## Layers
@@ -148,3 +158,5 @@ ReconciliationConcurrencyIT uses latch gates for competing uploads/approvals and
 Performance checks distinguish execution environments: the normal integration JVM is capped at 1 GiB with six cached Spring contexts. The slow test asserts each diff <60s and maximum chunk <5s, and records seed duration. The seed's <20s local runtime target is checked against an isolated Compose invocation, without JaCoCo or a concurrent image build. The benchmark profile still supplies its separate 256 MiB heap setting. The stale-export test fixes a nanosecond fraction that previously rounded down in PostgreSQL, proving the microsecond canonicalization regression.
 
 Final Phase 6 full verification: 141 unit/property/architecture tests plus 131 PostgreSQL integration tests, 272 total, zero failures/errors/skips. Domain line coverage is 359/361 (99.45%), with no gate. The deterministic 200k case (seed20261030) recorded seed16934ms, healthy diff31159ms, healthy apply24395ms, truncated diff29191ms and maximum25-action chunk668ms. It proved exactly80000 missing of200000 ACTIVE employees (40.0%), with ACTIVE count unchanged. Detailed runtime timings for the separate Compose smoke are recorded in the demo documentation.
+
+Phase 7 final proof: 285 tests (144 unit/property/architecture and 141 PostgreSQL integration), with zero failures, errors or skips. Domain line coverage is 359/361 (99.45%). The PII publishing extension also passed a focused rerun. Full-suite 200k timings: seed 16,930 ms, healthy diff 13,050 ms, healthy apply 22,209 ms, truncated diff 12,126 ms, maximum 25-action chunk 642 ms. These are acceptance timings; the constrained-heap benchmark and load-test evidence remain Phase 8.

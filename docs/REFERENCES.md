@@ -25,3 +25,5 @@
 | Lightsail bundles | Cloudburn, *Amazon Lightsail Pricing 2026* — https://cloudburn.io/blog/amazon-lightsail-pricing | option E |
 | AWS Free Tier (credit-based, since July 2025) | https://aws.amazon.com/free | budget note |
 | Render free tier limits | Render free-tier summaries (15-min sleep, 30-day Postgres) — https://livemy.app/blog/render-pricing | fallback |
+| Prometheus pinned release | [Prometheus v3.15.1](https://github.com/prometheus/prometheus/releases/tag/v3.15.1) | optional monitoring image |
+| Grafana pinned release | [Grafana v13.3.0](https://github.com/grafana/grafana/releases/tag/v13.3.0) | optional dashboard image |

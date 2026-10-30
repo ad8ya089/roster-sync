@@ -44,7 +44,7 @@ Rules every agent must follow:
 - Hibernate SQL exception diagnostics are disabled because driver messages can contain values; the handler records safe metadata instead.
 - **Access logs:** off. Paths contain employee IDs only.
 - **Outbox payload:** PII appears only as field **names** in `changedFields`.
-- **Metrics tags:** never employee IDs (cardinality) and never PII; tags are `outcome`, `reason`, `source`, `type`.
+- **Metrics tags:** no tenant IDs, employee IDs or PII. Labels are bounded outcomes, reasons, sources, types, sink names, event types, phases and cache names. Per-tenant views use the authenticated SQL summary rather than multiplying time series.
 
 **Proof:** `PiiLeakIT` — seeds canary values (`canary.person@pii.test`, `+919999900000`, `Canary Lane 42`, name `Zzcanary Person`), runs every main flow (valid + invalid events, duplicate, conflict, transport update, recon with bad rows, auth failures, a forced 500), captures all log output with `OutputCaptureExtension`, and also collects every error response body; asserts none of the canary strings appear.
 
@@ -82,7 +82,11 @@ Event batch ≤ 1000 and body ≤ 2 MB; CSV ≤ 100 MB (`spring.servlet.multipar
 
 - `prod` alone has no demo seeder, dev endpoints, or active fault injection.
 - The interview deployment intentionally enables `prod,demo`: production logging plus demo fixtures and, once implemented, demo endpoints. Every `/api/v1/dev/**` endpoint requires OPERATOR authentication; this is an explicit interview-only exception, not the normal production configuration.
-- Health probes and POST `/auth/token` are public. Other routes require bearer authentication and API handlers declare role authorization. The default generated Spring Security user is disabled so no generated password is logged.
+- POST `/auth/token` is public. Other API routes require bearer authentication and method authorization. All actuator endpoints are permitAll on the separate management listener 8081; no actuator handlers exist on 8080. Compose publishes 8081 only on loopback. Production clears its host port, keeps it out of the security group, and Caddy proxies only 8080. The default generated Spring Security user is disabled so no generated password is logged.
 - Caller correlation IDs must be UUIDs. Other values are replaced with a generated UUID before entering logs; error responses return the resulting ID.
 
 Phase 6 file boundary: saved uploads use generated UUID names, never the client filename. Invalid headers remove the generated copy and create no run. Binary spills live in generated UUID directories and are deleted in finally. Run/status/rejection responses expose counts, identifiers and codes; normalized action payloads remain internal. Malformed CSV reports only MALFORMED_CSV and a record number. Demo CSV export contains employee data and is OPERATOR-only under demo; prod alone has no dev endpoints. Whole-file asOf ordering and expected-version rechecks protect against older exports overwriting newer work. Inbox polling preserves source files and uses tenant-specific directories under the configured root.
+
+Boot 4 creates a child context for the management server. Its configuration is registered through `ManagementContextConfiguration.imports` and deliberately sits outside the application's component scan, so its permit-all filter chain cannot open API routes. A separate correlation filter wraps management requests. HealthIT and the endpoint guards assert management-public/API-404 separation.
+
+Cache keys include tenant IDs and values are immutable DTOs. EMPLOYEE ownership checks run before lookup. Employee invalidation occurs after commit (including NO_CHANGE version advances), and rollback cannot evict. Task decorators copy only correlationId; background jobs supply their own IDs and clear MDC in finally. PiiLeakIT scans logs, errors, outbox payloads, rejection and alert rows across ingest, transport, conflict, auth, forced failure and malformed recon rows.

@@ -2,7 +2,7 @@
 
 MoveInSync Backend Case Study 5 (Advanced Track). Java 21 · Spring Boot 4.1 · PostgreSQL 17 · one `docker compose up`.
 
-> Status: **Phases 1–4 implemented and verified locally**. JWT login, tenant-scoped offices, HR event ingestion, employee/self reads and transport patches are available. Changes are recorded atomically in the outbox; publishing/booking side effects arrive in Phase 5. Benchmark results will be measured in Phase 8.
+> Status: **Phases 1–7 implemented**. Event ingestion, publishing/booking effects, streaming reconciliation, operational metrics and caches are available. Phase 8 adds the final benchmark, load test and deployment proof.
 
 ## Target behavior
 
@@ -16,11 +16,11 @@ MoveInSync Backend Case Study 5 (Advanced Track). Java 21 · Spring Boot 4.1 · 
 ```bash
 cp .env.example .env
 docker compose up --build
-curl localhost:8080/actuator/health/readiness
+curl 127.0.0.1:8081/actuator/health/readiness
 ```
 Requirements for the container run: Docker Desktop/Engine with Compose. No host Java or Maven is required. The guided `scripts/demo.sh` walkthrough will be added in Phase 8.
 
-On Windows PowerShell, use `Copy-Item .env.example .env` for the first step and `curl.exe` for the readiness request. The app starts after PostgreSQL is healthy; Flyway creates the schema. Only port 8080 is exposed; PostgreSQL stays on the Compose network. The runtime is non-root and uploaded files will live on the `/data` volume.
+On Windows PowerShell, use `Copy-Item .env.example .env` for the first step and `curl.exe` for the readiness request. The app starts after PostgreSQL is healthy; Flyway creates the schema. The API uses 8080; public Actuator endpoints use the separate management port, bound to `127.0.0.1:8081` on the host. PostgreSQL stays on the Compose network. The runtime is non-root and uploads live on the `/data` volume.
 
 Local builds require JDK 21 or newer; JDK 22 is supported with `maven.compiler.release=21`. The Maven wrapper downloads Maven automatically:
 
@@ -32,11 +32,13 @@ Local builds require JDK 21 or newer; JDK 22 is supported with `maven.compiler.r
 
 In PowerShell, replace `./mvnw` with `.\mvnw.cmd`. Docker and CI use Temurin 21. A network proxy, if required by your machine, belongs in your local Maven settings rather than the repository.
 
-Public `/actuator/health/liveness` and `/actuator/health/readiness` probes include database connectivity in readiness. POST `/api/v1/auth/token` is the only other public route. Other routes require a signed bearer token; API controller methods declare their allowed roles. Both demo and production logging use ECS JSON; correlation IDs appear in `X-Correlation-Id` and error bodies, including 401/403 responses.
+All Actuator endpoints are public on 8081; readiness includes database connectivity. No Actuator routes exist on 8080. POST `/api/v1/auth/token` is public; other API handlers require a signed bearer token and declare allowed roles. Both demo and production logging use ECS JSON; correlation IDs appear in `X-Correlation-Id` and error bodies, including 401/403 responses.
+
+Optional monitoring: set a strong `GRAFANA_ADMIN_PASSWORD` in `.env`, then run `docker compose --profile monitoring up -d`. Prometheus is at `http://127.0.0.1:9090`; Grafana at `http://127.0.0.1:3000` (user `admin`), with the provisioned **Roster Sync Operations** dashboard. Default Compose starts only app and db. Metrics use finite labels without tenant/employee IDs or PII. `GET /api/v1/ops/summary` (OPERATOR) separates tenant-scoped durable SQL state from instance-wide counters/percentiles since restart; see [observability](docs/OBSERVABILITY.md). Production publishes no 8081 port; Caddy proxies only 8080.
 
 The `demo` profile seeds tenants `acme` and `globex`, offices `BLR-1`, `BLR-2`, inactive `BLR-3`, and `HYD-1`. Seeded usernames are `acme.hr`, `acme.admin`, `acme.operator`, `E1001`, `globex.hr`, `globex.admin` and `globex.operator`; their password comes from `DEMO_PASSWORD`. Acme has employees `E1001`–`E1005`, two future bookings and one completed booking for `E1002`, and route `R-BLR-07` with four seats. Restarting preserves existing data.
 
-Compose defaults to `demo`. Ordinary production uses `prod` alone, without demo fixtures or dev endpoints. The interview deployment intentionally enables `prod,demo`; its future dev endpoints require OPERATOR authentication. Change all example credentials before exposing an interview deployment publicly.
+Compose defaults to `demo`. Ordinary production uses `prod` alone, without demo fixtures or dev endpoints. The interview deployment intentionally enables `prod,demo`; dev endpoints require OPERATOR authentication. Change all example credentials before exposing an interview deployment publicly.
 
 Log in using the `DEMO_PASSWORD` chosen in `.env`, then pass the returned `accessToken`:
 
@@ -95,7 +97,7 @@ Higher-version identical snapshots, including DEACTIVATE on INACTIVE employees o
 Event apply: O(log M) index lookup, O(1) memory. Reconciliation: O(N + M) time, O(N/B) heap with B = 256 buckets, O(N) temp disk. First scaling limits: single Postgres writer, single outbox poller, table growth, per-row apply for mass changes.
 
 ## Tests _(counts filled in Phase 8)_
-Full `./mvnw -B verify` passes 141 unit/property/architecture tests and 131 PostgreSQL integration tests (272 total), with no failures, errors or skips. Two jqwik properties each run 1,000 trials with fixed seeds `2026103001` and `2026103002`, including maximum-version preservation across deactivations and identical snapshots. JaCoCo reports domain coverage at `target/site/jacoco/index.html`, without a gate. Integration tests prove migrations, health, auth/tenancy, per-record ingestion, replay, ordering, rollback, ownership and concurrency. Phases 5–6 add real application-context restart recovery, concurrent publishing/reconciliation, timeout/retry, retention, rehire, CSV parsing and 200k safety-brake proof. Later phases add reconciliation benchmarks and k6 load tests.
+Full `./mvnw -B verify` passes 144 unit/property/architecture tests and 141 PostgreSQL integration tests (285 total), with no failures, errors or skips. Two jqwik properties each run 1,000 trials with fixed seeds `2026103001` and `2026103002`, including maximum-version preservation across deactivations and identical snapshots. Domain line coverage is 99.45% (359/361); JaCoCo reports at `target/site/jacoco/index.html`, without a gate. Integration tests cover migrations, health/auth/tenancy, ingestion/replay/ordering/rollback, ownership/concurrency, real-context restart recovery, timeouts/retention/rehire, CSV/200k safety-brake behavior, management-port isolation, rollback-safe caches, SQL-free scrapes, hybrid summary and PII boundaries. Phase 8 adds the separate memory benchmark and k6 load tests.
 
 ## Demo video
 _link here_

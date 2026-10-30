@@ -20,7 +20,7 @@ Every sentence of the case-study PDF, mapped to design, code and proof. Agents m
 |---|---|---|---|---|
 | I1 | Create, update and deactivate events | `HrCommand` sealed hierarchy (`CreateEmployee`, `UpdateEmployee`, `DeactivateEmployee`) + `HrEventType` enum | `ChangeDeciderTest`, `TombstoneIT`, `ReplayIdempotencyIT` | done — Phase 4 API/domain/integration proof passes |
 | I2 | …each with the source system's version or timestamp | `version` (long); timestamp sources send epoch millis — documented in README/API.md | `RecordValidatorTest` (version ≤ 0 rejected) | done — Phase 4 API/domain/integration proof passes |
-| I3 | Reject invalid records (malformed phone, unknown office code) | E.164 phone rule, office lookup via cache + in-tx check | `RecordValidatorTest`, `BatchIsolationIT` | done for events — invalid phone/office and in-tx active-office refresh tested; cache added in Phase 7 |
+| I3 | Reject invalid records (malformed phone, unknown office code) | E.164 phone rule, office lookup via cache + in-tx check | `RecordValidatorTest`, `BatchIsolationIT` | done for events — invalid phone/office and in-tx active-office refresh tested; cache, no-negative-miss behavior and uncached in-tx office checks proved by CachingIT |
 | I4 | …with a per-record error report | response `results[i].errors[{field, code}]`; `record_rejection` table; `/reconciliation/runs/{id}/rejections` | `BatchIsolationIT`, `ReconciliationFlowIT.badRows` | done — per-record event isolation and file validation/audit with chunk rollback and per-action fallback |
 | I5 | One bad record must never fail a whole batch | per-record transaction (`EmployeeChangeApplier` separate bean, `@Transactional`), file rows rejected individually | `BatchIsolationIT`, `ReconciliationFlowIT.badRows` | done — per-record event isolation and file validation/audit with chunk rollback and per-action fallback |
 
@@ -83,9 +83,9 @@ Every sentence of the case-study PDF, mapped to design, code and proof. Agents m
 | X3 | Fault tolerance: crashes, timeouts, duplicate & out-of-order messages, partial failures; ≥ 1 failure-injection test | `DESIGN.md §6`, `FaultInjector` | `OutboxCrashRecoveryIT`, `OutboxRetryIT` (timeouts), `ReconciliationRecoveryIT` (partial failure) | done — ingest/outbox failures, timeout/redelivery and real reconciliation restart recovery tested |
 | X4 | OOP: encapsulation, inheritance, polymorphism; controller/service/repository layering | `docs/DESIGN.md` layering and entity/command hierarchies | `ArchitectureTest` + code review | done — encapsulated entities, command/decision hierarchies, EventSink implementations and shared snapshot applier; architecture guards pass |
 | X5 | Trade-offs: consistency vs availability vs latency; what was left out | `DECISIONS.md` | — | |
-| X6 | Metrics + structured logging; 3 AM counters: lag, error rate, rejections, retries, queue depth | `OBSERVABILITY.md` | `MetricsIT` | |
-| X7 | Caching for hot data, eviction policy, what can be stale / how long / how bounded | `CACHING.md` | `CachingIT` | |
-| X8 | Error handling framework, meaningful non-leaking messages, no PII in logs or error responses | `SECURITY.md §5` | `ErrorHandlingIT`, `PiiLeakIT` | partial — current HTTP and per-record errors, conflicts/audit and ingestion/transport PII proof pass; recon proof later |
+| X6 | Metrics + structured logging; 3 AM counters: lag, error rate, rejections, retries, queue depth | `OBSERVABILITY.md` | `MetricsIT` | done — finite labels, 8081 management, cached gauges, hybrid tenant SQL / instance-wide summary and provisioned monitoring |
+| X7 | Caching for hot data, eviction policy, what can be stale / how long / how bounded | `CACHING.md` | `CachingIT` | done — immutable tenant keys/DTOs, hit stats, after-commit rollback-safe eviction including version advances and recon |
+| X8 | Error handling framework, meaningful non-leaking messages, no PII in logs or error responses | `SECURITY.md §5` | `ErrorHandlingIT`, `PiiLeakIT` | done — PiiLeakIT covers ingest, replay/conflict, transport, auth, forced 500, recon bad rows, publishing, rejection and alert stores |
 
 ## Advanced track
 
