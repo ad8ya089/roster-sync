@@ -90,18 +90,27 @@ So: Lambda is excellent for spiky, stateless, short handlers; this service is a 
 ## 3. Option A step by step (what Prompt 8 automates in `deploy/aws-ec2/`)
 
 1. **Account hygiene:** create an AWS Budget alert (e.g. $10/month) before launching anything.
-2. **Launch** EC2 in `ap-south-1`: Ubuntu 24.04 LTS **arm64**, `t4g.small` (use `t4g.medium` if you want to run the 200k benchmark on the box), 20 GB gp3, an IAM role with `AmazonSSMManagedInstanceCore` (so you can use Session Manager instead of opening SSH) and `s3:PutObject` on a backup bucket.
+2. **Proposed launch, subject to the account-specific plan and approval:** Ubuntu 24.04 LTS arm64 on `t4g.small`, or x86_64 `t3.small` fallback, 20 GB encrypted gp3, an SSM instance role and restricted backup-bucket access. Bootstrap adds a 2 GB swap file. No resource is created before the concrete resource/name/cost plan is approved.
 3. **Security group:** inbound 80 and 443 from anywhere; **no** 22 (use SSM Session Manager) — or 22 only from your IP. Postgres, 8080 and 8081 are never exposed.
 4. **Elastic IP** (stable address for DNS). Note: every public IPv4 costs ~$0.005/hour whether attached or not — release it when you're done.
 5. **DNS:** point a free DuckDNS subdomain (or a domain you own) at the Elastic IP.
 6. **User data / bootstrap** (`deploy/aws-ec2/bootstrap.sh`): install Docker Engine + compose plugin, clone the repo, write `.env` from SSM Parameter Store SecureStrings (`/rostersync/JWT_SECRET`, `/rostersync/POSTGRES_PASSWORD`, `/rostersync/DEMO_PASSWORD`), `docker compose -f docker-compose.yml -f deploy/aws-ec2/compose.prod.yml up -d --build`.
-7. Phase 8's `compose.prod.yml` must clear **both** inherited app port mappings (Compose `ports: !reset []`); 8081 is never host-published in production. Add Caddy on 80/443 with `{$DOMAIN} { reverse_proxy app:8080 }` for HTTPS. Caddy proxies only 8080, so actuator paths return 404 publicly. Enable `prod,demo` for the intentional interview exception (OPERATOR dev endpoints); ordinary production uses `prod` alone. Set JVM `-Xmx768m`, Postgres `shared_buffers=256MB`. Monitoring reaches 8081 only on the private container network.
+7. Production Compose contains **app + db + caddy only**, without Prometheus/Grafana. Do not publish API 8080; bind management as `127.0.0.1:8081:8081` on the instance. Caddy publishes 80/443 and proxies only app:8080, so public actuator paths return 404. The security group does not open 8081. Use `prod,demo` for the intentional interview exception (OPERATOR dev endpoints); ordinary production uses `prod` alone. Set JVM `-Xmx768m` and Postgres `shared_buffers=256MB`.
 8. **Backups:** cron `pg_dump | gzip | aws s3 cp - s3://<bucket>/rostersync/$(date +%F).sql.gz` nightly.
 9. **Deploy updates:** `deploy/aws-ec2/deploy.sh` runs via SSM: `git pull && docker compose … up -d --build`. Optional GitHub Action that triggers it on tag.
 10. **Smoke test:** over SSM, `docker compose exec app curl -fsS localhost:8081/actuator/health/readiness`. Public `/actuator/health/readiness` must return 404. Run the API demo through `BASE_URL=https://<domain>`; the internal readiness check remains private.
 11. **Cost control after interviews:** `docker compose down`, stop or terminate the instance, release the Elastic IP, delete snapshots.
 
 Optional (you already know CDK): `deploy/aws-cdk/` — a ~80-line CDK stack (default VPC, SG, role, EC2 with the bootstrap as user data, Elastic IP, S3 backup bucket, SSM params). Nice to show, not required.
+
+Access the loopback management port through SSM port forwarding (AWS CLI + Session Manager plugin and an authenticated profile):
+```bash
+aws ssm start-session --profile roster-demo --target <INSTANCE_ID> \
+  --document-name AWS-StartPortForwardingSession \
+  --parameters '{"portNumber":["8081"],"localPortNumber":["18081"]}'
+curl http://127.0.0.1:18081/actuator/health/readiness
+```
+Secrets will be generated directly into SSM Parameter Store SecureString after resource approval, without printing them. AWS authentication, account details and approval remain human-owned prerequisites; local benchmarks, load tests and demo work do not depend on them.
 
 ---
 

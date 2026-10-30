@@ -81,12 +81,14 @@ There is also a **real kill -9 demo** (not a JUnit test): `scripts/demo-crash.sh
 
 ### Benchmark (`ReconciliationBenchmarkIT`, `-Pbenchmark`)
 1. Seed 200,000 active employees for tenant `bench` via the shared Java-CRC32/COPY fixture seeder.
-2. Generate a 200,000-row CSV to a temp file from the same generator with 1 % changed rows (higher version), 0.5 % missing, 0.1 % new.
+2. Generate a CSV from that source with 1 % changed rows (higher version), 0.5 % missing, 0.1 % new, deterministic seed 20261030. The generator's exact ground truth is 199,190 rows, 1,922 updates, 1,010 deactivations and 200 creates.
 3. Force GC, record `MemoryMXBean` heap used; start a sampler thread recording max heap used every 50 ms.
 4. Run the diff (dry run) → assert `diffMs < 60_000`; record `peakHeapDeltaMb`; assert plan counts match the generator's ground truth exactly.
 5. Run again in apply mode for the 1 % changes and time it.
 6. Print a Markdown table row (machine, JDK, cores, RAM, rows, diff ms, apply ms, peak heap) that is pasted into the README.
-Failsafe config for this test: `<argLine>-Xmx256m -XX:+UseG1GC</argLine>` — passing with a 256 MB heap is the "bounded memory" proof.
+Repeat the complete sample three times and report medians, all samples and the maximum observed chunk. Failsafe runs tagged benchmark methods in dedicated non-reused JVMs with `-Xmx256m -XX:+UseG1GC`, without the coverage agent. Normal integration tests keep their 1 GiB heap and coverage. A pre-integration-test cleanup removes only the benchmark summary XML so a failed prior invocation cannot contaminate a later result. Machine metadata includes CPU model/core counts, physical RAM, OS, JDK and Docker VM memory/CPU limits. Passing at 256 MiB is the bounded-memory proof.
+
+`ReconciliationThroughputIT` counts JDBC execute/batch/commit calls and measures 5,000 actions after 1,000 warm-up actions. These are API calls, not network packet counts. For the matched archived-source comparison use the same chunk size, heap and probe. `ReconciliationChunkIT` proves actual employee lock blocking and atomic rollback after the real JDBC outbox batch; it does not merely mock the write. Startup and host-load outliers are reported separately. The README records both the three-run mixed-file result and the slower counting-probe result.
 
 Also `IngestMicroBenchmarkIT` (optional): 10k events single-threaded through the service → events/s.
 
@@ -95,7 +97,9 @@ Also `IngestMicroBenchmarkIT` (optional): 10k events single-threaded through the
 
 ```bash
 docker compose up -d
-./scripts/loadtest.sh   # = docker run --rm -i --network host -v $PWD/loadtest:/scripts grafana/k6 run /scripts/ingest.js
+./scripts/loadtest.sh   # Docker Desktop: host.docker.internal:8080
+# Linux host networking is optional:
+DOCKER_NETWORK=host BASE_URL=http://127.0.0.1:8080 ./scripts/loadtest.sh
 ```
 Report in README: machine (CPU model, cores, RAM, OS, Docker resources), requests/s, events/s (= requests/s × 50), `http_req_duration` p50 / p99, error rate.
 
@@ -155,7 +159,7 @@ RosterCsvReaderTest proves BOM handling, trailer placement, malformed/duplicate 
 
 ReconciliationConcurrencyIT uses latch gates for competing uploads/approvals and proves a real-time update supersedes an older plan. ReconciliationRecoveryIT closes and reopens real application contexts against the same database after a fault following committed chunks; fresh-heartbeat and awaiting-approval preservation are tested. Async test fixtures await worker cleanup before the shared database is truncated for the next test.
 
-Performance checks distinguish execution environments: the normal integration JVM is capped at 1 GiB with six cached Spring contexts. The slow test asserts each diff <60s and maximum chunk <5s, and records seed duration. The seed's <20s local runtime target is checked against an isolated Compose invocation, without JaCoCo or a concurrent image build. The benchmark profile still supplies its separate 256 MiB heap setting. The stale-export test fixes a nanosecond fraction that previously rounded down in PostgreSQL, proving the microsecond canonicalization regression.
+Performance checks distinguish execution environments: the normal integration JVM is capped at 1 GiB with six cached Spring contexts. The slow test asserts each diff <60s and maximum chunk <5s, and records seed duration. Seed robustness takes precedence over the former 20s runtime target: seed/export transactions alone use a local five-minute statement timeout; the global timeout remains 30s. The benchmark profile supplies separate 256 MiB forks. The stale-export test fixes a nanosecond fraction that previously rounded down in PostgreSQL, proving the microsecond canonicalization regression.
 
 Final Phase 6 full verification: 141 unit/property/architecture tests plus 131 PostgreSQL integration tests, 272 total, zero failures/errors/skips. Domain line coverage is 359/361 (99.45%), with no gate. The deterministic 200k case (seed20261030) recorded seed16934ms, healthy diff31159ms, healthy apply24395ms, truncated diff29191ms and maximum25-action chunk668ms. It proved exactly80000 missing of200000 ACTIVE employees (40.0%), with ACTIVE count unchanged. Detailed runtime timings for the separate Compose smoke are recorded in the demo documentation.
 

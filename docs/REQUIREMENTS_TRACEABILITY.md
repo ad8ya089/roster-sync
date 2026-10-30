@@ -69,8 +69,8 @@ Every sentence of the case-study PDF, mapped to design, code and proof. Agents m
 | K1 | Define the idempotency key and the version comparison | README + `API.md` + `DESIGN.md §2` | — | done — Phase 4 API/domain/integration proof passes |
 | K2 | Show a test that replays the same feed twice and changes nothing | `ReplayIdempotencyIT` | itself | done — Phase 4 API/domain/integration proof passes |
 | K3 | Safety brake threshold configurable | property `BRAKE_MAX_MISSING_RATIO`, per-tenant `PUT /settings/reconciliation` | `SafetyBrakeTest`, `ReconciliationFlowIT.thresholdChangeTakesEffect` | done — Phase 6 streaming upload/diff/brake/apply and 200k truncation proof |
-| K4 | Never write personal data into logs or error reports. Use employee IDs | `SECURITY.md §4` | `ErrorHandlingIT`, `PiiLeakIT` | partial — ingest/transport/error/outbox canaries pass; reconciliation PII proof arrives later |
-| K5 | Diff a 200,000-row snapshot in under 60 s with bounded memory | `ReconciliationBenchmarkIT` | README benchmark table | partial — 200k diff timing and bounded bucket architecture proved; isolated heap benchmark remains Phase 8 |
+| K4 | Never write personal data into logs or error reports. Use employee IDs | `SECURITY.md §4` | `ErrorHandlingIT`, `PiiLeakIT` | done — PiiLeakIT covers API, auth, conflict, recon bad rows, publishing and operational stores |
+| K5 | Diff a 200,000-row snapshot in under 60 s with bounded memory | `ReconciliationBenchmarkIT` | README benchmark table | done — three-run 256 MiB benchmark; median dry-run wall time 14.948s for 199,190 rows from 200k employees |
 | K6 | Run a test that crashes the process between the DB write and the event publish | `OutboxCrashRecoveryIT.crashAfterCommitBeforePublish` (+ live kill -9 demo) | itself | done — Phase 5 restart recovery and side-effect proof pass |
 
 ## Plus points (overall evaluation criteria)
@@ -79,10 +79,10 @@ Every sentence of the case-study PDF, mapped to design, code and proof. Agents m
 |---|---|---|---|---|
 | X1 | Authentication + role-based access (employee vs admin vs operator) | `SECURITY.md §1–2` | `AuthorizationIT`, `SecuredEndpointsTest`, `JwtTokenServiceTest`, `LoginTimingTest` | done for current endpoints — JWT/RBAC matrix and automatic future-handler guards pass |
 | X1b | Tenant isolation — one client can never read another's data | `SECURITY.md §3` | `TenantIsolationIT`, `ArchitectureTest`, `TenantContextFilterTest` | done for current endpoints — tenant-scoped offices/employees/bookings/ops/reconciliation and repository guards |
-| X2 | Time & space complexity of core logic + small benchmark; where it stops scaling and why | `RECONCILIATION.md §8`, `DECISIONS.md` "Where the system stops scaling", README complexity section | `ReconciliationBenchmarkIT`, k6 | |
+| X2 | Time & space complexity of core logic + small benchmark; where it stops scaling and why | `RECONCILIATION.md §8`, `DECISIONS.md` "Where the system stops scaling", README complexity section | `ReconciliationBenchmarkIT`, k6 | done — three 256 MiB benchmark samples, matched JDBC-call comparison and HTTP load test; machine/results in README |
 | X3 | Fault tolerance: crashes, timeouts, duplicate & out-of-order messages, partial failures; ≥ 1 failure-injection test | `DESIGN.md §6`, `FaultInjector` | `OutboxCrashRecoveryIT`, `OutboxRetryIT` (timeouts), `ReconciliationRecoveryIT` (partial failure) | done — ingest/outbox failures, timeout/redelivery and real reconciliation restart recovery tested |
 | X4 | OOP: encapsulation, inheritance, polymorphism; controller/service/repository layering | `docs/DESIGN.md` layering and entity/command hierarchies | `ArchitectureTest` + code review | done — encapsulated entities, command/decision hierarchies, EventSink implementations and shared snapshot applier; architecture guards pass |
-| X5 | Trade-offs: consistency vs availability vs latency; what was left out | `DECISIONS.md` | — | |
+| X5 | Trade-offs: consistency vs availability vs latency; what was left out | `DECISIONS.md` | — | done — explicit consistency, latency, delivery, cache and cancellation trade-offs in DECISIONS |
 | X6 | Metrics + structured logging; 3 AM counters: lag, error rate, rejections, retries, queue depth | `OBSERVABILITY.md` | `MetricsIT` | done — finite labels, 8081 management, cached gauges, hybrid tenant SQL / instance-wide summary and provisioned monitoring |
 | X7 | Caching for hot data, eviction policy, what can be stale / how long / how bounded | `CACHING.md` | `CachingIT` | done — immutable tenant keys/DTOs, hit stats, after-commit rollback-safe eviction including version advances and recon |
 | X8 | Error handling framework, meaningful non-leaking messages, no PII in logs or error responses | `SECURITY.md §5` | `ErrorHandlingIT`, `PiiLeakIT` | done — PiiLeakIT covers ingest, replay/conflict, transport, auth, forced 500, recon bad rows, publishing, rejection and alert stores |
@@ -91,21 +91,21 @@ Every sentence of the case-study PDF, mapped to design, code and proof. Agents m
 
 | # | Requirement | Where | Status |
 |---|---|---|---|
-| A1 | Every hard rule has an automated test, incl. ≥ 1 concurrency and ≥ 1 failure test | this file + `TESTING.md` | |
-| A2 | Load test / benchmark with throughput and p50/p99, in README with the machine | `TESTING.md` benchmark + k6; README "Benchmarks" | |
-| A3 | Design note (1–2 pages): architecture diagram, sequence diagram for hardest flow, failure-mode table | `docs/DESIGN.md` | |
+| A1 | Every hard rule has an automated test, incl. ≥ 1 concurrency and ≥ 1 failure test | this file + `TESTING.md` | done — hard-rule, concurrency and fault/restart tests mapped above |
+| A2 | Load test / benchmark with throughput and p50/p99, in README with the machine | `TESTING.md` benchmark + k6; README "Benchmarks" | done — three-run benchmark plus 20-VU/60s k6 throughput and p50/p99 with machine specification |
+| A3 | Design note (1–2 pages): architecture diagram, sequence diagram for hardest flow, failure-mode table | `docs/DESIGN.md` | done — architecture/sequence diagrams and failure-mode table in the design note |
 | A4 | One-command run incl. DB/broker | `docker compose up` | done — fresh-volume Phase 3 build/run healthy; curl login succeeds for all seven demo users and office lists remain tenant-scoped |
 
 ## Instructions
 
 | # | Instruction | Where | Status |
 |---|---|---|---|
-| N1 | Understand requirements, inputs, outputs, hard rules, scale targets | this file | |
+| N1 | Understand requirements, inputs, outputs, hard rules, scale targets | this file | done — requirements, contracts, scale targets and hard rules mapped and tested |
 | N2 | Java + Spring Boot | ADR-001 | done — Boot 4.1.2; Java release 21 verified on local JDK 22 |
 | N3 | Plan first: data model, components, APIs, failure modes — in the design note | `docs/` written before code | done — architecture, schema, API and failure modes documented before implementation |
 | N4 | Clean layered code, meaningful names; core algorithm in plain classes testable without web server or DB | `domain` package, `ArchitectureTest` | done — pure Java decision/diff/brake core with ArchUnit enforcing dependency boundaries |
-| N5 | Unit tests for core logic + concurrency, failure, benchmark tests; normal inputs AND edge cases | `TESTING.md` | |
-| N6 | README: how to run, assumptions, benchmark results, trade-offs note | `README.md` | |
-| N7 | Public GitHub repo; meaningful commit history, not one giant commit | Conventional Commits, small verified commits | |
-| N8 | Demo video: main flows, one failure scenario live, sample API calls (Postman/curl) | `docs/DEMO_SCRIPT.md`, `scripts/demo.sh`, `postman/` collection | |
+| N5 | Unit tests for core logic + concurrency, failure, benchmark tests; normal inputs AND edge cases | `TESTING.md` | done — unit/property/architecture, real PostgreSQL concurrency/recovery and bounded-heap benchmark tests |
+| N6 | README: how to run, assumptions, benchmark results, trade-offs note | `README.md` | done — run instructions, precise rules, measured results, test counts and trade-offs linked |
+| N7 | Public GitHub repo; meaningful commit history, not one giant commit | Conventional Commits, small verified commits | partial — logical verified local commits; public GitHub publication awaits account access and explicit push authorization |
+| N8 | Demo video: main flows, one failure scenario live, sample API calls (Postman/curl) | `docs/DEMO_SCRIPT.md`, `scripts/demo.sh`, `postman/` collection | partial — automated curl demo, crash proof and Postman collection ready; video recording pending |
 

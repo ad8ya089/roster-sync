@@ -27,3 +27,5 @@
 | Render free tier limits | Render free-tier summaries (15-min sleep, 30-day Postgres) — https://livemy.app/blog/render-pricing | fallback |
 | Prometheus pinned release | [Prometheus v3.15.1](https://github.com/prometheus/prometheus/releases/tag/v3.15.1) | optional monitoring image |
 | Grafana pinned release | [Grafana v13.3.0](https://github.com/grafana/grafana/releases/tag/v13.3.0) | optional dashboard image |
+| k6 pinned release | [k6 v2.3.0](https://github.com/grafana/k6/releases/tag/v2.3.0) | portable Docker load runner |
+| Failsafe report handling | [Failsafe integration-test parameters](https://maven.apache.org/surefire/maven-failsafe-plugin/integration-test-mojo.html) | separate benchmark execution and summary file |

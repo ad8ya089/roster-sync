@@ -136,7 +136,7 @@ sequenceDiagram
   else not tripped
     RS->>DB: status = APPLYING
   end
-  loop recon_action PENDING, configured chunks (default 25)
+  loop recon_action PENDING, configured chunks (default 40)
     RS->>DB: lock employee row, re-check (still ACTIVE? version unchanged since plan?)
     RS->>DB: apply via EmployeeChangeApplier (same decider + outbox) or mark SUPERSEDED
   end
@@ -195,3 +195,7 @@ Kafka/RabbitMQ (seam: `EventSink`), CDC/Debezium, Redis (seam: Spring Cache), mu
 Phase 4 receipt refinement: reserve the key using INSERT ON CONFLICT DO NOTHING with provisional PROCESSING, then lock/decide/write and finalize the receipt in the same transaction. A concurrent same-key insert waits for the first transaction: commit yields a conflict on insertion, rollback lets the waiting insert succeed. Replays return DUPLICATE plus the stored originalOutcome. CONFLICT never reserves content: roll back a newly inserted provisional receipt, leave existing receipts untouched, and audit VERSION_CONFLICT in a separate transaction. REJECTED keys are likewise unconsumed.
 
 Phase 6 implementation details: upload uses transferTo and first-line header validation before run insertion. Whole-file asOf ordering rejects exports at/before the last COMPLETED run; acceptance and completion share a brief tenant lock. The streaming parser strips BOM, recognizes only a final trailer and spills length-prefixed binary records. Per-bucket duplicate handling chooses the highest version and treats equal-version conflicting content as present-but-invalid. Bucket queries include inactive rows/tombstones. Planning has separate ADVANCE counts and short per-bucket progress transactions. Each apply chunk rechecks the expected employee version and uses the shared snapshot path without receipts or nested retries. The measured default is 25 actions after an initial 500-action chunk exceeded lock_timeout. Failed chunks roll back before per-action fallback and safe rejection auditing. Startup/watchdog recovery uses heartbeat_at and a single-instance worker ownership assumption.
+
+## Phase 8 measured apply path
+
+The current default is 40 actions per transaction. Employee rows are selected/locked as a tenant-scoped set in stable ID order; relevant offices use plain READ COMMITTED reads. One employee flush, a JDBC outbox batch and one action-status UPDATE using id=ANY arrays replace per-action bookkeeping. Expected versions are checked under those locks, and a failed chunk rolls back before fallback. API receipt transactions remain per-record. Three 256 MiB benchmark samples give a median 14.948s dry-run wall time, 10.302s apply for 3,132 actions and 122.00 MiB sampled peak heap; maximum observed mixed-file chunk is 779ms. The README includes instrumented/cold timing variation and the machine specification. Cancellation of in-flight runs is omitted: it needs cooperative chunk boundaries and a defined CANCELLED state.

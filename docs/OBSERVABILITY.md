@@ -92,4 +92,4 @@ Validate rules with:
 ```bash
 docker run --rm --entrypoint promtool -v "${PWD}/ops/prometheus:/rules:ro" prom/prometheus:v3.15.1 check rules /rules/alerts.yml
 ```
-Production publishes no management port. Caddy proxies only app:8080, and the security group never opens 8081; monitoring must use the private container network or an authenticated tunnel.
+Production runs only app, db and Caddy. Management 8081 binds to the instance loopback interface for SSM forwarding; Caddy proxies only app:8080 and the security group never opens 8081. Prometheus/Grafana remain local-only.

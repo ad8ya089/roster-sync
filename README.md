@@ -2,7 +2,7 @@
 
 MoveInSync Backend Case Study 5 (Advanced Track). Java 21 · Spring Boot 4.1 · PostgreSQL 17 · one `docker compose up`.
 
-> Status: **Phases 1–7 implemented**. Event ingestion, publishing/booking effects, streaming reconciliation, operational metrics and caches are available. Phase 8 adds the final benchmark, load test and deployment proof.
+> Status: **Local implementation and Phase 8 measurements are available.** AWS deployment awaits account details and approval of the concrete resource/cost plan. Video and live URL links remain explicit placeholders below.
 
 ## Target behavior
 
@@ -18,7 +18,7 @@ cp .env.example .env
 docker compose up --build
 curl 127.0.0.1:8081/actuator/health/readiness
 ```
-Requirements for the container run: Docker Desktop/Engine with Compose. No host Java or Maven is required. The guided `scripts/demo.sh` walkthrough will be added in Phase 8.
+Requirements for the container run: Docker Desktop/Engine with Compose. No host Java or Maven is required. Run `./scripts/demo.sh` for the guided walkthrough, or `DEMO_AUTO=1 ./scripts/demo.sh` for assertions without pauses. Git Bash on Windows and Linux require curl + jq. The [Postman collection](postman/roster-sync.postman_collection.json) and [environment template](postman/roster-sync.postman_environment.json) contain the same requests; fill demoPassword locally.
 
 On Windows PowerShell, use `Copy-Item .env.example .env` for the first step and `curl.exe` for the readiness request. The app starts after PostgreSQL is healthy; Flyway creates the schema. The API uses 8080; public Actuator endpoints use the separate management port, bound to `127.0.0.1:8081` on the host. PostgreSQL stays on the Compose network. The runtime is non-root and uploads live on the `/data` volume.
 
@@ -27,14 +27,14 @@ Local builds require JDK 21 or newer; JDK 22 is supported with `maven.compiler.r
 ```bash
 ./mvnw -B test               # unit tests, no Docker
 ./mvnw -B verify             # unit + PostgreSQL integration tests, Docker required
-./mvnw -B verify -Pbenchmark # includes the benchmark once added in Phase 8
+./mvnw -B verify -Pbenchmark # normal tests + separate 256 MiB benchmark forks
 ```
 
 In PowerShell, replace `./mvnw` with `.\mvnw.cmd`. Docker and CI use Temurin 21. A network proxy, if required by your machine, belongs in your local Maven settings rather than the repository.
 
 All Actuator endpoints are public on 8081; readiness includes database connectivity. No Actuator routes exist on 8080. POST `/api/v1/auth/token` is public; other API handlers require a signed bearer token and declare allowed roles. Both demo and production logging use ECS JSON; correlation IDs appear in `X-Correlation-Id` and error bodies, including 401/403 responses.
 
-Optional monitoring: set a strong `GRAFANA_ADMIN_PASSWORD` in `.env`, then run `docker compose --profile monitoring up -d`. Prometheus is at `http://127.0.0.1:9090`; Grafana at `http://127.0.0.1:3000` (user `admin`), with the provisioned **Roster Sync Operations** dashboard. Default Compose starts only app and db. Metrics use finite labels without tenant/employee IDs or PII. `GET /api/v1/ops/summary` (OPERATOR) separates tenant-scoped durable SQL state from instance-wide counters/percentiles since restart; see [observability](docs/OBSERVABILITY.md). Production publishes no 8081 port; Caddy proxies only 8080.
+Optional monitoring: set a strong `GRAFANA_ADMIN_PASSWORD` in `.env`, then run `docker compose --profile monitoring up -d`. Prometheus is at `http://127.0.0.1:9090`; Grafana at `http://127.0.0.1:3000` (user `admin`), with the provisioned **Roster Sync Operations** dashboard. Default Compose starts only app and db. Metrics use finite labels without tenant/employee IDs or PII. `GET /api/v1/ops/summary` (OPERATOR) separates tenant-scoped durable SQL state from instance-wide counters/percentiles since restart; see [observability](docs/OBSERVABILITY.md). Production binds 8081 only to instance loopback for SSM forwarding; Caddy proxies only 8080, and Prometheus/Grafana stay local.
 
 The `demo` profile seeds tenants `acme` and `globex`, offices `BLR-1`, `BLR-2`, inactive `BLR-3`, and `HYD-1`. Seeded usernames are `acme.hr`, `acme.admin`, `acme.operator`, `E1001`, `globex.hr`, `globex.admin` and `globex.operator`; their password comes from `DEMO_PASSWORD`. Acme has employees `E1001`–`E1005`, two future bookings and one completed booking for `E1002`, and route `R-BLR-07` with four seats. Restarting preserves existing data.
 
@@ -83,24 +83,53 @@ Higher-version identical snapshots, including DEACTIVATE on INACTIVE employees o
 5. Absence from the nightly file is weaker evidence than a versioned event, so recon deactivations never bump the HR version.
 6. Operators are tenant-scoped users.
 
-## Benchmarks _(filled in Phase 8)_
+## Measured local performance
 
-| Machine | JDK | Rows | Diff time | Apply time (1 % changed) | Peak heap (`-Xmx256m`) |
-|---|---|---|---|---|---|
-| | | 200,000 | | | |
+Machine: Intel Core i5-1240P, 12 physical / 16 logical cores, 15.69 GiB OS-reported RAM, Windows 11 Home Single Language build 26200. Docker Desktop Engine 29.9.2: 16 logical CPUs and 7.60 GiB VM memory. Host benchmark JDK 22.0.1 compiles release 21; the running app uses Temurin 21. These are local measurements, not AWS sizing guarantees.
 
-| k6 ingest load | VUs | req/s | events/s | p50 | p99 | errors |
-|---|---|---|---|---|---|---|
-| | 20 | | | | | |
+The benchmark uses three runs in one dedicated 256 MiB JVM, a 200,000-employee source, deterministic seed 20261030, 1% mutation / 0.5% drop / 0.1% new. Each file has 199,190 valid rows and plans exactly 1,922 updates, 1,010 deactivations and 200 creates. Peak heap is sampled every 50 ms; coverage remains enabled for normal tests and is excluded from benchmark timing.
+
+| Run | Dry-run wall time | Diff phase | Apply 3,132 actions | Sampled peak heap |
+|---|---|---|---|---|
+| 1 | 20.055 s | 19.904 s | 11.894 s | 98.56 MiB |
+| 2 | 14.484 s | 14.344 s | 9.956 s | 122.00 MiB |
+| 3 | 14.948 s | 14.805 s | 10.302 s | 122.06 MiB |
+| **Median** | **14.948 s** | **14.805 s** | **10.302 s** | **122.00 MiB** |
+
+At the selected 40-action default, median mixed-file apply throughput is **304 actions/s**, and the largest chunk across these three runs was **779 ms**. Raw JSON is generated under target when the benchmark runs.
+
+The matched update-only profiling comparison used 1,000 warm-up actions, 5,000 measured actions, chunk 64, the same 256 MiB heap and no coverage agent: **89.6 → 380.3 actions/s (4.25×)**. JDBC execution/batch/commit calls fell from **6.08 → 0.17 per action**. These counts describe JDBC calls, not packet captures. The implementation batches action status updates and outbox inserts, defers flushing, and reads/locks employee sets together.
+
+Timings vary with startup and host load. An additional 40-action JDBC-counting probe measured 258 actions/s with a 246 ms measured maximum and a 1.605 s cold-start maximum; a stressed 64-action probe had a larger cold outlier. Cold bootstrap time is reported separately from the three-run nightly-file result. See [trade-offs](docs/DECISIONS.md).
+
+| k6 HTTP ingest | Duration | VUs | Batches/s | Events/s | HTTP p50 | HTTP p99 | HTTP / outcome failures |
+|---|---|---|---|---|---|---|---|
+| 50 events/batch, 90% fresh / 5% replay / 5% stale | 60 s | 20 | 8.46 | 423.00 | 2,210 ms | 3,912 ms | 0% / 0% |
+
+The run completed 519 batches / 25,950 events. `./scripts/loadtest.sh` uses `BASE_URL=http://host.docker.internal:8080` on Windows Docker Desktop. Linux can also use `DOCKER_NETWORK=host BASE_URL=http://127.0.0.1:8080 ./scripts/loadtest.sh`. It writes the ignored loadtest/results/summary.json and exits non-zero if HTTP or outcome failures reach 1%.
 
 ## Complexity & limits _(summary; details in RECONCILIATION.md and DECISIONS.md)_
 Event apply: O(log M) index lookup, O(1) memory. Reconciliation: O(N + M) time, O(N/B) heap with B = 256 buckets, O(N) temp disk. First scaling limits: single Postgres writer, single outbox poller, table growth, per-row apply for mass changes.
 
-## Tests _(counts filled in Phase 8)_
-Full `./mvnw -B verify` passes 144 unit/property/architecture tests and 141 PostgreSQL integration tests (285 total), with no failures, errors or skips. Two jqwik properties each run 1,000 trials with fixed seeds `2026103001` and `2026103002`, including maximum-version preservation across deactivations and identical snapshots. Domain line coverage is 99.45% (359/361); JaCoCo reports at `target/site/jacoco/index.html`, without a gate. Integration tests cover migrations, health/auth/tenancy, ingestion/replay/ordering/rollback, ownership/concurrency, real-context restart recovery, timeouts/retention/rehire, CSV/200k safety-brake behavior, management-port isolation, rollback-safe caches, SQL-free scrapes, hybrid summary and PII boundaries. Phase 8 adds the separate memory benchmark and k6 load tests.
+## Tests
+
+| Type | Test cases |
+|---|---|
+| Unit and web-slice | 139 |
+| jqwik properties | 2, each with 1,000 fixed-seed trials |
+| Architecture and endpoint guards | 4 |
+| PostgreSQL integration | 144 |
+| Benchmark/profile methods | 2; the 200k method executes three samples |
+| **Total including benchmark profile** | **291** |
+
+Normal verification and the focused benchmark executions pass with zero failures/errors/skips. Domain line coverage is **99.45% (359/361)**; JaCoCo renders its report at target/site/jacoco/index.html without a gate. Coverage includes ordering, idempotency, version-only updates, ownership, tenant/role isolation, rollback, real-context restart recovery, publisher concurrency, rehire, streaming/200k safety brake, management isolation, rollback-safe caches and PII boundaries. [Testing details](docs/TESTING.md).
 
 ## Demo video
-_link here_
+[Demo video — recording pending](https://example.com/REPLACE_WITH_DEMO_VIDEO)
+
+[Live API — account and deployment approval pending](https://YOUR-DOMAIN.example)
+
+Both links are placeholders. The repeatable local demo and sample requests are available now. [Deployment plan and private management access](docs/DEPLOYMENT.md).
 
 ## Local verification status
 
@@ -108,7 +137,7 @@ Verified on 2026-10-30 with Docker Desktop's Linux/WSL2 engine: clean-volume `do
 
 Host Maven and Maven inside the build image reach Maven Central directly. The plain Docker build succeeds without HTTP_PROXY/HTTPS_PROXY build arguments, and Docker client automatic proxy defaults were unset. No proxy URLs, credentials, or network-specific defaults are committed. The temporary Maven settings used during initial setup remain outside the repository. First builds download images and dependencies; subsequent builds reuse the Maven build layers.
 
-Domain line coverage after Phase 6 is 99.45% (359/361 lines, no gate).
+Domain line coverage is 99.45% (359/361 lines, no gate).
 
 ## Event ingestion and replay
 
@@ -135,6 +164,6 @@ Deactivation cancels only future SCHEDULED bookings and frees seats, in an indep
 ## Nightly reconciliation
 POST multipart `/api/v1/reconciliation/runs` with file and asOf returns 202 after synchronous header validation. Parsing spills into 256 binary buckets; the pure differ compares one bucket at a time. The safety brake stops all changes when a truncated export appears to omit too many active employees. OPERATOR may approve ALL, approve SKIP_DEACTIVATIONS or reject; dry runs are terminal PLANNED runs. Whole-file ordering rejects asOf at/before the last completed export.
 
-Explicit ADVANCE actions preserve higher identical versions without business events. Apply rechecks planned versions under employee locks, has no receipts or nested event retries, and commits configured chunks (default 25 after measured tuning). Failed chunks roll back before per-action fallback. Startup resumes APPLYING runs, fails interrupted planning and preserves awaiting approvals; a heartbeat watchdog avoids failing live work. Multi-instance deployment would need leases and shared upload storage.
+Explicit ADVANCE actions preserve higher identical versions without business events. Apply rechecks planned versions under employee locks, has no receipts or nested event retries, and commits configured chunks (default 40 after measured tuning). Each chunk batches employee flushing, outbox inserts and action-status bookkeeping. Failed chunks roll back before per-action fallback. Startup resumes APPLYING runs, fails interrupted planning and preserves awaiting approvals; a heartbeat watchdog avoids failing live work. Multi-instance deployment would need leases and shared upload storage.
 
 Demo OPERATOR endpoints seed S000001… fixtures with Java CRC32/COPY and stream deterministic CSV exports with seed/mutation/drop/new/truncation options. Seed fixtures intentionally bypass outbox/receipts. Export uses a read-only PostgreSQL cursor with fetchSize=1000. See the run JSON contracts in [API.md](docs/API.md) and the algorithm in [RECONCILIATION.md](docs/RECONCILIATION.md).
