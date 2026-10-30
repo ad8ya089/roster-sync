@@ -94,4 +94,38 @@ public class EmployeeChangeApplier {
     }
 
     private static RecordRejectedException rejected(String code) { return new RecordRejectedException(List.of(new FieldError("officeCode", code))); }
+
+    /** Joins the caller's chunk transaction. No receipts and no nested lock retry loop. */
+    @Transactional(propagation=org.springframework.transaction.annotation.Propagation.MANDATORY)
+    public String applySnapshot(UUID tenantId,com.moveinsync.rostersync.infrastructure.persistence.ReconActionDao.Action action) {
+        var employee=employees.findForUpdate(tenantId,action.employeeId()).orElse(null);
+        if(action.expectedVersion()==null && employee!=null || action.expectedVersion()!=null &&
+                (employee==null || employee.getHrVersion()>action.expectedVersion())) return "SUPERSEDED";
+        var now=clock.instant();
+        if(action.type()==com.moveinsync.rostersync.domain.recon.ActionType.DEACTIVATE) {
+            if(employee==null || employee.getHrVersion()!=action.expectedVersion() || !"ACTIVE".equals(employee.snapshot().status())) return "SUPERSEDED";
+            employee.markDeactivatedByRecon(now);employees.flush(tenantId);
+            outbox.write(tenantId,action.employeeId(),employee.getHrVersion(),com.moveinsync.rostersync.domain.outbox.OutboxEventType.DEACTIVATED,
+                    "RECON",List.of(EmployeeField.STATUS),employee.snapshot(),now);return "APPLIED";
+        }
+        var command=new UpdateEmployee(action.employeeId(),action.fileVersion(),null,null,action.snapshot());
+        var decision=decider.decide(employee==null?CurrentEmployeeState.missing():employee.currentState(),command,DecisionMode.SNAPSHOT);
+        switch(decision) {
+            case ApplyDecision.Apply change -> {
+                OfficeEntity office=null;
+                if(change.newSnapshot().officeCode()!=null) {
+                    office=offices.findByTenantIdAndCode(tenantId,change.newSnapshot().officeCode()).orElseThrow(()->rejected("UNKNOWN_OFFICE"));
+                    offices.refreshPlain(tenantId,office);if(!office.isActive()) throw rejected("INACTIVE_OFFICE");
+                }
+                if(employee==null) employees.saveAndFlush(tenantId,new EmployeeEntity(tenantId,action.employeeId(),BucketPartitioner.bucketOf(action.employeeId(),buckets),change.newSnapshot(),action.fileVersion(),now,office));
+                else employee.applyHrSnapshot(change.newSnapshot(),action.fileVersion(),now,office);
+                employees.flush(tenantId);outbox.write(tenantId,action.employeeId(),action.fileVersion(),change.eventType(),"RECON",change.changedFields(),change.newSnapshot(),now);
+            }
+            case ApplyDecision.VersionAdvanced advanced -> {employee.advanceHrVersion(advanced.newVersion(),now);employees.flush(tenantId);}
+            case ApplyDecision.Duplicate ignored -> {return "SUPERSEDED";}
+            case ApplyDecision.Stale ignored -> {return "SUPERSEDED";}
+            case ApplyDecision.Conflict ignored -> throw new IllegalStateException("Snapshot conflict");
+        }
+        return "APPLIED";
+    }
 }
