@@ -203,3 +203,12 @@ aws ssm get-parameter --profile moveinsync-dev --region ap-southeast-2 \
 - Dockerdaemon.json and per-service rotation10m/3; Docker enabled;2GBswap persisted; t4g.smallStandard credits;20GiBencryptedgp3 verified. The budget is rostersync-monthly-25-usd with actual80/100 and forecast100 thresholds.
 
 Pause/resume and exact destructive cleanup commands are in [TEARDOWN.md](../deploy/aws-ec2/TEARDOWN.md). The original local maximum-chunk performance criterion remains open; successful deployment does not change that measurement.
+
+
+### Phase 9 pre-deploy handoff
+
+The console implementation is locally verified; no Phase 9 AWS redeploy has been performed. Existing infrastructure, region Sydney, secrets, memory limits and security group remain unchanged. The frontend has no production Node process. `VITE_STYLEGUIDE` and `VITE_DEMO_HINTS` remain false in the production build. The interview deployment keeps its approved prod,demo server profiles, so authenticated operators can detect and use demo tools; the login page shows no username hints in that image.
+
+After deployment approval: publish the reviewed commits, update the existing instance checkout via SSM, verify swap is active, run `docker compose -f compose.prod.yml build` before `up`, wait for readiness, and reload Caddy using `docker compose -f compose.prod.yml exec -T caddy caddy reload --config /etc/caddy/Caddyfile`. Reload is required because changing a bind-mounted file alone does not reload an existing Caddy process. Its root interception has been removed; Spring serves the login page and hashed assets while /actuator stays blocked. Keep all existing volumes and secrets.
+
+Verify HTTPS login for each role, role-default screens, one small out-of-order scenario, transport read/clear semantics, run review, HTML/asset cache and security headers, HTTP-to-HTTPS redirect and external port isolation. Run the existing DEMO_AUTO=1 DEMO_LIGHT=1 API smoke. Demonstrate the200k flow locally rather than making the live light smoke seed it. The instance-wide management listener stays on loopback and is reached through the documented SSM tunnel. No new AWS resources are needed.

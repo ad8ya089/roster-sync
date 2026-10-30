@@ -110,6 +110,13 @@ Every sentence of the case-study PDF, mapped to design, code and proof. Agents m
 | N8 | Demo video: main flows, one failure scenario live, sample API calls (Postman/curl) | `docs/DEMO_SCRIPT.md`, `scripts/demo.sh`, `postman/` collection | partial — automated curl demo, crash proof and Postman collection ready; video recording pending |
 
 
-## Phase 9 console checkpoint
+## Phase 9 console
 
-The frontend is partial pending design approval: auth/client foundation, dispatch-board styleguide and real braked-run review are implemented and verified. APIcreatedAt, static delivery/cache/security and browser precision/role/accessibility checks pass. The remaining ops, events, employee/profile, demo-tool screens, full console CI job and live redeploy await checkpoint approval; this does not mark the entire frontend phase done. The PDF video requirement remains partial as recorded above.
+| Scope | Implementation / evidence | Status |
+|---|---|---|
+| Approved dispatch-board design | Styleguide + real Run detail; eight checkpoint captures reviewed before continuing | done — human approved the checkpoint |
+| Operations, runs/upload/settings, event scenarios, employees/transport/history, self profile, demo tools | frontend/src/pages; existing server role and tenant checks retained | done — local implementation; browser and accessibility verification documented in TESTING.md |
+| Static delivery, cache/security headers, version precision, CI | Spring static resources; multi-stage Docker build; native source-text reviver; frontend CI job | done — sole API addition remains read-only createdAt |
+| Live console over HTTPS | Existing EC2/Caddy deployment; production build disables styleguide/hints | partial — pre-deploy review requested; no Phase 9 AWS deployment yet |
+
+The PDF demo-video requirement remains partial as recorded above.

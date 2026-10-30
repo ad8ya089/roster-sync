@@ -89,9 +89,31 @@ Higher-version identical snapshots, including DEACTIVATE on INACTIVE employees o
 
 ## Documentation
 
-The Phase 9 console is at its **design checkpoint**: login, the opt-in styleguide and a working reconciliation Run detail review. Other screens await design approval. The [console specification](docs/FRONTEND.md) defines the dispatch-board visual rules. Tokens remain in memory; hash routing keeps server API paths independent. Docker builds the UI without requiring host Node, and ordinary Maven verification remains Node-independent.
+The local console implements Operations, reconciliation review/upload/settings, the HR event console, Employees with transport editing, My profile and profile-detected demo tools. The [console specification](docs/FRONTEND.md) defines the approved dispatch-board design. Tokens stay in memory; reloading signs out. Docker builds the UI inside the same Spring Boot jar; ordinary Maven verification needs no Node. **The live deployment still serves the previous revision; the console redeploy awaits review.**
 
-For local design review with ports 8080/8081 free, run `VITE_STYLEGUIDE=true docker compose -p roster-sync-checkpoint up --build -d`. This uses separate local volumes. The styleguide and username hints default off in the AWS image; the existing live deployment is unchanged until Phase 9 is complete.
+For local review with ports 8080/8081 free, run `VITE_STYLEGUIDE=true docker compose -p roster-sync-phase9 up --build -d` in Git Bash. This uses separate local volumes. Sign in at [localhost:8080](http://localhost:8080/) with the private demo password. Defaults: operator to Operations, HR to Event console, transport admin to Employees, employee to My profile. The local styleguide is opt-in; it and username hints default off in the AWS build.
+
+Frontend checks (Node 24 LTS, from `frontend/`):
+
+```bash
+npm ci
+npm run lint && npm run lint:design && npm run typecheck && npm test && npm run build
+npx playwright install chromium
+ROSTER_TEST_PROJECT=roster-sync-phase9 npm run e2e
+npm exec --yes --package=lighthouse@13.6.0 -- node scripts/lighthouse.mjs
+```
+
+Browser checks seed the isolated tenant dataset, create a real braked run, then exercise the six HR presets, rejection, transport clears, roles, alert acknowledgement and retry. The database fixture is accepted only for the named local Phase 9/checkpoint projects. Lighthouse snapshots the authenticated screens so a page reload cannot replace them with Login. Raw reports and browser captures stay ignored; selected documentation captures use synthetic demo data.
+
+<details>
+<summary>Console screenshots (synthetic local demo data)</summary>
+
+![Operations board](docs/images/console-ops.png)
+![Reconciliation runs](docs/images/console-runs.png)
+![Event console](docs/images/console-events.png)
+![Employee ownership and detail](docs/images/console-employee-detail.png)
+
+</details>
 
 | Doc | What's in it |
 |---|---|
@@ -168,8 +190,8 @@ Event apply: O(log M) index lookup, O(1) memory. Reconciliation: O(N + M) time, 
 | Architecture and endpoint guards | 4 |
 | PostgreSQL integration | 147 |
 | **Backend normal verify** | **292** |
-| Frontend unit | 17 |
-| Design-checkpoint browser cases | 5, including 12 axe scans |
+| Frontend unit | 26 |
+| Console browser cases | 15, including 48 axe scans |
 | Benchmark/profile methods | 2, last run in Phase 8; the 200k method executes three samples |
 
 The Phase 9 checkpoint `./mvnw -B verify` passes 292 backend tests with Node absent from PATH and zero failures/errors/skips. The earlier Phase 8 unfiltered `verify -Pbenchmark` passed 292 tests at that revision; the benchmark profile has not been rerun for this frontend checkpoint. Normal push/PR CI runs `verify`; the benchmark runs only on manual dispatch and the weekly Monday 03:00 UTC schedule. The approved chunk p99/max criterion passes as stated above. Domain line coverage is **99.45% (359/361)**; JaCoCo renders its report at target/site/jacoco/index.html without a gate. Coverage includes ordering, idempotency, version-only updates, ownership, tenant/role isolation, rollback, real-context restart recovery, publisher concurrency, rehire, streaming/200k safety brake, management isolation, rollback-safe caches and PII boundaries. [Testing details](docs/TESTING.md).
@@ -217,3 +239,5 @@ POST multipart `/api/v1/reconciliation/runs` with file and asOf returns 202 afte
 Explicit ADVANCE actions preserve higher identical versions without business events. Apply rechecks planned versions under employee locks, has no receipts or nested event retries, and commits configured chunks (default 40 after measured tuning). Each chunk batches employee flushing, outbox inserts and action-status bookkeeping. Failed chunks roll back before per-action fallback. Startup resumes APPLYING runs, fails interrupted planning and preserves awaiting approvals; a heartbeat watchdog avoids failing live work. Multi-instance deployment would need leases and shared upload storage.
 
 Demo OPERATOR endpoints seed S000001… fixtures with Java CRC32/COPY and stream deterministic CSV exports with seed/mutation/drop/new/truncation options. Seed fixtures intentionally bypass outbox/receipts. Export uses a read-only PostgreSQL cursor with fetchSize=1000. See the run JSON contracts in [API.md](docs/API.md) and the algorithm in [RECONCILIATION.md](docs/RECONCILIATION.md).
+
+The completed local console passes 26 Vitest cases and 15 real-Compose Playwright cases. Forty-eight axe scans (light/dark, desktop/mobile) have zero serious/critical violations; 48 viewport captures are retained as local evidence, with representative screens visually reviewed. Authenticated Lighthouse accessibility is 100 on Runs and Employees in both themes. Production initial JS is 109.46 kB gzip (300 kB limit); the opt-in review build is 110.48 kB plus a 1.58 kB lazy styleguide. The complete six-preset browser case takes 3.8 s and explicitly checks the brief ordering flow against 30 s; generating/exporting/uploading 120,000 rows against the seeded 200,000-row roster reached the real brake in 21.511 s, then rejection passed. Seed time is outside that two-click demo measurement. These are local review measurements, not EC2 latency promises.

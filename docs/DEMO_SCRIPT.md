@@ -172,3 +172,12 @@ Fresh-clone Phase 8 proof (2026-10-30): clone at commit3e5916f, copy .env.exampl
 ## Live light demo
 
 Run overSSM in /opt/roster-sync: `DEMO_AUTO=1 DEMO_LIGHT=1 BASE_URL=https://rostersync-aditya.duckdns.org ./scripts/demo.sh`. The root-only .env supplies credentials; they are never printed. DEMO_LIGHT skips only the 200kseed/recon steps7–8. It keeps the real crash test on the instance, where COMPOSE_FILE points at the production file. From a separate machine, DEMO_SKIP_CRASH=1 may omit only the Docker-dependent crash step, which is verified separately overSSM. MANAGEMENT_URL can point at anSSMforward; without it the light mode checks public actuator404 and tenant-scoped ops instead. Full local200k demonstration remains available.
+
+
+## Console walkthrough (Phase 9, local until redeploy approval)
+
+Open http://localhost:8080/ and use the password provided privately. As acme.hr, choose Out-of-order: the three server outcomes are Applied, Applied, Stale; Replay returns Duplicate; No-op higher version returns No change; Ownership violation returns Applied with a warning; Deactivate applies. Bad batch isolates two rejected rows. HR never reads privileged employee history.
+
+As acme.operator, review the durable/since-restart Operations board. Demo tools can seed200000 employees once, then generate a truncateAt120000 export and Upload as reconciliation run. The amber sentence comes verbatim from the server; reject with a note, or review the consequences before approving either mode. Uploaded and Export taken are separate timestamps. Operator employee details omit bookings and transport editing.
+
+As acme.admin, find an employee by ID, inspect field ownership and the first-arrival receipt timeline, then edit transport fields. Clear explicitly sends null; unchanged fields are omitted and Save is disabled for a no-op. Receipts are scoped to the displayed page. E1001 shows only My profile and own bookings. Reload deliberately signs out. The200k demonstration is local; the existing HTTPS deployment gets the console only after the pre-deploy report is approved.

@@ -34,3 +34,5 @@
 - [JSON.parse source-text reviver](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/JSON/parse) for preserving long version tokens.
 - [Tailwind with Vite](https://tailwindcss.com/docs/installation/using-vite) for build-time theme integration.
 - [TanStack Query retries](https://tanstack.com/query/latest/docs/framework/react/guides/query-retries) for bounded GET retries; mutations are not retried.
+
+- [Lighthouse user flows and authenticated snapshot audits](https://github.com/GoogleChrome/lighthouse/blob/main/docs/user-flows.md): accessibility checks preserve the memory-only session instead of auditing a redirected login page.
