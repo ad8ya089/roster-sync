@@ -18,6 +18,35 @@ class ReconciliationBenchmarkIT extends AbstractReconciliationIntegrationTest {
     private static final UUID BENCH=UUID.fromString("00000000-0000-0000-0000-000000000003");
     @org.springframework.beans.factory.annotation.Autowired com.moveinsync.rostersync.config.RosterProperties properties;
     @org.springframework.beans.factory.annotation.Autowired ReconciliationChunkApplier chunks;
+    @Test void exact200000RowSnapshotFits256MiBAnd60Seconds() throws Exception {
+        var memory=ManagementFactory.getMemoryMXBean();
+        assertThat(memory.getHeapMemoryUsage().getMax()).isEqualTo(256L*1024*1024);
+        jdbc.update("INSERT INTO tenant(id,code,name) VALUES (?,'bench','Benchmark')",BENCH);
+        jdbc.update("INSERT INTO tenant_settings(tenant_id) VALUES (?)",BENCH);
+        jdbc.update("INSERT INTO office(tenant_id,code,name) VALUES (?,'BENCH-1','Benchmark')",BENCH);
+        seed.seed(BENCH,200000);
+        Path file=temporary.resolve("exact-200000.csv");
+        try(var output=Files.newOutputStream(file)) {
+            assertThat(exporter.write(BENCH,output,RosterFileGenerator.Spec.unchanged()).written()).isEqualTo(200000);
+        }
+        var peak=new AtomicLong(memory.getHeapMemoryUsage().getUsed());
+        var sampler=Executors.newSingleThreadScheduledExecutor(Thread.ofPlatform().daemon().name("exact-200k-heap").factory());
+        sampler.scheduleAtFixedRate(()->peak.accumulateAndGet(memory.getHeapMemoryUsage().getUsed(),Math::max),0,50,TimeUnit.MILLISECONDS);
+        try {
+            long started=System.nanoTime();
+            var run=awaitRun(uploads.upload(BENCH,"benchmark",new ReconciliationFlowIT.PathUpload(file),Instant.now(),200000,true).runId());
+            long wallMs=(System.nanoTime()-started)/1_000_000;
+            assertThat(run.status()).isEqualTo("PLANNED");
+            assertThat(run.rows().valid()).isEqualTo(200000);
+            assertThat(run.rows().rejected()).isZero();
+            assertThat(run.plan().unchanged()).isEqualTo(200000);
+            assertThat(run.brake().tripped()).isFalse();
+            assertThat(wallMs).isLessThan(60000);
+            var report=Map.of("rows",200000,"heapLimitMiB",256,"wallMs",wallMs,"diffMs",run.timings().diffMs(),"sampledPeakHeapMiB",peak.get()/1048576.0);
+            Files.writeString(Path.of("target/final-exact-200k.json"),mapper.writerWithDefaultPrettyPrinter().writeValueAsString(report));
+            System.out.println("EXACT_200K "+mapper.writeValueAsString(report));
+        } finally {sampler.shutdownNow();}
+    }
     @Test void medianOfThree200kRunsWithA256MiBHeap() throws Exception {
         var memory=ManagementFactory.getMemoryMXBean();
         assertThat(memory.getHeapMemoryUsage().getMax()).as("benchmark must run with -Xmx256m").isEqualTo(256L*1024*1024);
