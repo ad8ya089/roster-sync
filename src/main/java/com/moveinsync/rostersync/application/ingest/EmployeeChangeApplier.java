@@ -26,11 +26,13 @@ public class EmployeeChangeApplier {
     private final FaultInjector faults;
     private final Clock clock;
     private final int buckets;
+    private final com.moveinsync.rostersync.infrastructure.cache.AfterCommitCacheEvictor eviction;
     public EmployeeChangeApplier(EmployeeRepository employees, OfficeRepository offices, HrEventReceiptDao receipts,
                                  ChangeDecider decider, RecordHasher hasher, OutboxWriter outbox, FaultInjector faults,
-                                 Clock clock, RosterProperties properties) {
+                                 Clock clock, RosterProperties properties,com.moveinsync.rostersync.infrastructure.cache.AfterCommitCacheEvictor eviction) {
         this.employees=employees; this.offices=offices; this.receipts=receipts; this.decider=decider; this.hasher=hasher;
         this.outbox=outbox; this.faults=faults; this.clock=clock; buckets=properties.reconciliation().buckets();
+        this.eviction=eviction;
     }
 
     @Transactional
@@ -70,7 +72,7 @@ public class EmployeeChangeApplier {
                 employees.flush(tenantId);
                 outbox.write(tenantId, command.employeeId(), command.version(), change.eventType(), "API", change.changedFields(), change.newSnapshot(), now);
                 // After both writes, before commit: rollback tests exercise JDBC + JPA + receipt atomicity.
-                faults.hit(FaultPoint.APPLY_AFTER_EMPLOYEE_WRITE);
+                eviction.employee(tenantId,command.employeeId());faults.hit(FaultPoint.APPLY_AFTER_EMPLOYEE_WRITE);
                 yield ApplyResult.outcome(IngestOutcome.APPLIED);
             }
             case ApplyDecision.VersionAdvanced advanced -> {
@@ -82,7 +84,7 @@ public class EmployeeChangeApplier {
                 }
                 employee.advanceHrVersion(advanced.newVersion(), now);
                 employees.flush(tenantId);
-                faults.hit(FaultPoint.APPLY_AFTER_EMPLOYEE_WRITE);
+                eviction.employee(tenantId,command.employeeId());faults.hit(FaultPoint.APPLY_AFTER_EMPLOYEE_WRITE);
                 yield ApplyResult.outcome(IngestOutcome.NO_CHANGE);
             }
             case ApplyDecision.Stale stale -> new ApplyResult(IngestOutcome.STALE, stale.currentVersion(), null);
@@ -106,7 +108,7 @@ public class EmployeeChangeApplier {
             if(employee==null || employee.getHrVersion()!=action.expectedVersion() || !"ACTIVE".equals(employee.snapshot().status())) return "SUPERSEDED";
             employee.markDeactivatedByRecon(now);employees.flush(tenantId);
             outbox.write(tenantId,action.employeeId(),employee.getHrVersion(),com.moveinsync.rostersync.domain.outbox.OutboxEventType.DEACTIVATED,
-                    "RECON",List.of(EmployeeField.STATUS),employee.snapshot(),now);return "APPLIED";
+                    "RECON",List.of(EmployeeField.STATUS),employee.snapshot(),now);eviction.employee(tenantId,action.employeeId());return "APPLIED";
         }
         var command=new UpdateEmployee(action.employeeId(),action.fileVersion(),null,null,action.snapshot());
         var decision=decider.decide(employee==null?CurrentEmployeeState.missing():employee.currentState(),command,DecisionMode.SNAPSHOT);
@@ -132,6 +134,6 @@ public class EmployeeChangeApplier {
             case ApplyDecision.Stale ignored -> {return "SUPERSEDED";}
             case ApplyDecision.Conflict ignored -> throw new IllegalStateException("Snapshot conflict");
         }
-        return "APPLIED";
+        eviction.employee(tenantId,action.employeeId());return "APPLIED";
     }
 }

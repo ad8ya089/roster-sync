@@ -13,7 +13,8 @@ import org.springframework.transaction.annotation.Transactional;
 public class OfficeService {
     private final OfficeRepository offices;
     private final Clock clock;
-    public OfficeService(OfficeRepository offices, Clock clock) { this.offices = offices; this.clock = clock; }
+    private final com.moveinsync.rostersync.infrastructure.cache.AfterCommitCacheEvictor eviction;
+    public OfficeService(OfficeRepository offices, Clock clock,com.moveinsync.rostersync.infrastructure.cache.AfterCommitCacheEvictor eviction) { this.offices = offices; this.clock = clock;this.eviction=eviction; }
 
     public List<OfficeView> list(UUID tenantId, boolean includeInactive) {
         return offices.findAllByTenantIdOrderByCodeAsc(tenantId).stream()
@@ -23,13 +24,14 @@ public class OfficeService {
 
     @Transactional
     public OfficeView create(UUID tenantId, String code, String name) {
-        return OfficeView.from(offices.insert(tenantId, new OfficeEntity(tenantId, code, name, clock.instant())));
+        var view=OfficeView.from(offices.insert(tenantId, new OfficeEntity(tenantId, code, name, clock.instant())));eviction.office(tenantId,code);return view;
     }
 
     @Transactional
     public OfficeView patch(UUID tenantId, String code, String name, Boolean active) {
         var office = find(tenantId, code);
         office.update(name, active);
+        eviction.office(tenantId,code);
         return OfficeView.from(office);
     }
 

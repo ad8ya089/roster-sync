@@ -19,9 +19,11 @@ public class TransportProfileService {
     private final RecordValidator validator;
     private final OutboxWriter outbox;
     private final Clock clock;
+    private final com.moveinsync.rostersync.infrastructure.cache.AfterCommitCacheEvictor eviction;
     public TransportProfileService(EmployeeRepository employees, OfficeRepository offices, FieldOwnershipPolicy policy,
-                                   RecordValidator validator, OutboxWriter outbox, Clock clock) {
+                                   RecordValidator validator, OutboxWriter outbox, Clock clock,com.moveinsync.rostersync.infrastructure.cache.AfterCommitCacheEvictor eviction) {
         this.employees=employees; this.offices=offices; this.policy=policy; this.validator=validator; this.outbox=outbox; this.clock=clock;
+        this.eviction=eviction;
     }
     @Transactional
     public EmployeeView patch(UUID tenantId, String employeeId, Map<String,Object> body) {
@@ -59,6 +61,7 @@ public class TransportProfileService {
         else employee.applyTransportFields(new TransportFields(fields),now);
         employees.flush(tenantId);
         outbox.write(tenantId,employeeId,employee.getHrVersion(),OutboxEventType.TRANSPORT_PROFILE_UPDATED,"TRANSPORT_ADMIN",changed,employee.snapshot(),now);
+        eviction.employee(tenantId,employeeId);
         return EmployeeView.from(employee);
     }
     private static void invalid(List<FieldError> errors) {

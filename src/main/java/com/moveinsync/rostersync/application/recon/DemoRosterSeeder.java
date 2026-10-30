@@ -13,7 +13,8 @@ import org.springframework.transaction.PlatformTransactionManager;
 @Service
 public class DemoRosterSeeder {
     private final JdbcTemplate jdbc;private final Clock clock;private final int buckets;private final TransactionTemplate transactions;
-    public DemoRosterSeeder(JdbcTemplate jdbc,Clock clock,RosterProperties properties,PlatformTransactionManager manager){this.jdbc=jdbc;this.clock=clock;buckets=properties.reconciliation().buckets();transactions=new TransactionTemplate(manager);}
+    private final com.moveinsync.rostersync.infrastructure.cache.AfterCommitCacheEvictor eviction;
+    public DemoRosterSeeder(JdbcTemplate jdbc,Clock clock,RosterProperties properties,PlatformTransactionManager manager,com.moveinsync.rostersync.infrastructure.cache.AfterCommitCacheEvictor eviction){this.jdbc=jdbc;this.clock=clock;buckets=properties.reconciliation().buckets();transactions=new TransactionTemplate(manager);this.eviction=eviction;}
     public Map<String,Object> seed(UUID tenantId,int count) {
         long started=System.nanoTime();var offices=jdbc.queryForList("SELECT id FROM office WHERE tenant_id=? AND active ORDER BY code",Long.class,tenantId);
         if(offices.isEmpty()) throw new IllegalStateException("No demo offices");
@@ -55,7 +56,7 @@ public class DemoRosterSeeder {
             if(existing) jdbc.update("INSERT INTO employee ("+columns+") SELECT "+columns+" FROM roster_seed_stage ON CONFLICT (tenant_id,external_id) DO NOTHING");
             org.slf4j.LoggerFactory.getLogger(DemoRosterSeeder.class).info("recon.demo.seed_stages count={} directCopy={} copyMs={} insertMs={}",count,!existing,copyMs,(System.nanoTime()-insertStarted)/1000000);
         });
-        long elapsed=(System.nanoTime()-started)/1000000;
+        eviction.allEmployees();long elapsed=(System.nanoTime()-started)/1000000;
         org.slf4j.LoggerFactory.getLogger(DemoRosterSeeder.class).info("recon.demo.seeded tenantId={} count={} elapsedMs={}",tenantId,count,elapsed);
         return Map.of("requested",count,"elapsedMs",elapsed);
     }

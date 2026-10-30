@@ -12,13 +12,16 @@ import org.springframework.transaction.annotation.Transactional;
 public class EmployeeQueryService {
     private final EmployeeRepository employees;
     private final HrEventReceiptRepository receipts;
-    public EmployeeQueryService(EmployeeRepository employees, HrEventReceiptRepository receipts) { this.employees=employees; this.receipts=receipts; }
+    private final org.springframework.cache.Cache cache;
+    public EmployeeQueryService(EmployeeRepository employees, HrEventReceiptRepository receipts,org.springframework.cache.CacheManager caches) { this.employees=employees; this.receipts=receipts;cache=caches.getCache("employeeView"); }
     public PageResponse<EmployeeView> list(UUID tenantId, EmploymentStatus status, String officeCode, int page, int size) {
         return PageResponse.from(employees.findPage(tenantId, status, officeCode, PageRequest.of(page,size,Sort.by("externalId"))).map(EmployeeView::from));
     }
     public EmployeeView get(UUID tenantId, String employeeId, Role role, String selfId) {
         if (role == Role.EMPLOYEE && !employeeId.equals(selfId)) throw new NotFoundException();
-        return EmployeeView.from(find(tenantId,employeeId));
+        var key=new com.moveinsync.rostersync.infrastructure.cache.CacheConfig.EmployeeKey(tenantId,employeeId);
+        var found=cache.get(key,EmployeeView.class);if(found!=null)return found;
+        var view=EmployeeView.from(find(tenantId,employeeId));cache.put(key,view);return view;
     }
     public PageResponse<ReceiptView> receipts(UUID tenantId, String employeeId, int page, int size) {
         find(tenantId, employeeId);

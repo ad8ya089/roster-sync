@@ -22,6 +22,7 @@ public class OfficeEntity extends TenantScopedEntity {
         this.active = true;
         this.createdAt = createdAt;
     }
+    public Long getId() { return id; }
     public String getCode() { return code; }
     public String getName() { return name; }
     public boolean isActive() { return active; }
