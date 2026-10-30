@@ -1,5 +1,8 @@
 # Decisions & Trade-offs
 
+## Bulk demo timeout allowance
+Seed COPY and streaming export execute `SET LOCAL statement_timeout = '5min'` inside their own transactions. The normal connection setting stays 30 seconds and is restored automatically after commit or rollback. Fixture generation prioritizes robustness over the earlier arbitrary 20-second seed target; no additional seed optimization is required. Reconciliation apply and ordinary API statements retain their existing limits.
+
 ## ADR-018 State in SQL, time series in Prometheus
 The operational summary separates tenant-scoped durable database state from explicitly instance-wide `sinceRestart` counters and rolling p99 estimates. Receipts/rejections reconstruct accepted outcomes and audited failures for the last 15 minutes. They cannot reconstruct replay deliveries, lock retries or historical publisher failures, so those remain Micrometer counters. Prometheus rate/increase handles reset-aware windows. No minute-rollup hot row serializes ingestion. V4 adds only the requested SQL indexes. Gauges refresh into AtomicLongs every 15 seconds; scraping does no database work.
 

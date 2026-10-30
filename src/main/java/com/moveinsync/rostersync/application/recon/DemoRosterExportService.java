@@ -12,6 +12,9 @@ public class DemoRosterExportService {
     public DemoRosterExportService(JdbcTemplate jdbc,RosterFileGenerator generator){this.jdbc=jdbc;this.generator=generator;}
     @Transactional(readOnly=true)
     public RosterFileGenerator.Expected write(UUID tenantId,OutputStream output,RosterFileGenerator.Spec spec) throws IOException {
+        // A large cursor export may outlast the normal 30s statement budget. Keep the
+        // allowance local to this streaming transaction, never on a pooled connection.
+        jdbc.execute("SET LOCAL statement_timeout = '5min'");
         // PostgreSQL cursor streaming requires BOTH autocommit off (this transaction) and fetchSize.
         try(var session=generator.open(output,spec)) {
             jdbc.query(connection->{

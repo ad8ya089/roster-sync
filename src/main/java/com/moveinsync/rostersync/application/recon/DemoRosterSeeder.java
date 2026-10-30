@@ -24,6 +24,9 @@ public class DemoRosterSeeder {
         // not source events. Java CRC32 is authoritative; PostgreSQL has no matching built-in CRC32.
         String columns="tenant_id,external_id,name,email,phone,office_id,shift_code,status,hr_version,hr_updated_at,recon_bucket,created_at,updated_at";
         transactions.executeWithoutResult(status->{
+            // Fixture COPY can exceed the API's 30s budget on Docker Desktop; SET LOCAL
+            // gives only this bulk transaction five minutes and resets on commit/rollback.
+            jdbc.execute("SET LOCAL statement_timeout = '5min'");
             // Serialize only demo seeders, without locking tenant/office rows against event FKs.
             jdbc.query("SELECT pg_advisory_xact_lock(hashtextextended(?,0))",(org.springframework.jdbc.core.RowCallbackHandler)row->{},"demo-seed:"+tenantId);
             String upper="S"+"0".repeat(Math.max(0,6-Integer.toString(count).length()))+count;

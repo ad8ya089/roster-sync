@@ -4,6 +4,8 @@ Plus-point **6**: "Add metrics and structured logging. Expose the counters an on
 
 ## Stack
 
+Demo seed/export can take longer on Docker Desktop. Their transactions alone use a five-minute statement timeout; the global 30-second limit remains. Seed duration is diagnostic evidence, with no 20-second acceptance gate.
+
 - Micrometer + Actuator + Prometheus registry, on the separate management listener `:8081`. All management endpoints are public on that listener; none are registered on `:8080`.
 - Histograms and p50/p99 are enabled only for `roster.apply.duration`, `roster.ingest.lag`, and `http.server.requests`. Other timers, including reconciliation phases, export count/sum/max without histogram buckets.
 - Structured logs: Spring Boot built-in structured logging, `logging.structured.format.console=ecs` (JSON, one line per event) in `prod`/`demo`; plain text for local `dev` if preferred. MDC keys appear automatically as JSON fields.
