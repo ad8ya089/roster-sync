@@ -13,6 +13,15 @@ import org.junit.jupiter.params.provider.ValueSource;
 import static org.assertj.core.api.Assertions.*;
 
 class RecordValidatorTest {
+    @org.junit.jupiter.api.Test
+    void transportPatchValidatesOnlySuppliedValuesAndDoesNotRequireHrSnapshotFields() {
+        var validator = new RecordValidator(com.moveinsync.rostersync.domain.ownership.FieldOwnershipPolicy.defaults(), (tenant,code) -> OfficeLookup.Status.ACTIVE);
+        var clear = new java.util.EnumMap<EmployeeField,String>(EmployeeField.class);
+        clear.put(EmployeeField.PICKUP_POINT,null);
+        assertThat(validator.validateTransportFields(java.util.UUID.randomUUID(),"E1",clear).valid()).isTrue();
+        assertThat(validator.validateTransportFields(java.util.UUID.randomUUID(),"E1",java.util.Map.of(EmployeeField.PHONE,"+91 9800000001")).errors())
+                .contains(new com.moveinsync.rostersync.domain.validation.FieldError("phone","INVALID_FORMAT"));
+    }
     private static final UUID TENANT = UUID.fromString("00000000-0000-0000-0000-000000000001");
     private final OfficeLookup offices = (tenant, code) -> {
         assertThat(tenant).isEqualTo(TENANT);

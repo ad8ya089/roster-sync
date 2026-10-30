@@ -30,6 +30,12 @@ public final class RecordValidator {
         return validate(tenantId, employeeId, version, "UPDATE", WriteSource.HR_SNAPSHOT, fields, unknownFields);
     }
 
+    public ValidationResult validateTransportFields(UUID tenantId, String employeeId, Map<EmployeeField,String> fields) {
+        var input = new ValidationInput(tenantId, employeeId, 1, "UPDATE", WriteSource.TRANSPORT_ADMIN, fields);
+        // A PATCH validates supplied values; full-HR required fields do not apply to an absent key.
+        return new ValidationResult(rules.stream().skip(1).flatMap(rule -> rule.validate(input).stream()).toList(), List.of());
+    }
+
     private ValidationResult validate(UUID tenantId, String employeeId, long version, String eventType, WriteSource source,
                                       Map<EmployeeField, String> fields, Set<String> unknownFields) {
         var warnings = new ArrayList<FieldError>();

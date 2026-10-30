@@ -58,12 +58,20 @@ public class EmployeeEntity extends AuditedTenantEntity {
         hrVersion = version; hrUpdatedAt = at; setUpdatedAt(at);
     }
     public void applyTransportFields(TransportFields fields, Instant at) {
+        applyTransportFields(fields, at, office);
+    }
+    public void applyTransportFields(TransportFields fields, Instant at, OfficeEntity resolvedOffice) {
         for (var entry : fields.values().entrySet()) {
             switch (entry.getKey()) {
+                case NAME -> name = entry.getValue();
+                case EMAIL -> email = entry.getValue();
                 case PHONE -> phone = entry.getValue();
+                case MANAGER_ID -> managerId = entry.getValue();
+                case OFFICE_CODE -> office = resolvedOffice;
+                case SHIFT_CODE -> shiftCode = entry.getValue();
+                case STATUS -> status = EmploymentStatus.valueOf(entry.getValue());
                 case PICKUP_POINT -> pickupPoint = entry.getValue();
                 case SPECIAL_ASSISTANCE -> specialAssistance = entry.getValue();
-                default -> throw new IllegalArgumentException("Unsupported transport field");
             }
         }
         transportVersion++; transportUpdatedAt = at; setUpdatedAt(at);
