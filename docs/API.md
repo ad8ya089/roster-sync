@@ -85,15 +85,16 @@ Batch of 1–1000 events. Each event is processed in **its own transaction**; on
 - `DEACTIVATE` needs only `employeeId` + `version`; it sets `status=INACTIVE` and keeps the other HR fields.
 - `UPDATE` for an unknown employee is treated as a create (the `CREATE` was delayed or lost). `DEACTIVATE` for an unknown employee stores a **tombstone** so a late, lower-version `CREATE` is ignored as stale.
 - If the source only has timestamps, it sends `version = epoch milliseconds` of the change.
-- Higher-version CREATE/UPDATE events apply and advance the HR version even when the canonical HR-owned values are unchanged; `changedFields=[]` is allowed in this case. This preserves ordering against later arrivals of intermediate versions.
-- DEACTIVATE ignores all carried HR/transport fields with `UNKNOWN_FIELD_IGNORED` warnings. A repeated DEACTIVATE against an existing empty tombstone returns `DUPLICATE` after the lower-version stale check; it does not advance the stored version or emit a change. This is the explicit tombstone no-op exception.
+- A higher-version event with the same resolved HR-owned hash returns `NO_CHANGE` (`VersionAdvanced(newVersion)`): advance `hr_version` and `hr_updated_at`, retain business fields, and write no outbox row. This covers identical CREATE/UPDATE snapshots and DEACTIVATE on an already-INACTIVE full record or tombstone. The version high-water mark always advances, preventing a late intermediate CREATE from resurrecting an employee.
+- `Apply` always has non-empty `changedFields` and exactly one Employee outbox event. `VersionAdvanced` is a distinct decision, never an empty-field Apply. Its receipt outcome is `NO_CHANGE`, response summary counter is `noChange`, and metrics tag is `no_change`. Phase 4 implements the transactional database effects.
+- DEACTIVATE ignores all carried HR/transport fields with `UNKNOWN_FIELD_IGNORED` warnings. Equal-version identical content remains `DUPLICATE`; lower versions remain `STALE`, including against tombstones.
 - Email is trimmed and lower-cased before validation and hashing. Phone validation uses the original string: spaces and dashes are invalid. CREATE requires name/email/officeCode; UPDATE additionally requires status. Errors are sorted by field name, then code, with no values.
 - Snapshot decisions use the same version comparison, with equal-version differing content represented as `Apply(heal=true)`. Replacing a tombstone with ACTIVE state emits EmployeeCreated; reactivating an existing inactive full record emits EmployeeReactivated.
 
 Response:
 ```json
 {
-  "summary": { "received": 5, "applied": 2, "duplicate": 1, "stale": 1, "conflict": 0, "rejected": 1 },
+  "summary": { "received": 5, "applied": 2, "noChange": 0, "duplicate": 1, "stale": 1, "conflict": 0, "rejected": 1 },
   "results": [
     { "index": 0, "employeeId": "E000123", "version": 7, "outcome": "APPLIED", "warnings": [] },
     { "index": 1, "employeeId": "E000123", "version": 6, "outcome": "STALE", "currentVersion": 7 },

@@ -96,8 +96,8 @@ Rule: `domain` must not import `org.springframework.*` or `jakarta.persistence.*
 1. **Validate at the boundary** (`RecordValidator`, pure): phone E.164, email format, office code exists for this tenant, required fields, `version > 0`. Invalid → `REJECTED` with `[{field, code}]`; written to `record_rejection`; the rest of the batch continues. Rejected events do **not** consume their idempotency key, so HR can resend a fixed record with the same version.
 2. **Receipt**: `INSERT INTO hr_event_receipt ... ON CONFLICT DO NOTHING`. If the key already exists → compare payload hash → `DUPLICATE` (same) or `CONFLICT` (different). Done, no state change.
 3. **Lock the employee**: `SELECT ... FOR UPDATE`. If absent, insert; if the insert loses a race (unique violation) the applier retries the transaction once and finds the row.
-4. **Decide** (`ChangeDecider`, pure): `incoming.version > current.hr_version` → `APPLY`; `<` → `STALE`; `==` → `DUPLICATE` if hashes match else `CONFLICT`. Ownership policy filters the incoming fields to HR-owned ones; transport-owned fields present in the payload generate a `FIELD_NOT_OWNED_BY_SOURCE` warning.
-5. **Write** employee HR columns + `hr_version` + one `outbox_event` row (`EmployeeCreated | EmployeeUpdated | EmployeeDeactivated | EmployeeReactivated`, with changed field names) — same transaction.
+4. **Decide** (`ChangeDecider`, pure): newer version with different resolved HR hash → `Apply`; newer with the same hash → `VersionAdvanced(newVersion)` / `NO_CHANGE`; older → `STALE`; equal → `DUPLICATE` if hashes match else `CONFLICT`. Ownership policy filters HR-owned fields and warns about transport-owned input.
+5. **Write**: `Apply` requires non-empty changed fields and atomically updates employee state/version plus exactly one Employee outbox row. `VersionAdvanced` updates only `hr_version` and `hr_updated_at`, writes receipt outcome `NO_CHANGE`, and emits no outbox event. The high-water version always equals the maximum valid version seen. Phase 4 proves `Employee* outbox rows == APPLIED count`.
 6. **After commit**: evict the employee read cache entry; increment metrics.
 
 ### 5.2 Nightly reconciliation (the hardest flow)
@@ -143,7 +143,7 @@ sequenceDiagram
   RS->>DB: status = COMPLETED with counts
 ```
 
-The domain decision core is pure Java. Higher-version identical CREATE/UPDATE snapshots still advance the version with an empty changed-fields list. Equal-version file drift is a heal, while equal-version event drift is a conflict. Repeated deactivation of an empty tombstone is the documented duplicate-equivalent exception.
+The domain decision core is pure Java. Higher-version identical snapshots advance the source version through the distinct `VersionAdvanced` decision without a business event. This also applies to repeated deactivation of tombstones: v5 → DEACTIVATE v8 retains v8, CREATE v6 is stale, and CREATE v9 emits EmployeeCreated. Equal-version file drift is a heal; equal-version event drift is a conflict.
 
 Details, edge cases, complexity and the brake formula are in `RECONCILIATION.md`.
 

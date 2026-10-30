@@ -8,6 +8,7 @@ Short ADRs. Each: decision → why → what we gave up → when we'd revisit. Th
 
 ## ADR-002 Events are full-state snapshots ordered by a per-employee version
 - **Why:** with full state, "apply only if newer" makes the final state independent of arrival order (the v7-before-v6 example ends with v7's shift automatically). Deltas would require buffering and reordering, or vector merges.
+- **Version-only changes:** a newer event with the same resolved HR hash yields `VersionAdvanced` / `NO_CHANGE`. Advance the HR version and timestamp without a business event; `Apply` retains its non-empty-field invariant. A repeated DEACTIVATE must advance tombstones too, otherwise v5 + DEACTIVATE v8 could admit a stale CREATE v6 and resurrect the employee. Only APPLIED business changes produce Employee outbox events.
 - **Gave up:** bigger payloads; HR must send the whole HR-owned record each time. Realistic: HRIS webhooks (Workday, SuccessFactors) and SCIM PUT are full-resource.
 - **Revisit:** if a source can only send deltas → buffer per employee until the gap is filled, with a timeout, or rely on nightly heal.
 

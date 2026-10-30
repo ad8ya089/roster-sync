@@ -27,10 +27,10 @@ public final class BucketDiffer {
                     actions.add(new PlannedAction(row.employeeId(), ActionType.DEACTIVATE, null, row.hrVersion(), null));
                     missing++;
                 }
-            } else if (file.hash().equals(hasher.hash(row.snapshot()))) {
-                unchanged++;
             } else if (file.version() < row.hrVersion()) {
                 stale++;
+            } else if (file.version() == row.hrVersion() && file.hash().equals(hasher.hash(row.snapshot()))) {
+                unchanged++;
             } else {
                 ActionType type = file.version() == row.hrVersion() ? ActionType.HEAL : ActionType.UPDATE;
                 actions.add(new PlannedAction(row.employeeId(), type, file.version(), row.hrVersion(), file.snapshot()));

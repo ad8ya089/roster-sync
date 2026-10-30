@@ -13,7 +13,7 @@ Plus-point **6**: "Add metrics and structured logging. Expose the counters an on
 
 | Need at 3 AM | Metric (Prometheus name) | Type | Tags |
 |---|---|---|---|
-| Are events flowing? outcome mix | `roster_events_total` | counter | `outcome` = applied/duplicate/stale/conflict/rejected/retryable_error, `type` |
+| Are events flowing? outcome mix | `roster_events_total` | counter | `outcome` = applied/no_change/duplicate/stale/conflict/rejected/retryable_error, `type` |
 | **Rejections** and why | `roster_rejections_total` | counter | `reason` (error code), `source` = api/file |
 | **Error rate** | derived: `rate(roster_events_total{outcome=~"rejected|retryable_error|conflict"}[5m]) / rate(roster_events_total[5m])`; plus `http_server_requests_seconds_count{status=~"5.."}` | | |
 | **Ingest lag** (HR change → applied) | `roster_ingest_lag_seconds` | timer/histogram | — (uses `occurredAt` when present) |
@@ -35,7 +35,7 @@ Gauges that need DB queries (`outbox_pending`, `outbox_oldest_pending_age_second
 ```json
 {
   "generatedAt": "2026-10-30T03:00:00Z",
-  "ingest":   { "last15m": { "applied": 1203, "duplicate": 40, "stale": 7, "conflict": 0, "rejected": 12, "retryableError": 0 },
+  "ingest":   { "last15m": { "applied": 1203, "noChange": 23, "duplicate": 40, "stale": 7, "conflict": 0, "rejected": 12, "retryableError": 0 },
                 "rejectionRate": 0.0095, "topRejectionReasons": { "UNKNOWN_OFFICE": 9, "INVALID_FORMAT": 3 },
                 "p99ApplyMs": 18.4, "lagP99Seconds": 2.1, "retriesLast15m": 3 },
   "outbox":   { "pending": 4, "oldestPendingAgeSeconds": 0.7, "dead": 0, "failuresLast15m": 0 },

@@ -58,12 +58,14 @@ class ChangeDeciderTest {
     }
 
     @Test
-    void higherIdenticalVersionAppliesWithEmptyFieldsToPreserveOrdering() {
+    void higherIdenticalVersionAdvancesWithoutABusinessEventToPreserveOrdering() {
         for (DecisionMode mode : DecisionMode.values()) {
-            var result = applied(decider.decide(state(7, snapshot("S1")), update(9, snapshot("S1")), mode));
-            assertThat(result.changedFields()).isEmpty();
-            assertThat(result.heal()).isFalse();
-            assertThat(decider.decide(state(9, result.newSnapshot()), update(8, snapshot("S2")), mode)).isEqualTo(new ApplyDecision.Stale(9));
+            var result = decider.decide(state(7, snapshot("S1")), update(8, snapshot("S1")), mode);
+            assertThat(result).isEqualTo(new ApplyDecision.VersionAdvanced(8));
+            assertThat(result.outcome()).isEqualTo(IngestOutcome.NO_CHANGE);
+            assertThat(decider.decide(state(8, snapshot("S1")), update(7, snapshot("S2")), mode)).isEqualTo(new ApplyDecision.Stale(8));
+            assertThat(decider.decide(state(7, snapshot("S1")), update(Long.MAX_VALUE, snapshot("S1")), mode))
+                    .isEqualTo(new ApplyDecision.VersionAdvanced(Long.MAX_VALUE));
         }
     }
 
@@ -74,7 +76,7 @@ class ChangeDeciderTest {
         assertThat(deactivated.eventType()).isEqualTo(OutboxEventType.DEACTIVATED);
         assertThat(deactivated.changedFields()).containsExactly(EmployeeField.STATUS);
         assertThat(applied(decider.decide(state(2, inactive), update(3, snapshot("S1")), DecisionMode.EVENT)).eventType()).isEqualTo(OutboxEventType.REACTIVATED);
-        assertThat(applied(decider.decide(state(2, inactive), update(3, inactive), DecisionMode.EVENT)).eventType()).isEqualTo(OutboxEventType.UPDATED);
+        assertThat(decider.decide(state(2, inactive), update(3, inactive), DecisionMode.EVENT)).isEqualTo(new ApplyDecision.VersionAdvanced(3));
     }
 
     @Test
@@ -83,8 +85,40 @@ class ChangeDeciderTest {
         assertThat(decider.decide(current, new CreateEmployee("E1", 3, null, null, snapshot("S1")), DecisionMode.EVENT))
                 .isEqualTo(new ApplyDecision.Stale(5));
         assertThat(applied(decider.decide(current, update(6, snapshot("S1")), DecisionMode.EVENT)).eventType()).isEqualTo(OutboxEventType.CREATED);
-        assertThat(decider.decide(current, new DeactivateEmployee("E1", 6, null, null), DecisionMode.EVENT)).isEqualTo(new ApplyDecision.Duplicate());
+        assertThat(decider.decide(current, new DeactivateEmployee("E1", 6, null, null), DecisionMode.EVENT)).isEqualTo(new ApplyDecision.VersionAdvanced(6));
         assertThat(applied(decider.decide(CurrentEmployeeState.missing(), new DeactivateEmployee("E1", 1, null, null), DecisionMode.EVENT)).newSnapshot()).isEqualTo(HrSnapshot.tombstone());
+    }
+
+    @Test
+    void advancingATombstonePreventsLateIntermediateCreateFromResurrectingIt() {
+        var tombstone = state(5, HrSnapshot.tombstone());
+        var advanced = decider.decide(tombstone, new DeactivateEmployee("E1", 8, null, null), DecisionMode.EVENT);
+        assertThat(advanced).isEqualTo(new ApplyDecision.VersionAdvanced(8));
+        assertThat(advanced.outcome()).isEqualTo(IngestOutcome.NO_CHANGE);
+        var versionEight = state(((ApplyDecision.VersionAdvanced) advanced).newVersion(), tombstone.snapshot());
+        assertThat(decider.decide(versionEight, new CreateEmployee("E1", 6, null, null, snapshot("S1")), DecisionMode.EVENT))
+                .isEqualTo(new ApplyDecision.Stale(8));
+        var created = applied(decider.decide(versionEight, new CreateEmployee("E1", 9, null, null, snapshot("S1")), DecisionMode.EVENT));
+        assertThat(created.eventType()).isEqualTo(OutboxEventType.CREATED);
+        assertThat(created.outcome()).isEqualTo(IngestOutcome.APPLIED);
+    }
+
+    @Test
+    void deactivatingAnInactiveFullRecordAdvancesTheVersionWithoutAnEvent() {
+        var inactive = state(5, snapshot("S1").withStatus("INACTIVE"));
+        var decision = decider.decide(inactive, new DeactivateEmployee("E1", 7, null, null), DecisionMode.EVENT);
+        assertThat(decision).isEqualTo(new ApplyDecision.VersionAdvanced(7));
+        assertThat(decision.outcome()).isEqualTo(IngestOutcome.NO_CHANGE);
+        assertThat(decider.decide(state(7, inactive.snapshot()), update(8, inactive.snapshot()), DecisionMode.EVENT))
+                .isEqualTo(new ApplyDecision.VersionAdvanced(8));
+        assertThat(decider.decide(inactive, new DeactivateEmployee("E1", 5, null, null), DecisionMode.EVENT)).isInstanceOf(ApplyDecision.Duplicate.class);
+        assertThat(decider.decide(inactive, new DeactivateEmployee("E1", 4, null, null), DecisionMode.EVENT)).isEqualTo(new ApplyDecision.Stale(5));
+    }
+
+    @Test
+    void applyRejectsEmptyChangedFieldsEvenWhenAssertionsAreDisabled() {
+        assertThatThrownBy(() -> new ApplyDecision.Apply(snapshot("S1"), java.util.List.of(), OutboxEventType.UPDATED, false))
+                .isInstanceOf(IllegalArgumentException.class).hasMessage("Apply requires changed HR fields");
     }
 
     @Test

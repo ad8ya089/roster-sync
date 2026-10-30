@@ -61,16 +61,18 @@ APPLY   — only if not tripped (or after approval), see §6
 | In file? | In DB? | Condition | Action |
 |---|---|---|---|
 | yes | no | — | `CREATE` (with file version) |
-| yes | yes | hash equal | `UNCHANGED` (status is part of the hash) |
-| yes | yes | hash differs, `file.version > db.hr_version` | `UPDATE` |
+| yes | yes | hash equal, versions equal | `UNCHANGED` (status is part of the hash) |
+| yes | yes | `file.version > db.hr_version`, any hash | `UPDATE` (same hash becomes version-only `NO_CHANGE` at apply time) |
 | yes | yes | hash differs, `file.version == db.hr_version` | `HEAL` (same version, different content — the snapshot is authoritative; e.g. a `DEACTIVATE` carried over older fields) |
-| yes | yes | hash differs, `file.version < db.hr_version` | `STALE_SKIP` (a real-time event after the export already moved us ahead) |
+| yes | yes | `file.version < db.hr_version`, any hash | `STALE_SKIP` (a real-time event after the export already moved us ahead) |
 | present-but-invalid | yes | — | nothing (counts as present) |
 | no | yes, ACTIVE | `db.hr_updated_at <= asOf` | `DEACTIVATE` candidate |
 | no | yes, ACTIVE | `db.hr_updated_at > asOf` | skip — the employee was created/changed after the export was taken |
 | no | yes, INACTIVE | — | nothing |
 
 Note the asymmetry with real-time events: for an **event**, same version + different content is a `CONFLICT` (two different messages claim the same version — suspicious, reject). For the **snapshot**, it is a `HEAL` (the export is the authoritative state of HR at that version). Being able to explain this asymmetry is a strong interview point.
+
+Version comparison precedes the equal-hash shortcut. Planned updates include higher-version identical content: the shared decider returns `VersionAdvanced`, advancing the version/timestamp without an Employee outbox event. Only equal-version identical content is unchanged; this keeps the same source high-water guarantee for events and files.
 
 ## 4. Safety brake
 
@@ -124,7 +126,7 @@ A partial unique index allows only one non-terminal run per tenant (`UPLOADED`, 
 
 - Read `recon_action` where `status='PENDING'` in id order, chunks of 500.
 - Each chunk runs in one transaction for throughput; if the chunk throws, it is retried **action by action** (one transaction each) so one bad action can't block the rest.
-- Every action goes through the **same** `EmployeeChangeApplier` as real-time events (same row lock, same `ChangeDecider`, same outbox write) — so reconciliation can never bypass ownership rules or forget an event.
+- Every action goes through the **same** `EmployeeChangeApplier` as real-time events (same row lock and `ChangeDecider`). Apply emits exactly one business outbox event; VersionAdvanced changes only the HR version/timestamp and emits none. Reconciliation cannot bypass ownership or version ordering.
 - Re-check at apply time (state may have moved since planning):
   - `CREATE/UPDATE/HEAL`: decider runs in *snapshot mode* (`>=` for HEAL, `>` otherwise); if the employee's `hr_version` is now higher → `SUPERSEDED`.
   - `DEACTIVATE`: only if still `ACTIVE` **and** `hr_version == expected_db_version`; otherwise `SUPERSEDED`. Recon deactivation does not bump `hr_version` (it is not an HR version — "absent from a snapshot" is weaker evidence than a versioned event) and sets `deactivation_source='RECON'`.
@@ -145,7 +147,7 @@ Let N = file rows, M = DB rows for the tenant, B = buckets (256), C = changed ro
 | Pass 1 (parse, validate, hash, spill) | O(N) | O(B · buffer) ≈ 2 MB | O(N) temp disk |
 | Pass 2 (per bucket load + query + diff) | O(N + M) total, B queries, each an index range scan | O(N/B + M/B) ≈ 800 + 800 rows ≈ < 1 MB | B small reads |
 | Writing the plan | O(C) | O(batch) | C rows |
-| Apply | O(C · log M) (index lookups) | O(chunk) | C row locks + C outbox rows |
+| Apply | O(C · log M) (index lookups) | O(chunk) | C row locks; at most C Employee outbox rows (version-only NO_CHANGE emits none) |
 
 Hashing: SHA-256 of ~150 bytes per row ≈ 1 µs → 0.2 s for 200k. The expected bottleneck is Postgres I/O, not CPU.
 

@@ -42,7 +42,7 @@ Compose defaults to `demo`. Ordinary production uses `prod` alone, without demo 
 
 **Idempotency key:** `(tenantId, employeeId, version)`. **Version comparison** (per employee, under a row lock): `incoming > current` → apply · `incoming < current` → `STALE` (ignored) · equal → `DUPLICATE` if the payload hash matches, else `CONFLICT`. Events carry the **full HR-owned state** at that version, so the final state never depends on arrival order.
 
-Higher-version identical CREATE/UPDATE snapshots apply with `changedFields=[]` and advance the version. Repeating DEACTIVATE against an empty tombstone is the explicit duplicate-equivalent no-op exception. The full rules are in `docs/API.md`.
+Higher-version identical snapshots, including DEACTIVATE on INACTIVE employees or tombstones, produce `VersionAdvanced` with outcome `NO_CHANGE`: advance the HR version/timestamp and write no outbox event. `Apply` requires non-empty changed fields and exactly one Employee outbox event. Equal versions with the same content remain `DUPLICATE`. The full rules are in `docs/API.md`.
 
 **Field ownership conflict rule:** every field has exactly one owner (HR: name, email, phone, manager, office, shift, status; transport admin: pickup point, special assistance). A source may change only the fields it owns; non-owned fields in a payload are ignored and reported as the warning `FIELD_NOT_OWNED_BY_SOURCE`. Ownership is configuration (`roster.ownership.transport-owned`).
 

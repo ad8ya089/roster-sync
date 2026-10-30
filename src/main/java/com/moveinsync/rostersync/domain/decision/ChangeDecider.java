@@ -1,7 +1,6 @@
 package com.moveinsync.rostersync.domain.decision;
 
 import com.moveinsync.rostersync.domain.command.HrCommand;
-import com.moveinsync.rostersync.domain.command.HrEventType;
 import com.moveinsync.rostersync.domain.hash.RecordHasher;
 import com.moveinsync.rostersync.domain.model.*;
 import com.moveinsync.rostersync.domain.outbox.OutboxEventType;
@@ -34,12 +33,10 @@ public final class ChangeDecider {
         boolean equalVersion = current.exists() && command.version() == current.hrVersion();
         if (equalVersion && same) return new ApplyDecision.Duplicate();
         if (equalVersion && mode == DecisionMode.EVENT) return new ApplyDecision.Conflict(current.hrVersion());
-        // Repeated deactivation of an empty tombstone is the explicitly requested duplicate-equivalent no-op.
-        if (current.exists() && command.type() == HrEventType.DEACTIVATE && isTombstone(current)) {
-            return new ApplyDecision.Duplicate();
-        }
-        // Higher versions with identical values still apply: otherwise an older event could overwrite them.
-        assert !changed.isEmpty() || same || !current.exists();
+        // Preserve the source high-water mark even when its business state has not changed.
+        // This has no change event; otherwise a late intermediate CREATE could revive a tombstone.
+        if (same) return new ApplyDecision.VersionAdvanced(command.version());
+        assert !changed.isEmpty() : "Different HR hashes must have changed HR fields";
         return new ApplyDecision.Apply(merged, changed, eventType(current, merged), equalVersion && !same);
     }
 

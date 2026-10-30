@@ -91,7 +91,7 @@ CREATE TABLE hr_event_receipt (
   event_id      VARCHAR(100),                 -- optional, supplied by HR, informational
   event_type    VARCHAR(12) NOT NULL CHECK (event_type IN ('CREATE','UPDATE','DEACTIVATE')),
   payload_hash  CHAR(64) NOT NULL,            -- SHA-256 hex of the canonical HR payload
-  outcome       VARCHAR(16) NOT NULL,         -- APPLIED | STALE | DUPLICATE | CONFLICT (first processing result)
+  outcome       VARCHAR(16) NOT NULL,         -- APPLIED | NO_CHANGE | STALE | DUPLICATE | CONFLICT (first processing result)
   warnings      VARCHAR(200),                 -- comma-separated warning codes, never values
   received_at   TIMESTAMPTZ NOT NULL DEFAULT now(),
   UNIQUE (tenant_id, external_id, version)

@@ -1,6 +1,10 @@
 package com.moveinsync.rostersync.domain.recon;
 
 import com.moveinsync.rostersync.domain.hash.RecordHasher;
+import com.moveinsync.rostersync.domain.command.UpdateEmployee;
+import com.moveinsync.rostersync.domain.decision.ApplyDecision;
+import com.moveinsync.rostersync.domain.decision.ChangeDecider;
+import com.moveinsync.rostersync.domain.decision.DecisionMode;
 import com.moveinsync.rostersync.domain.model.*;
 import com.moveinsync.rostersync.domain.ownership.FieldOwnershipPolicy;
 import java.util.LinkedHashMap;
@@ -25,7 +29,7 @@ class BucketDifferTest {
                 db("equal-time", 1, snapshot("S1")));
         Map<String, FileRow> files = new LinkedHashMap<>();
         for (FileRow row : List.of(file("update", 2, "S2"), file("heal", 2, "S2"), file("stale", 2, "S2"),
-                file("same", 9, "S1"), file("invalid", 2, "S2"), file("create", 1, "S1"), file("invalid-new", 1, "S1"))) files.put(row.employeeId(), row);
+                file("same", 4, "S1"), file("invalid", 2, "S2"), file("create", 1, "S1"), file("invalid-new", 1, "S1"))) files.put(row.employeeId(), row);
         var original = Map.copyOf(files);
         BucketDiff result = differ.diff(files, rows, Set.of("invalid", "invalid-new"), NOW);
         assertThat(files).isEqualTo(original);
@@ -46,6 +50,20 @@ class BucketDifferTest {
         assertThat(files.get("create").toString()).doesNotContain("Test Person", "test@example.test");
         assertThat(rows.getFirst().toString()).doesNotContain("Test Person", "test@example.test");
         assertThat(update.toString()).doesNotContain("Test Person", "test@example.test");
+    }
+
+    @Test
+    void identicalHashesStillScheduleHigherVersionsAndSkipLowerVersions() {
+        var result = differ.diff(Map.of("higher", file("higher", 8, "S1"), "equal", file("equal", 7, "S1"), "lower", file("lower", 6, "S1")),
+                List.of(db("higher", 7, snapshot("S1")), db("equal", 7, snapshot("S1")), db("lower", 7, snapshot("S1"))), Set.of(), NOW);
+        assertThat(result.counters()).isEqualTo(new DiffCounters(3, 0, 0, 1, 0, 1, 1));
+        assertThat(result.actions()).singleElement().satisfies(action -> {
+            assertThat(action.action()).isEqualTo(ActionType.UPDATE);
+            assertThat(action.fileVersion()).isEqualTo(8);
+            var decision = new ChangeDecider(FieldOwnershipPolicy.defaults())
+                    .decide(state(7, snapshot("S1")), new UpdateEmployee("higher", 8, null, null, action.payload()), DecisionMode.SNAPSHOT);
+            assertThat(decision).isEqualTo(new ApplyDecision.VersionAdvanced(8));
+        });
     }
 
     @Test
