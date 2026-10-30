@@ -49,6 +49,7 @@ public class SecurityConfig {
                 .exceptionHandling(errors -> errors.authenticationEntryPoint(unauthorized).accessDeniedHandler(forbidden))
                 // Construct here, rather than as a servlet Filter bean, to prevent double registration.
                 .addFilterAfter(new TenantContextFilter(), BearerTokenAuthenticationFilter.class)
+                .addFilterAfter(new com.moveinsync.rostersync.api.hr.EventBodyLimitFilter(mapper), org.springframework.security.web.access.intercept.AuthorizationFilter.class)
                 .build();
         // Security 7.1 adds public metadata automatically and exposes no disable switch.
         // Our public-route contract is only login and health, so omit that filter from the chain.

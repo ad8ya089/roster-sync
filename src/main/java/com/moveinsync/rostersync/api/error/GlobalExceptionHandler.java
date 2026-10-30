@@ -31,6 +31,9 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(ApiException.class)
     public ProblemDetail handleApiException(ApiException exception) {
+        if (exception instanceof RequestValidationException validation) {
+            var detail = problem(validation.errorCode()); detail.setProperty("errors", validation.errors()); return detail;
+        }
         return problem(exception.errorCode());
     }
 
