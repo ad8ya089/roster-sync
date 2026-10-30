@@ -16,7 +16,7 @@ class SchemaMigrationIT extends AbstractIntegrationTest {
 
     @Test
     void appliesV1AndCreatesEveryCoreTable() {
-        assertThat(flyway.info().current().getVersion().getVersion()).isEqualTo("2");
+        assertThat(flyway.info().current().getVersion().getVersion()).isEqualTo("3");
         assertThat(flyway.validateWithResult().validationSuccessful).isTrue();
         var tables = jdbc.queryForList("SELECT tablename FROM pg_tables WHERE schemaname='public'", String.class);
         assertThat(tables).contains("tenant", "tenant_settings", "office", "app_user", "employee",

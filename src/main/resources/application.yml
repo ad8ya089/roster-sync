@@ -6,12 +6,13 @@ spring:
   autoconfigure:
     exclude: org.springframework.boot.security.autoconfigure.UserDetailsServiceAutoConfiguration
   datasource:
-    url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://localhost:5432/rostersync}
+    url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://localhost:5432/rostersync?reWriteBatchedInserts=true}
     username: ${POSTGRES_USER:roster}
     password: ${POSTGRES_PASSWORD}
     hikari:
       maximum-pool-size: 20
       data-source-properties:
+        reWriteBatchedInserts: true
         options: -c lock_timeout=5000 -c statement_timeout=30000
   jpa:
     open-in-view: false

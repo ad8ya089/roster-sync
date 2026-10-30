@@ -12,7 +12,8 @@ import org.testcontainers.postgresql.PostgreSQLContainer;
 @ActiveProfiles("test")
 public abstract class AbstractIntegrationTest {
     @ServiceConnection
-    protected static final PostgreSQLContainer POSTGRES = new PostgreSQLContainer("postgres:17-alpine");
+    protected static final PostgreSQLContainer POSTGRES = new PostgreSQLContainer("postgres:17-alpine")
+            .withUrlParam("reWriteBatchedInserts","true");
 
     static {
         // One container for the entire test JVM; per-class extension shutdown breaks cached contexts.
