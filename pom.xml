@@ -96,6 +96,19 @@
                         <systemPropertyVariables><spring.test.context.cache.maxSize>1</spring.test.context.cache.maxSize></systemPropertyVariables>
                     </configuration>
                 </execution></executions>
+            </plugin>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId><artifactId>maven-clean-plugin</artifactId>
+                <executions><execution>
+                    <id>reset-benchmark-summary</id><phase>pre-integration-test</phase><goals><goal>clean</goal></goals>
+                    <configuration>
+                        <!-- Failsafe merges custom summary files; never retain a prior invocation's failures. -->
+                        <excludeDefaultDirectories>true</excludeDefaultDirectories>
+                        <filesets><fileset><directory>${project.build.directory}/benchmark-reports</directory>
+                            <includes><include>failsafe-summary.xml</include></includes><followSymlinks>false</followSymlinks>
+                        </fileset></filesets>
+                    </configuration>
+                </execution></executions>
             </plugin></plugins></build>
         </profile>
     </profiles>
