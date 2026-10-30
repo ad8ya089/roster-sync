@@ -1,4 +1,5 @@
 {$DOMAIN:rostersync-aditya.duckdns.org} {
+    encode zstd gzip
     tls {
         issuer acme https://acme-v02.api.letsencrypt.org/directory
     }
