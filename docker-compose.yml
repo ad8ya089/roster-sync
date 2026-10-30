@@ -16,7 +16,11 @@ services:
       - pgdata:/var/lib/postgresql/data
 
   app:
-    build: .
+    build:
+      context: .
+      args:
+        VITE_DEMO_HINTS: "true"
+        VITE_STYLEGUIDE: ${VITE_STYLEGUIDE:-false}
     env_file: .env
     environment:
       SPRING_DATASOURCE_URL: ${SPRING_DATASOURCE_URL:-jdbc:postgresql://db:5432/rostersync?reWriteBatchedInserts=true}

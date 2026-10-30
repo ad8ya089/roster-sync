@@ -1,5 +1,13 @@
 # Deployment
 
+## Phase 9 console build and root routing
+
+The Dockerfile builds static console files in a pinned Node 24 stage, copies them into the Maven stage, and keeps the runtime Java-only. Maven verification does not invoke Node. Local jar users may run `scripts/build-frontend.sh`; generated static resources are ignored by Git.
+
+Local Compose enables username hints. The opt-in `VITE_STYLEGUIDE=true` build flag is used only for the local design checkpoint. Both flags default to false in the Dockerfile, including the AWS build. The production Caddyfile's former root-path identification response has been removed so `/` reaches Spring and serves the console; the `/actuator` block remains. This is an explicitly approved routing correction, not an infrastructure change. The live application is not redeployed until the design checkpoint has been approved and the rest of Phase 9 is complete.
+
+Static HTML uses no-cache and hashed assets use one-year immutable caching. CSP permits self-hosted fonts and scripts only, with the specified inline-style allowance. The API and management-port permissions remain unchanged.
+
 Two goals, in this order:
 1. **One-command local run** (required by the brief): `docker compose up`.
 2. **A live URL** (a plus point): the same containers on AWS, deployed in a way that is cheap, reliable for an interview window, and easy to defend.

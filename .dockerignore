@@ -3,3 +3,14 @@
 !src/
 !src/**
 !Dockerfile
+!frontend/
+!frontend/**
+frontend/node_modules/
+frontend/dist/
+frontend/test-results/
+frontend/playwright-report/
+frontend/tests/e2e/screenshots/
+frontend/*.tsbuildinfo
+frontend/.checkpoint.json
+frontend/.env*
+src/main/resources/static/

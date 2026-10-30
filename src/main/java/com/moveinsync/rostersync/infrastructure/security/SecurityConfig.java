@@ -39,6 +39,7 @@ public class SecurityConfig {
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(access -> access
                         .requestMatchers(HttpMethod.POST, "/api/v1/auth/token").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/", "/index.html", "/assets/**", "/favicon.svg").permitAll()
                         // No actuator handlers exist on this listener; MVC returns 404 even anonymously.
                         .requestMatchers("/actuator", "/actuator/**").permitAll()
                         // No form/Basic/logout filters exist. Let MVC return 404 for their old paths.
@@ -48,12 +49,15 @@ public class SecurityConfig {
                         .jwt(jwt -> jwt.decoder(tokens.decoder()).jwtAuthenticationConverter(converter))
                         .authenticationEntryPoint(unauthorized).accessDeniedHandler(forbidden))
                 .exceptionHandling(errors -> errors.authenticationEntryPoint(unauthorized).accessDeniedHandler(forbidden))
+                .headers(headers -> headers
+                        .contentSecurityPolicy(csp -> csp.policyDirectives("default-src 'self'; img-src 'self' data:; style-src 'self' 'unsafe-inline'; script-src 'self'; connect-src 'self'; font-src 'self'; frame-ancestors 'none'"))
+                        .referrerPolicy(referrer -> referrer.policy(org.springframework.security.web.header.writers.ReferrerPolicyHeaderWriter.ReferrerPolicy.NO_REFERRER)))
                 // Construct here, rather than as a servlet Filter bean, to prevent double registration.
                 .addFilterAfter(new TenantContextFilter(), BearerTokenAuthenticationFilter.class)
                 .addFilterAfter(new com.moveinsync.rostersync.api.hr.EventBodyLimitFilter(mapper), org.springframework.security.web.access.intercept.AuthorizationFilter.class)
                 .build();
         // Security 7.1 adds public metadata automatically and exposes no disable switch.
-        // Our public-route contract is only login and health, so omit that filter from the chain.
+        // Metadata is outside our explicit public-route contract, so omit that filter.
         return new DefaultSecurityFilterChain(chain.getRequestMatcher(), chain.getFilters().stream()
                 .filter(filter -> !(filter instanceof OAuth2ProtectedResourceMetadataFilter)).toList());
     }

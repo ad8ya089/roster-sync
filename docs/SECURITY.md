@@ -1,5 +1,7 @@
 # Security, Tenant Isolation, PII and Error Handling
 
+Phase 9 static resources: only GET `/`, `/index.html`, `/assets/**` and `/favicon.svg` are added to the public allowlist. They use same-origin CSP (including `font-src 'self'` and `frame-ancestors 'none'`), `Referrer-Policy: no-referrer` and `X-Content-Type-Options: nosniff`. Hash routing adds no SPA fallback for unknown server paths. API method authorization, tenant predicates and the separate management listener are unchanged. Browser tokens stay in memory, and logout/expiry clears tenant query data. Browser role hints never replace server authorization.
+
 Covers plus-points **1 (Authentication + RBAC + tenant isolation)** and **8 (Error handling, no PII)** and the key point *"Never write personal data into logs or error reports. Use employee IDs."*
 
 ## 1. Authentication

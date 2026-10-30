@@ -1,8 +1,19 @@
+FROM node:24.22.2-alpine AS frontend
+WORKDIR /frontend
+COPY frontend/package.json frontend/package-lock.json ./
+RUN npm ci
+COPY frontend/ ./
+ARG VITE_STYLEGUIDE=false
+ARG VITE_DEMO_HINTS=false
+ENV VITE_STYLEGUIDE=$VITE_STYLEGUIDE VITE_DEMO_HINTS=$VITE_DEMO_HINTS
+RUN npm run build
+
 FROM maven:3.9-eclipse-temurin-21 AS build
 WORKDIR /workspace
 COPY pom.xml ./
 RUN mvn -B -q dependency:go-offline
 COPY src ./src
+COPY --from=frontend /frontend/dist ./src/main/resources/static
 RUN mvn -B -DskipTests package
 
 FROM eclipse-temurin:21-jre

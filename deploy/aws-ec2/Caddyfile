@@ -4,7 +4,5 @@
     }
     @management path /actuator /actuator/*
     respond @management 404
-    @root path /
-    respond @root "HR Roster Sync API" 200
     reverse_proxy app:8080
 }
