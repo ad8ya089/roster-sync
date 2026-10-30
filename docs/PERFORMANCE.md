@@ -19,7 +19,7 @@ Keep the **40-action default**. Median mixed-file apply throughput in this repea
 
 The matched update-only profiling comparison used 1,000 warm-up actions, 5,000 measured actions, chunk 64, the same 256 MiB heap and no coverage agent: **89.6 → 380.3 actions/s (4.25×)**. JDBC execution/batch/commit calls fell from **6.08 → 0.17 per action**. These counts describe JDBC calls, not packet captures. The implementation batches action status updates and outbox inserts, defers flushing, and reads/locks employee sets together.
 
-Cold JIT, class loading and host scheduling vary. Earlier mixed-file repeats measured 303–304 actions/s with maxima 779–1,265 ms; instrumented 40-action probes measured 251–258 actions/s and cold maxima 833–1,605 ms. A stressed 64-action probe reached 6,140 ms. These are different workloads/instrumentation and are retained rather than hidden. The old saved summaries contained only maxima, so their p50/p99 cannot be recovered; this repeat adds complete distribution capture. The new criterion replaces the old maximum-below-one-second target. It is a local acceptance measurement, not a guarantee for every host or cold start. See [trade-offs](docs/DECISIONS.md).
+Cold JIT, class loading and host scheduling vary. Earlier mixed-file repeats measured 303–304 actions/s with maxima 779–1,265 ms; instrumented 40-action probes measured 251–258 actions/s and cold maxima 833–1,605 ms. A stressed 64-action probe reached 6,140 ms. These are different workloads/instrumentation and are retained rather than hidden. The old saved summaries contained only maxima, so their p50/p99 cannot be recovered; this repeat adds complete distribution capture. The new criterion replaces the old maximum-below-one-second target. It is a local acceptance measurement, not a guarantee for every host or cold start. See [trade-offs](DECISIONS.md).
 
 The latest separate 40-action JDBC-counting probe measured 252.2 actions/s, 330 ms maximum after warm-up and 925 ms cold maximum. Its first measured chunk used 0.25 JDBC calls/action. This instrumented update-only workload is separate from both the mixed-file result and the archived matched 64-action comparison.
 
@@ -44,7 +44,7 @@ The pool size stayed at 20. Hikari gauges were sampled every 200 ms (observed ma
 
 The diagnostic temporarily relaxed durability only on the local database and restored `synchronous_commit=on` in finally, verified before the test suite. It is not a production recommendation: acknowledged commits may be lost after a crash with asynchronous commit. The earlier isolated 20-VU run measured 423 events/s (request p50/p99 2,210/3,912 ms); retain that as variation, rather than treating either run as a hardware-independent guarantee.
 
-Run `BATCH_SIZE=1 LOAD_VUS=5 ./scripts/loadtest.sh` or the default batch50 case. `python loadtest/run-matrix.py` runs the local-only matrix, including the temporary durability diagnostic. Docker Desktop uses `BASE_URL=http://host.docker.internal:8080`; Linux may use `DOCKER_NETWORK=host BASE_URL=http://127.0.0.1:8080`. See [test methodology](docs/TESTING.md).
+Run `BATCH_SIZE=1 LOAD_VUS=5 ./scripts/loadtest.sh` or the default batch50 case. `python loadtest/run-matrix.py` runs the local-only matrix, including the temporary durability diagnostic. Docker Desktop uses `BASE_URL=http://host.docker.internal:8080`; Linux may use `DOCKER_NETWORK=host BASE_URL=http://127.0.0.1:8080`. See [test methodology](TESTING.md).
 
 
 ## Reproduce

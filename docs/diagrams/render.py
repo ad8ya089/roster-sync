@@ -35,7 +35,9 @@ def arrow(ax,points,color=TEAL,dashed=False,label=None,at=None):
         ax.text(*at,label,fontsize=9,color=color,ha='center',va='center',bbox={'facecolor':PAPER,'edgecolor':'none','pad':2})
 
 def save(fig,name):
-    fig.savefig(OUT/(name+'.svg'),metadata={'Date':None})
+    svg=OUT/(name+'.svg')
+    fig.savefig(svg,metadata={'Date':None})
+    svg.write_text('\n'.join(line.rstrip() for line in svg.read_text(encoding='utf-8').splitlines())+'\n',encoding='utf-8')
     fig.savefig(OUT/(name+'.png'),dpi=150)
     plt.close(fig)
 

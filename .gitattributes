@@ -2,3 +2,6 @@
 *.sh text eol=lf
 mvnw text eol=lf
 *.cmd text eol=crlf
+
+# Generated documents must retain byte offsets on every checkout.
+*.pdf binary
