@@ -165,7 +165,7 @@ Hashing: SHA-256 of ~150 bytes per row ≈ 1 µs → 0.2 s for 200k. The expecte
 - `ReconciliationFlowIT` — truncated file → `AWAITING_APPROVAL`, nobody deactivated, counts in message; approve/reject paths; SKIP_DEACTIVATIONS.
 - `ReconciliationConcurrencyIT` — real-time event during apply → `SUPERSEDED`; two uploads → 409.
 - `ReconciliationRecoveryIT` — fault at `RECON_AFTER_N_ACTIONS` → restart → completes, no duplicates.
-- `ReconciliationBenchmarkIT` (tag `benchmark`, run with `-Xmx256m`) — 200k-row DB + 200k-row file (1 % changed, 0.5 % missing) → diff wall time < 60 s, asserts peak heap delta, prints numbers for the README.
+- `ReconciliationBenchmarkIT` (tag `benchmark`, run with `-Xmx256m`) — 200k-employee source, generated file with 1% mutation / 0.5% missing / 0.1% new → three samples, exact plan counts and diff wall time <60s. Asserts the 256 MiB heap cap, samples used heap/delta and prints medians for the README.
 
 ## Phase 6 input and scheduling details
 Upload rejects empty content, a future asOf beyond five minutes and an export at/before the last COMPLETED asOf. MultipartFile.transferTo saves the file; synchronous first-line header validation requires the nine documented columns and forbids duplicate names. Invalid headers leave no run or saved upload. UTF-8 BOM is stripped. A trailer is recognized only as the last CSV record; malformed CSV fails with MALFORMED_CSV and a record number, never row contents. Generated binary spill directories are deleted in finally on success or failure. Header/transport extras are ignored with a run-level warning.

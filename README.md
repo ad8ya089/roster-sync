@@ -13,6 +13,17 @@ MoveInSync Backend Case Study 5 (Advanced Track). Java 21 · Spring Boot 4.1 · 
 
 ## Run it
 
+```mermaid
+flowchart LR
+    HR[HR events] --> API[Authenticated API]
+    CSV[Nightly CSV] --> RECON[Bucketed diff and safety brake]
+    API --> DB[(PostgreSQL: employees and receipts)]
+    RECON --> DB
+    DB --> OUTBOX[Transactional outbox]
+    OUTBOX --> SINK[Logs and booking side effects]
+    OPS[Operator] --> RECON
+```
+
 ```bash
 cp .env.example .env
 docker compose up --build
@@ -58,9 +69,9 @@ Office reads allow TRANSPORT_ADMIN and OPERATOR; writes require TRANSPORT_ADMIN.
 
 Higher-version identical snapshots, including DEACTIVATE on INACTIVE employees or tombstones, produce `VersionAdvanced` with outcome `NO_CHANGE`: advance the HR version/timestamp and write no outbox event. `Apply` requires non-empty changed fields and exactly one Employee outbox event. Equal versions with the same content remain `DUPLICATE`. The full rules are in `docs/API.md`.
 
-**Field ownership conflict rule:** every field has exactly one owner (HR: name, email, phone, manager, office, shift, status; transport admin: pickup point, special assistance). A source may change only the fields it owns; non-owned fields in a payload are ignored and reported as the warning `FIELD_NOT_OWNED_BY_SOURCE`. Ownership is configuration (`roster.ownership.transport-owned`).
+**Field ownership conflict rule:** every field has exactly one owner (HR: name, email, phone, manager, office, shift, status; transport admin: pickup point, special assistance). HR payloads ignore non-owned fields with warning `FIELD_NOT_OWNED_BY_SOURCE`; transport PATCH rejects HR-owned keys with 400 and that code. Ownership is configuration (`roster.ownership.transport-owned`).
 
-**Safety brake:** a nightly run that would deactivate ≥ 30 % of active employees (configurable, per tenant) — or whose trailer row count doesn't match — stops in `AWAITING_APPROVAL`; nobody is deactivated until an operator approves.
+**Safety brake:** a nightly run that would deactivate ≥ 30 % of active employees (configurable, per tenant), exceeds the optional missing-count guard, or mismatches trailer/expected row counts stops in `AWAITING_APPROVAL` before any apply. Ratio comparisons use exact arithmetic; zero active employees skip ratio/count guards while row-count checks still apply. An operator may approve all, skip deactivations or reject.
 
 ## Documentation
 
@@ -91,16 +102,16 @@ The benchmark uses three runs in one dedicated 256 MiB JVM, a 200,000-employee s
 
 | Run | Dry-run wall time | Diff phase | Apply 3,132 actions | Sampled peak heap |
 |---|---|---|---|---|
-| 1 | 20.055 s | 19.904 s | 11.894 s | 98.56 MiB |
-| 2 | 14.484 s | 14.344 s | 9.956 s | 122.00 MiB |
-| 3 | 14.948 s | 14.805 s | 10.302 s | 122.06 MiB |
-| **Median** | **14.948 s** | **14.805 s** | **10.302 s** | **122.00 MiB** |
+| 1 | 24.016 s | 23.794 s | 12.739 s | 104.83 MiB |
+| 2 | 15.871 s | 15.732 s | 10.338 s | 111.57 MiB |
+| 3 | 15.812 s | 15.738 s | 9.939 s | 111.77 MiB |
+| **Median** | **15.871 s** | **15.738 s** | **10.338 s** | **111.57 MiB** |
 
-At the selected 40-action default, median mixed-file apply throughput is **304 actions/s**, and the largest chunk across these three runs was **779 ms**. Raw JSON is generated under target when the benchmark runs.
+At the candidate 40-action default, median mixed-file apply throughput is **303 actions/s**, and the largest chunk across the final three runs was **1,265 ms**. The throughput target is met, but the requested maximum below one second is **not yet met consistently**. An earlier three-sample run measured 304 actions/s and a 779 ms maximum; both sets are retained locally. Raw JSON is generated under target when the benchmark runs.
 
 The matched update-only profiling comparison used 1,000 warm-up actions, 5,000 measured actions, chunk 64, the same 256 MiB heap and no coverage agent: **89.6 → 380.3 actions/s (4.25×)**. JDBC execution/batch/commit calls fell from **6.08 → 0.17 per action**. These counts describe JDBC calls, not packet captures. The implementation batches action status updates and outbox inserts, defers flushing, and reads/locks employee sets together.
 
-Timings vary with startup and host load. An additional 40-action JDBC-counting probe measured 258 actions/s with a 246 ms measured maximum and a 1.605 s cold-start maximum; a stressed 64-action probe had a larger cold outlier. Cold bootstrap time is reported separately from the three-run nightly-file result. See [trade-offs](docs/DECISIONS.md).
+Timings vary with startup and host load. Additional 40-action JDBC-counting probes measured 251�258 actions/s with 219�246 ms measured maxima and 0.833�1.605 s cold-start maxima; a stressed 64-action probe had a larger cold outlier. The final nightly-file repeat also exceeded one second, so performance acceptance remains open pending the agreed treatment of cold chunks and further tuning. See [trade-offs](docs/DECISIONS.md).
 
 | k6 HTTP ingest | Duration | VUs | Batches/s | Events/s | HTTP p50 | HTTP p99 | HTTP / outcome failures |
 |---|---|---|---|---|---|---|---|
@@ -122,7 +133,7 @@ Event apply: O(log M) index lookup, O(1) memory. Reconciliation: O(N + M) time, 
 | Benchmark/profile methods | 2; the 200k method executes three samples |
 | **Total including benchmark profile** | **291** |
 
-Normal verification and the focused benchmark executions pass with zero failures/errors/skips. Domain line coverage is **99.45% (359/361)**; JaCoCo renders its report at target/site/jacoco/index.html without a gate. Coverage includes ordering, idempotency, version-only updates, ownership, tenant/role isolation, rollback, real-context restart recovery, publisher concurrency, rehire, streaming/200k safety brake, management isolation, rollback-safe caches and PII boundaries. [Testing details](docs/TESTING.md).
+The final unfiltered `./mvnw -B verify -Pbenchmark` passes all 291 tests with zero failures/errors/skips. Performance timings are measurements; the one-second chunk target remains open as stated above. Domain line coverage is **99.45% (359/361)**; JaCoCo renders its report at target/site/jacoco/index.html without a gate. Coverage includes ordering, idempotency, version-only updates, ownership, tenant/role isolation, rollback, real-context restart recovery, publisher concurrency, rehire, streaming/200k safety brake, management isolation, rollback-safe caches and PII boundaries. [Testing details](docs/TESTING.md).
 
 ## Demo video
 [Demo video — recording pending](https://example.com/REPLACE_WITH_DEMO_VIDEO)

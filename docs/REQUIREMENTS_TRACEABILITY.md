@@ -70,7 +70,7 @@ Every sentence of the case-study PDF, mapped to design, code and proof. Agents m
 | K2 | Show a test that replays the same feed twice and changes nothing | `ReplayIdempotencyIT` | itself | done — Phase 4 API/domain/integration proof passes |
 | K3 | Safety brake threshold configurable | property `BRAKE_MAX_MISSING_RATIO`, per-tenant `PUT /settings/reconciliation` | `SafetyBrakeTest`, `ReconciliationFlowIT.thresholdChangeTakesEffect` | done — Phase 6 streaming upload/diff/brake/apply and 200k truncation proof |
 | K4 | Never write personal data into logs or error reports. Use employee IDs | `SECURITY.md §4` | `ErrorHandlingIT`, `PiiLeakIT` | done — PiiLeakIT covers API, auth, conflict, recon bad rows, publishing and operational stores |
-| K5 | Diff a 200,000-row snapshot in under 60 s with bounded memory | `ReconciliationBenchmarkIT` | README benchmark table | done — three-run 256 MiB benchmark; median dry-run wall time 14.948s for 199,190 rows from 200k employees |
+| K5 | Diff a 200,000-row snapshot in under 60 s with bounded memory | `ReconciliationBenchmarkIT` | README benchmark table | done — three-run 256 MiB benchmark; final median dry-run wall time 15.871s for 199,190 rows from 200k employees |
 | K6 | Run a test that crashes the process between the DB write and the event publish | `OutboxCrashRecoveryIT.crashAfterCommitBeforePublish` (+ live kill -9 demo) | itself | done — Phase 5 restart recovery and side-effect proof pass |
 
 ## Plus points (overall evaluation criteria)
