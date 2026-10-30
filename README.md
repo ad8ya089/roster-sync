@@ -2,7 +2,7 @@
 
 MoveInSync Backend Case Study 5 (Advanced Track). Java 21 · Spring Boot 4.1 · PostgreSQL 17 · one `docker compose up`.
 
-> Status: **Local implementation and Phase 8 measurements are available.** AWS deployment awaits account details and approval of the concrete resource/cost plan. Video and live URL links remain explicit placeholders below.
+> Status: **Local implementation and Phase 8 measurements are available.** AWS authentication is verified; the Sydney deployment resource/cost proposal awaits approval. Video and live URL links remain explicit placeholders below.
 
 ## Target behavior
 
@@ -111,7 +111,7 @@ At the candidate 40-action default, median mixed-file apply throughput is **303 
 
 The matched update-only profiling comparison used 1,000 warm-up actions, 5,000 measured actions, chunk 64, the same 256 MiB heap and no coverage agent: **89.6 → 380.3 actions/s (4.25×)**. JDBC execution/batch/commit calls fell from **6.08 → 0.17 per action**. These counts describe JDBC calls, not packet captures. The implementation batches action status updates and outbox inserts, defers flushing, and reads/locks employee sets together.
 
-Timings vary with startup and host load. Additional 40-action JDBC-counting probes measured 251�258 actions/s with 219�246 ms measured maxima and 0.833�1.605 s cold-start maxima; a stressed 64-action probe had a larger cold outlier. The final nightly-file repeat also exceeded one second, so performance acceptance remains open pending the agreed treatment of cold chunks and further tuning. See [trade-offs](docs/DECISIONS.md).
+Timings vary with startup and host load. Additional 40-action JDBC-counting probes measured 251–258 actions/s with 219–246 ms measured maxima and 0.833–1.605 s cold-start maxima; a stressed 64-action probe had a larger cold outlier. The final nightly-file repeat also exceeded one second, so performance acceptance remains open pending the agreed treatment of cold chunks and further tuning. See [trade-offs](docs/DECISIONS.md).
 
 | k6 HTTP ingest | Duration | VUs | Batches/s | Events/s | HTTP p50 | HTTP p99 | HTTP / outcome failures |
 |---|---|---|---|---|---|---|---|
@@ -138,9 +138,9 @@ The final unfiltered `./mvnw -B verify -Pbenchmark` passes all 291 tests with ze
 ## Demo video
 [Demo video — recording pending](https://example.com/REPLACE_WITH_DEMO_VIDEO)
 
-[Live API — account and deployment approval pending](https://YOUR-DOMAIN.example)
+[Live API — deployment approval pending](https://YOUR-DOMAIN.example)
 
-Both links are placeholders. The repeatable local demo and sample requests are available now. [Deployment plan and private management access](docs/DEPLOYMENT.md).
+Both links are placeholders. The planned AWS region is **Sydney (`ap-southeast-2`)**, with domain `rostersync-aditya.duckdns.org`; it is not live yet. The repeatable local demo and sample requests are available now. [Deployment plan and private management access](docs/DEPLOYMENT.md).
 
 ## Local verification status
 

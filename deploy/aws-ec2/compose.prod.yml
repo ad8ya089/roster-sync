@@ -1,0 +1,59 @@
+# Standalone production file: do not merge local monitoring/port mappings.
+name: rostersync
+services:
+  db:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_USER: roster
+      POSTGRES_DB: rostersync
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Fetch from SSM into the private .env}
+    command: [postgres, -c, shared_buffers=256MB]
+    volumes: [pgdata:/var/lib/postgresql/data]
+    mem_limit: 512m
+    restart: unless-stopped
+    healthcheck:
+      test: [CMD-SHELL, 'pg_isready -U roster -d rostersync']
+      interval: 5s
+      timeout: 5s
+      retries: 20
+    logging: &rotation
+      driver: json-file
+      options: {max-size: 10m, max-file: '3'}
+  app:
+    build: {context: ../..}
+    env_file: ../../.env
+    environment:
+      SPRING_PROFILES_ACTIVE: prod,demo
+      SPRING_DATASOURCE_URL: jdbc:postgresql://db:5432/rostersync?reWriteBatchedInserts=true
+      SPRING_DATASOURCE_USERNAME: roster
+      JAVA_OPTS: -Xms128m -Xmx768m -XX:+ExitOnOutOfMemoryError
+      AWS_REGION: ap-southeast-2
+    ports: ['127.0.0.1:8081:8081']
+    volumes: [appdata:/data]
+    mem_limit: 1152m
+    depends_on: {db: {condition: service_healthy}}
+    restart: unless-stopped
+    healthcheck:
+      test: [CMD, curl, --fail, --silent, 'http://localhost:8081/actuator/health/readiness']
+      interval: 5s
+      timeout: 5s
+      start_period: 40s
+      retries: 20
+    logging: *rotation
+  caddy:
+    image: caddy:2-alpine
+    environment: {DOMAIN: rostersync-aditya.duckdns.org}
+    ports: ['80:80', '443:443']
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddydata:/data
+      - caddyconfig:/config
+    mem_limit: 128m
+    depends_on: {app: {condition: service_healthy}}
+    restart: unless-stopped
+    logging: *rotation
+volumes:
+  pgdata:
+  appdata:
+  caddydata:
+  caddyconfig:

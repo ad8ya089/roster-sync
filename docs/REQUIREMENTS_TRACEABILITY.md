@@ -106,6 +106,6 @@ Every sentence of the case-study PDF, mapped to design, code and proof. Agents m
 | N4 | Clean layered code, meaningful names; core algorithm in plain classes testable without web server or DB | `domain` package, `ArchitectureTest` | done — pure Java decision/diff/brake core with ArchUnit enforcing dependency boundaries |
 | N5 | Unit tests for core logic + concurrency, failure, benchmark tests; normal inputs AND edge cases | `TESTING.md` | done — unit/property/architecture, real PostgreSQL concurrency/recovery and bounded-heap benchmark tests |
 | N6 | README: how to run, assumptions, benchmark results, trade-offs note | `README.md` | done — run instructions, precise rules, measured results, test counts and trade-offs linked |
-| N7 | Public GitHub repo; meaningful commit history, not one giant commit | Conventional Commits, small verified commits | partial — logical verified local commits; public GitHub publication awaits account access and explicit push authorization |
+| N7 | Public GitHub repo; meaningful commit history, not one giant commit | Conventional Commits, small verified commits | done — public ad8ya089/roster-sync main contains all 72 implementation commits; verified full-history Gitleaks has no findings |
 | N8 | Demo video: main flows, one failure scenario live, sample API calls (Postman/curl) | `docs/DEMO_SCRIPT.md`, `scripts/demo.sh`, `postman/` collection | partial — automated curl demo, crash proof and Postman collection ready; video recording pending |
 

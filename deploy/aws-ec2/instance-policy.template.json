@@ -1,0 +1,23 @@
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "WriteOnlyProjectBackups",
+      "Effect": "Allow",
+      "Action": ["s3:PutObject", "s3:AbortMultipartUpload"],
+      "Resource": "arn:aws:s3:::rostersync-backups-${AWS_ACCOUNT_ID}-ap-southeast-2/backups/*"
+    },
+    {
+      "Sid": "ReadProjectSecrets",
+      "Effect": "Allow",
+      "Action": ["ssm:GetParameter", "ssm:GetParameters"],
+      "Resource": "arn:aws:ssm:ap-southeast-2:${AWS_ACCOUNT_ID}:parameter/rostersync/*"
+    },
+    {
+      "Sid": "RestrictManagedCoreParameterReadGrant",
+      "Effect": "Deny",
+      "Action": ["ssm:GetParameter", "ssm:GetParameters", "ssm:GetParametersByPath"],
+      "NotResource": "arn:aws:ssm:ap-southeast-2:${AWS_ACCOUNT_ID}:parameter/rostersync/*"
+    }
+  ]
+}

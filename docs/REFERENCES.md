@@ -21,7 +21,7 @@
 | AWS App Runner availability change | AWS docs — https://docs.aws.amazon.com/apprunner/latest/dg/apprunner-availability-change.html | DEPLOYMENT option F |
 | ECS Express Mode | AWS What's New (Nov 2025) — https://aws.amazon.com/about-aws/whats-new/2025/11/announcing-amazon-ecs-express-mode/ | DEPLOYMENT option C |
 | Fargate / ALB / IPv4 costs | Cloudburn, *AWS Fargate Pricing* (2026) — https://cloudburn.io/blog/aws-fargate-pricing ; AWS blog, *public IPv4 address charge* — https://aws.amazon.com/blogs/aws/new-aws-public-ipv4-address-charge-public-ip-insights | cost table |
-| EC2 t4g.small price | Holori calculator — https://calculator.holori.com/aws/ec2/t4g.small/us-east-1 | cost table |
+| Sydney EC2/EBS prices | [AWS regional price list](https://pricing.us-east-1.amazonaws.com/offers/v1.0/aws/AmazonEC2/current/ap-southeast-2/index.csv) | selected-region on-demand estimate; the pricing distribution hostname is global |
 | Lightsail bundles | Cloudburn, *Amazon Lightsail Pricing 2026* — https://cloudburn.io/blog/amazon-lightsail-pricing | option E |
 | AWS Free Tier (credit-based, since July 2025) | https://aws.amazon.com/free | budget note |
 | Render free tier limits | Render free-tier summaries (15-min sleep, 30-day Postgres) — https://livemy.app/blog/render-pricing | fallback |
