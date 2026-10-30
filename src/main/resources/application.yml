@@ -27,6 +27,8 @@ server:
     include-stacktrace: never
     include-binding-errors: never
   tomcat:
+    # Allow a modest oversized JSON body to drain after 413 instead of resetting the socket.
+    max-swallow-size: ${OVERSIZE_SWALLOW_LIMIT:4MB}
     accesslog:
       enabled: false
 

@@ -36,5 +36,7 @@ public final class EventBodyLimitFilter extends OncePerRequestFilter {
     private void tooLarge(HttpServletResponse response) throws IOException {
         response.setStatus(413); response.setContentType(MediaType.APPLICATION_PROBLEM_JSON_VALUE);
         mapper.writeValue(response.getOutputStream(), GlobalExceptionHandler.problem(ErrorCode.PAYLOAD_TOO_LARGE));
+        // Commit the error before Tomcat discards the remaining oversized request body.
+        response.flushBuffer();
     }
 }

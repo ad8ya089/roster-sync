@@ -34,7 +34,8 @@ public class HrEventInputParser {
             if (METADATA.contains(key)) continue;
             var field = Arrays.stream(EmployeeField.values()).filter(value -> value.jsonName().equals(key)).findFirst();
             if (field.isEmpty()) unknown.add(key.matches("[A-Za-z][A-Za-z0-9_]{0,63}") ? key : "unknownField");
-            else fields.put(field.get(), "DEACTIVATE".equals(type) ? null : string(raw, key, errors));
+            else fields.put(field.get(), "DEACTIVATE".equals(type) || policy.ownerOf(field.get()) != FieldOwner.HR
+                    ? null : string(raw, key, errors));
         }
         // Email normalises before validation. Phone keeps its exact input through validation.
         if (fields.containsKey(EmployeeField.EMAIL)) fields.put(EmployeeField.EMAIL, EmployeeField.EMAIL.canonicalValue(fields.get(EmployeeField.EMAIL)));
@@ -42,7 +43,8 @@ public class HrEventInputParser {
         errors.addAll(checked.errors());
         var validation = new ValidationResult(errors, checked.warnings());
         String safeId = employeeId != null && employeeId.matches("[A-Za-z0-9_-]{1,64}") ? employeeId : null;
-        if (!validation.valid()) return new ParsedEvent(null, safeId, version, "UNKNOWN", validation);
+        if (!validation.valid()) return new ParsedEvent(null, safeId, version,
+                Set.of("CREATE","UPDATE","DEACTIVATE").contains(type == null ? "" : type) ? type : "UNKNOWN", validation);
         var kept = policy.filter(WriteSource.HR_EVENT, fields).kept();
         var normalized = new EnumMap<EmployeeField, String>(EmployeeField.class);
         kept.forEach((field,value) -> normalized.put(field, field == EmployeeField.PHONE ? value : field.canonicalValue(value)));

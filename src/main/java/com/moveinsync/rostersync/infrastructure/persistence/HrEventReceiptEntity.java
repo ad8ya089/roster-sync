@@ -9,6 +9,7 @@ public class HrEventReceiptEntity extends TenantScopedEntity {
     @Column(nullable = false) private long version;
     @Column(name = "event_id", length = 100) private String eventId;
     @Column(name = "event_type", nullable = false, length = 12) private String eventType;
+    @org.hibernate.annotations.JdbcTypeCode(org.hibernate.type.SqlTypes.CHAR)
     @Column(name = "payload_hash", nullable = false, length = 64, columnDefinition = "char(64)") private String payloadHash;
     @Column(nullable = false, length = 16) private String outcome;
     @Column(length = 200) private String warnings;

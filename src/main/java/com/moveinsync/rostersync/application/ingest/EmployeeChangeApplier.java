@@ -56,6 +56,7 @@ public class EmployeeChangeApplier {
                     String code = change.newSnapshot().officeCode();
                     if (code != null) {
                         office = offices.findForShare(tenantId, code).orElseThrow(() -> rejected("UNKNOWN_OFFICE"));
+                        offices.refreshForShare(tenantId, office);
                         if (!office.isActive()) throw rejected("INACTIVE_OFFICE");
                     }
                     if (employee == null) {
@@ -76,6 +77,7 @@ public class EmployeeChangeApplier {
                 // Recheck a submitted office even on identical updates; DEACTIVATE submits no office.
                 if (command.type() != HrEventType.DEACTIVATE && current.snapshot().officeCode() != null) {
                     var office = offices.findForShare(tenantId, current.snapshot().officeCode()).orElseThrow(() -> rejected("UNKNOWN_OFFICE"));
+                    offices.refreshForShare(tenantId, office);
                     if (!office.isActive()) throw rejected("INACTIVE_OFFICE");
                 }
                 employee.advanceHrVersion(advanced.newVersion(), now);
