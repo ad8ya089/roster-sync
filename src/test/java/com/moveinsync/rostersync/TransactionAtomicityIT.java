@@ -23,7 +23,7 @@ class TransactionAtomicityIT extends AbstractIngestionIntegrationTest {
             assertThat(cached.isActive()).isTrue();
             jdbc.update("UPDATE office SET active=false WHERE tenant_id=? AND code='BLR-1'",JwtTestTokens.ACME);
             assertThat(cached.isActive()).isTrue();
-            assertThat(officeRows.refreshForShare(JwtTestTokens.ACME,cached).isActive()).isFalse();
+            assertThat(officeRows.refreshPlain(JwtTestTokens.ACME,cached).isActive()).isFalse();
             status.setRollbackOnly(); return null;
         });
     }

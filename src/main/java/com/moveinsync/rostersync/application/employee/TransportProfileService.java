@@ -50,8 +50,8 @@ public class TransportProfileService {
         if (changed.isEmpty()) return EmployeeView.from(employee);
         OfficeEntity office=null;
         if (fields.containsKey(EmployeeField.OFFICE_CODE) && fields.get(EmployeeField.OFFICE_CODE) != null) {
-            office=offices.findForShare(tenantId,fields.get(EmployeeField.OFFICE_CODE)).orElseThrow(NotFoundException::new);
-            offices.refreshForShare(tenantId,office);
+            office=offices.findByTenantIdAndCode(tenantId,fields.get(EmployeeField.OFFICE_CODE)).orElseThrow(NotFoundException::new);
+            offices.refreshPlain(tenantId,office);
             if (!office.isActive()) invalid(List.of(new FieldError("officeCode","INACTIVE_OFFICE")));
         }
         var now=clock.instant();

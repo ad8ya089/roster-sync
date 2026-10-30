@@ -102,3 +102,6 @@ Kafka/RabbitMQ, Debezium, Redis, Kubernetes, an OIDC provider, refresh tokens, P
 - Outbox JSONB is serialized with Boot's Jackson 3 JsonMapper and bound using CAST(? AS jsonb) on the JpaTransactionManager connection.
 
 For early JSON body rejection, Tomcat drains at most 4 MiB (OVERSIZE_SWALLOW_LIMIT), while the application body remains capped at 2 MiB plus one detection byte. The bounded drain lets modest oversized requests receive their 413 response. See the [Tomcat HTTP connector reference](https://tomcat.apache.org/tomcat-11.0-doc/config/http.html#Standard_Implementation) for maxSwallowSize; both declared/chunked integration checks and the Compose curl oversized-body check pass.
+
+## Office-read follow-up (Phase 5 entry)
+The previous office mode was JPA PESSIMISTIC_READ (PostgreSQL FOR SHARE), including refresh. It is now a plain READ COMMITTED lookup/refresh with LockModeType.NONE: office rows are not locked by ingestion. A deactivation just after the read is a benign race; the FK guarantees existence and the next event observes the inactive office. This avoids per-office contention and multixact overhead. Employee version/order locks remain unchanged.
