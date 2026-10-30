@@ -14,6 +14,8 @@ public class SinkDispatcher {
     private final com.moveinsync.rostersync.infrastructure.metrics.RosterMetrics metrics;
     public SinkDispatcher(List<EventSink> sinks,@Qualifier("sinkExecutor") ExecutorService executor,RosterProperties properties,com.moveinsync.rostersync.infrastructure.metrics.RosterMetrics metrics) {
         this.sinks=List.copyOf(sinks); this.executor=executor; timeoutMillis=properties.outbox().sinkTimeout().toMillis();this.metrics=metrics;
+        for(var sink:this.sinks)for(var type:com.moveinsync.rostersync.domain.outbox.OutboxEventType.values())
+            if(sink.supports(type.wireName()))metrics.registerSink(sink.name(),type.wireName());
     }
     public void dispatch(OutboxEventView event) {
         // Timeout completes the future, not the running sink. Late completion can race redelivery:

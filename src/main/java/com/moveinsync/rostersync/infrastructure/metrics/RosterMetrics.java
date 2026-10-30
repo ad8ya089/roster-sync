@@ -18,13 +18,34 @@ public class RosterMetrics {
     // Aggregate p99 across outcomes without exporting a second copy of every observation.
     private final SimpleMeterRegistry summaryRegistry=new SimpleMeterRegistry();
     private final Timer allApplies=Timer.builder("roster.apply.duration").publishPercentiles(.5,.99).register(summaryRegistry);
-    public RosterMetrics(MeterRegistry registry,Clock clock){this.registry=registry;this.clock=clock;since=clock.instant();}
+    public RosterMetrics(MeterRegistry registry,Clock clock){this.registry=registry;this.clock=clock;since=clock.instant();registerCatalogue();}
+    private void registerCatalogue(){
+        // Finite zero-valued series make an idle/restarted instance observable without
+        // inventing events. Registering a timer does not record a latency/lag sample.
+        for(var outcome:com.moveinsync.rostersync.domain.model.IngestOutcome.values()){
+            applyTimer(outcome.metricTag());
+            for(String type:List.of("CREATE","UPDATE","DEACTIVATE","UNKNOWN"))registry.counter("roster.events","outcome",outcome.metricTag(),"type",type);
+        }
+        lagTimer();for(String reason:List.of("lock_timeout","unique_race","serialization"))registry.counter("roster.apply.retries","reason",reason);
+        for(var code:ErrorCode.values())for(String source:List.of("api","file"))registry.counter("roster.rejections","reason",code.name(),"source",source);
+        for(String reason:List.of("MALFORMED_CSV","APPLY_FAILED"))registry.counter("roster.rejections","reason",reason,"source","file");
+        registry.counter("side.effects.bookings.cancelled");registry.counter("side.effects.seats.freed");registry.counter("side.effects.skipped","reason","reactivated");
+        for(String status:List.of("PLANNED","AWAITING_APPROVAL","COMPLETED","REJECTED","FAILED"))registry.counter("recon.runs","status",status);
+        for(String reason:List.of("ROW_COUNT_MISMATCH","MISSING_RATIO","MISSING_COUNT"))registry.counter("recon.brake.tripped","reason",reason);
+        for(var action:com.moveinsync.rostersync.domain.recon.ActionType.values())for(String result:List.of("APPLIED","SUPERSEDED","SKIPPED","FAILED"))registry.counter("recon.actions","action",action.name(),"result",result);
+        for(String phase:List.of("parse","diff","apply"))registry.timer("recon.phase.duration","phase",phase);
+        registry.counter("recon.rows.rejected");
+        for(var type:com.moveinsync.rostersync.domain.outbox.OutboxEventType.values())registry.counter("outbox.publish.failures","sink","executor","event_type",type.wireName());
+    }
+    public void registerSink(String sink,String type){for(String name:List.of("outbox.published","outbox.publish.failures","outbox.retries"))registry.counter(name,"sink",sink,"event_type",type);}
+    private Timer applyTimer(String outcome){return Timer.builder("roster.apply.duration").tag("outcome",outcome).publishPercentiles(.5,.99).publishPercentileHistogram().register(registry);}
+    private Timer lagTimer(){return Timer.builder("roster.ingest.lag").publishPercentiles(.5,.99).publishPercentileHistogram().register(registry);}
     public void event(String outcome,String type,long nanos,Instant occurredAt) {
         registry.counter("roster.events","outcome",outcome,"type",type).increment();
-        Timer.builder("roster.apply.duration").tag("outcome",outcome).publishPercentiles(.5,.99).publishPercentileHistogram().register(registry).record(nanos,TimeUnit.NANOSECONDS);
+        applyTimer(outcome).record(nanos,TimeUnit.NANOSECONDS);
         allApplies.record(nanos,TimeUnit.NANOSECONDS);
         if(occurredAt!=null){var lag=Duration.between(occurredAt,clock.instant());if(!lag.isNegative())
-            Timer.builder("roster.ingest.lag").publishPercentiles(.5,.99).publishPercentileHistogram().register(registry).record(lag);}
+            lagTimer().record(lag);}
     }
     public void retry(String reason){registry.counter("roster.apply.retries","reason",reason).increment();}
     public void rejection(String code,String source) {

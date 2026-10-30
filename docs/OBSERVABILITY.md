@@ -34,6 +34,8 @@ Gauges that need DB queries (`outbox_pending`, `outbox_oldest_pending_age_second
 
 Tags are finite enums or configured sink names. No metric has tenant IDs, employee IDs, usernames or PII tags: adding an ID would multiply every outcome/type/histogram series by the number of tenants or employees. Per-tenant state is available through the authenticated SQL summary. Cache names are declared at startup and Caffeine stats are enabled, allowing Boot to bind both caches automatically.
 
+The finite metric catalogue is registered at startup with zero counts, including retry/failure families and supported sink/event-type pairs. A zero-valued timer has no recorded observation; negative lag still records nothing. This makes every documented family visible on an idle instance without injecting failures or synthetic events.
+
 ## `GET /api/v1/ops/summary` (OPERATOR) — the human-readable 3 AM view
 
 ```json

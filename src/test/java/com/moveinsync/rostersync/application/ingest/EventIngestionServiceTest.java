@@ -37,7 +37,7 @@ class EventIngestionServiceTest {
         when(applier.apply(eq(tenant),eq(command),anyList())).thenThrow(new DataIntegrityViolationException("safe",sql)).thenReturn(ApplyResult.outcome(IngestOutcome.NO_CHANGE));
         assertThat(service.ingest(tenant,List.of(Map.of())).summary().noChange()).isEqualTo(1);
         verify(applier,times(2)).apply(eq(tenant),eq(command),anyList());
-        assertThat(metrics.get("roster.events").tag("outcome","no_change").counter().count()).isEqualTo(1);
+        assertThat(metrics.get("roster.events").tag("outcome","no_change").tag("type","UPDATE").counter().count()).isEqualTo(1);
     }
     @Test void aConflictAuditsAfterTheProxyHasRolledBackAndNeverRetries() {
         prepare(); when(applier.apply(eq(tenant),eq(command),anyList())).thenThrow(new RecordConflictException(7));

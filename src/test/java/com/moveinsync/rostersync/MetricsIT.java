@@ -60,6 +60,13 @@ class MetricsIT extends AbstractReconciliationIntegrationTest {
         clearInvocations(client);
         var scrape=HttpClient.newHttpClient().send(HttpRequest.newBuilder(URI.create("http://localhost:"+managementPort+"/actuator/prometheus")).GET().build(),HttpResponse.BodyHandlers.ofString());
         assertThat(scrape.statusCode()).isEqualTo(200);assertThat(scrape.body()).contains("outbox_pending","recon_runs_awaiting_approval","cache_gets_total");
+        var names=scrape.body().lines().filter(line->!line.isBlank() && !line.startsWith("#")).map(line->line.split("[ {]",2)[0]).collect(java.util.stream.Collectors.toSet());
+        assertThat(names).contains("roster_events_total","roster_rejections_total","roster_ingest_lag_seconds_count","roster_apply_duration_seconds_count","roster_apply_retries_total",
+                "outbox_pending","outbox_oldest_pending_age_seconds","outbox_dead","outbox_published_total","outbox_publish_failures_total","outbox_retries_total",
+                "side_effects_bookings_cancelled_total","side_effects_seats_freed_total","side_effects_skipped_total","recon_runs_total","recon_brake_tripped_total",
+                "recon_runs_awaiting_approval","recon_phase_duration_seconds_count","recon_actions_total","recon_rows_rejected_total","cache_gets_total","cache_evictions_total","cache_size",
+                "jvm_memory_used_bytes","hikaricp_connections_active","hikaricp_connections_pending","http_server_requests_seconds_count");
+        assertThat(names.stream().filter(name->name.endsWith("_bucket"))).containsOnly("roster_apply_duration_seconds_bucket","roster_ingest_lag_seconds_bucket","http_server_requests_seconds_bucket");
         verifyNoInteractions(client);
         assertThat(registry.getMeters()).allSatisfy(meter->assertThat(meter.getId().getTags()).noneMatch(tag->Set.of("tenantId","employeeId","tenant_id","employee_id").contains(tag.getKey())));
     }
