@@ -1,6 +1,6 @@
 # Stop/start and teardown — Sydney
 
-Run in Git Bash/Linux with authenticated AWS CLI. A temporary stop retains EBS and the Elastic IP; those two resources remain chargeable while compute is stopped.
+Run in Git Bash/Linux with authenticated AWS CLI and jq. A temporary stop retains EBS and the Elastic IP; those two resources remain chargeable while compute is stopped.
 
 ```bash
 set -euo pipefail
@@ -33,23 +33,30 @@ aws ec2 terminate-instances --instance-ids "$INSTANCE_ID"
 aws ec2 wait instance-terminated --instance-ids "$INSTANCE_ID"
 # 2. Release the public address and the now-unused security group.
 aws ec2 release-address --allocation-id "$ALLOCATION_ID"
-aws ec2 delete-security-group --group-id "$SG_ID"
+for attempt in $(seq 1 12); do
+  aws ec2 delete-security-group --group-id "$SG_ID" && break
+  ((attempt < 12)) || exit 1
+  sleep 5 # ENI deletion can lag the terminated state.
+done
 # 3. Remove this profile/role, keeping the AWS-managed SSM policy itself.
 aws iam remove-role-from-instance-profile --instance-profile-name rostersync-ec2-profile --role-name rostersync-ec2-role
 aws iam delete-instance-profile --instance-profile-name rostersync-ec2-profile
 aws iam detach-role-policy --role-name rostersync-ec2-role --policy-arn arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore
 aws iam delete-role-policy --role-name rostersync-ec2-role --policy-name rostersync-runtime-policy
-aws iam delete-role --role-name rostersync-ec2-role
+for attempt in $(seq 1 12); do
+  aws iam delete-role --role-name rostersync-ec2-role && break
+  ((attempt < 12)) || exit 1
+  sleep 5 # IAM profile/policy detach is eventually consistent.
+done
 # 4. Delete application parameters and the global budget.
 aws ssm delete-parameters --names /rostersync/JWT_SECRET /rostersync/POSTGRES_PASSWORD /rostersync/DEMO_PASSWORD
 aws budgets delete-budget --region us-east-1 --account-id "$ACCOUNT_ID" --budget-name rostersync-monthly-25-usd
 # 5. Abort incomplete uploads, remove backup objects, then the bucket.
-aws s3api list-multipart-uploads --bucket "$BUCKET" --query 'Uploads[].{Key:Key,UploadId:UploadId}' --output json > /tmp/rostersync-uploads.json
-python3 - <<'PY'
-import json, subprocess
-for upload in json.load(open('/tmp/rostersync-uploads.json')) or []:
-    subprocess.run(['aws','s3api','abort-multipart-upload','--bucket','rostersync-backups-687971794741-ap-southeast-2','--key',upload['Key'],'--upload-id',upload['UploadId']],check=True)
-PY
+aws s3api list-multipart-uploads --bucket "$BUCKET" --output json |
+  jq -r '.Uploads[]? | [.Key,.UploadId] | @tsv' |
+  while IFS=$'\t' read -r key upload_id; do
+    aws s3api abort-multipart-upload --bucket "$BUCKET" --key "$key" --upload-id "$upload_id"
+  done
 aws s3 rm "s3://$BUCKET" --recursive
 aws s3api delete-bucket --bucket "$BUCKET"
 ```

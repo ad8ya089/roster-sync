@@ -132,7 +132,7 @@ Phase 6 JDBC URLs recommend reWriteBatchedInserts=true. The default host URL, Co
 
 ## Sydney resource approval plan
 
-Status: **proposed, not created**. Public-repository preflight on 2026-10-30 passed: remote tree exposes only .env.example among the requested restricted-name matches; anonymous GitHub metadata is PUBLIC; Gitleaks scanned all 72 commits and 1.01 MB with no findings. Live STS identifies AccountFullAccessRole, not root. Sydney's free-tier-eligible filter includes t4g.small and t3.small; both are offered in all three Sydney zones. Free-tier eligibility does not guarantee zero spend or unrestricted create permissions.
+Status: **approved, provisioned and verified**. Public-repository preflight on 2026-10-30 passed: remote tree exposes only .env.example among the requested restricted-name matches; anonymous GitHub metadata is PUBLIC; Gitleaks scanned all 72 commits and 1.01 MB with no findings. Live STS identifies AccountFullAccessRole, not root. Sydney's free-tier-eligible filter includes t4g.small and t3.small; both are offered in all three Sydney zones. Free-tier eligibility does not guarantee zero spend or unrestricted create permissions.
 
 | Resource | Proposed name / configuration |
 |---|---|
@@ -173,9 +173,9 @@ Rates are from the official regional EC2/EBS and S3 price lists, effective 2026-
 
 The USD 25 budget is an alert, **not a hard cap**; the conservative preferred gross estimate is below it. Applicable account credits or temporary trials may reduce the actual bill, but are not assumed in the baseline. No Paid-plan upgrade is authorized. Standard CPU credits avoid surplus CPU-credit charges, but may throttle sustained workloads. Additional backup storage, egress beyond free allowances, taxes and other account usage can change costs. No customer-managed KMS key, NAT gateway, load balancer, RDS or monitoring server is proposed.
 
-After approval: create the scoped budget/IAM/S3/SSM resources, generate secrets through the SDK without printing them, allocate/associate the EIP, bootstrap the reviewed runtime, wait for the human's DuckDNS update, then verify HTTPS, tenant/auth/demo flows, backup upload and private 8081 forwarding. No AWS write API has been executed for this proposal. Bootstrap/deploy/backup automation remains part of the subsequent approved implementation, not a claim of a live deployment.
+Approved sequence: create the scoped budget/IAM/S3/SSM resources, generate secrets through the SDK without printing them, allocate/associate the EIP, bootstrap the reviewed runtime, wait for the human's DuckDNS update, then verify HTTPS, tenant/auth/demo flows, backup upload and private 8081 forwarding. The approved resources have been created. Bootstrap/deploy/backup automation is committed, and the deployment acceptance results are recorded below.
 
-Approved deployment changes: swap is enabled before building, Docker is enabled at boot, daemon and per-service logs rotate at10m/3files, and the host builds before Compose up. t4g.small Standard has no launch credits and a20% baseline per vCPU; the first build can be slow. Bootstrap starts db/app only; start-caddy.sh requires matching DNS. The light demo skips only the200k seed/recon; run on the instance over SSM to retain the real crash step without exposing a Docker socket. Public root responds with service identification and valid HTTPS. Acceptance also checks closed ports22/5432/8080/8081 from the user's machine, reboot recovery and a manually verified S3 backup.
+Approved deployment changes: swap is enabled before building, Docker is enabled at boot, daemon and per-service logs rotate at 10m/3 files, and the host builds before Compose up. t4g.small Standard has no launch credits and a 20% baseline per vCPU; the first build can be slow. Bootstrap starts db/app only; start-caddy.sh requires matching DNS. The light demo skips only the 200k seed/recon; run on the instance over SSM to retain the real crash step without exposing a Docker socket. Public root responds with service identification and valid HTTPS. Acceptance also checks closed ports22/5432/8080/8081 from the user's machine, reboot recovery and a manually verified S3 backup.
 
 Retrieve the demo password yourself in a private terminal (do not paste its output into chat or recordings):
 ```bash
@@ -183,3 +183,15 @@ aws ssm get-parameter --profile moveinsync-dev --region ap-southeast-2 \
   --name /rostersync/DEMO_PASSWORD --with-decryption --query Parameter.Value --output text
 ```
 [Pause/teardown commands](../deploy/aws-ec2/TEARDOWN.md) are documented for the named deployment.
+
+## Live deployment acceptance (2026-10-30, IST)
+
+- Live URL https://rostersync-aditya.duckdns.org, EIP54.253.159.60, instancei-0fd988840111e4f37 inSydney2a. Root200 with a trusted Let's Encrypt YE2certificate valid until2027-01-28; HTTP 308redirects toHTTPS.
+- User-machine TCPprobes:22,5432,8080,8081unreachable;443reachable. Public actuator404; unauthenticated offices401. Private8081readiness UPviaSSM; no management/publicSQLorSSHport was opened.
+- Light demo viaSSM against public HTTPS: PASS run 1793380895_19447.200kseed/reconskipped; realHALT/restart retained and event1079820f-7d93-4969-8d28-2a51b4d21143published after restart. Password not present in its log.
+- sudo reboot viaSSM: bootID0b7cd3d9-749e-43b9-9f76-77bba39e4fd3changed toa8f43d7a-5e48-43da-94c2-c2aa0261d4e4. At87secondsuptime all services were running and readiness UP. No manualservice restart/Composeup was used. Public token issuance succeeded afterward.
+- Cronbackup17:15UTC/22:45IST created backups/rostersync-20261030T171501Z.sql.gz (5188bytes); manualbackupcreated backups/rostersync-20261030T172158Z.sql.gz (13084bytes), confirmedAES256SSE-S3. Bucketprivate/public-accessblockall remains enabled.
+- LiveIAMpolicy was read back; simulation with aws:RequestedRegion=ap-southeast-2 allows projectGetParameter and explicitly denies an outside-project parameter. Without region context the simulator reports the account's regional organizational restriction; that is not a failure of the approved project Allow. The instance itself fetched project SecureStrings using rostersync-ec2-role.
+- Dockerdaemon.json and per-service rotation10m/3; Docker enabled;2GBswap persisted; t4g.smallStandard credits;20GiBencryptedgp3 verified. The budget is rostersync-monthly-25-usd with actual80/100 and forecast100 thresholds.
+
+Pause/resume and exact destructive cleanup commands are in [TEARDOWN.md](../deploy/aws-ec2/TEARDOWN.md). The original local maximum-chunk performance criterion remains open; successful deployment does not change that measurement.

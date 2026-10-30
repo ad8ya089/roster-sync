@@ -2,7 +2,7 @@
 
 MoveInSync Backend Case Study 5 (Advanced Track). Java 21 · Spring Boot 4.1 · PostgreSQL 17 · one `docker compose up`.
 
-> Status: **Local implementation and Phase 8 measurements are available.** AWS authentication is verified; the Sydney deployment resource/cost proposal awaits approval. Video and live URL links remain explicit placeholders below.
+> Status: **Live on AWS Sydney.** HTTPS, the light demo, reboot recovery and encrypted S3 backups are verified. The video recording and the local sub-second maximum-chunk target remain open.
 
 ## Target behavior
 
@@ -138,9 +138,9 @@ The final unfiltered `./mvnw -B verify -Pbenchmark` passes all 291 tests with ze
 ## Demo video
 [Demo video — recording pending](https://example.com/REPLACE_WITH_DEMO_VIDEO)
 
-[Live API — deployment approval pending](https://YOUR-DOMAIN.example)
+[Live API](https://rostersync-aditya.duckdns.org)
 
-Both links are placeholders. The planned AWS region is **Sydney (`ap-southeast-2`)**, with domain `rostersync-aditya.duckdns.org`; it is not live yet. The repeatable local demo and sample requests are available now. [Deployment plan and private management access](docs/DEPLOYMENT.md).
+The video link is a placeholder. The API is live in **Sydney (`ap-southeast-2`)** at `rostersync-aditya.duckdns.org`. The repeatable local demo and sample requests are available now. [Deployment plan and private management access](docs/DEPLOYMENT.md).
 
 ## Local verification status
 
