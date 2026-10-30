@@ -169,7 +169,7 @@ Unknown columns are ignored with a run-level warning; transport columns (e.g. `p
 ### `GET /reconciliation/runs/{runId}` — HR_SYSTEM (own runs), OPERATOR, TRANSPORT_ADMIN
 ```json
 {
-  "runId": "…", "status": "AWAITING_APPROVAL", "dryRun": false, "asOf": "…",
+  "runId": "…", "status": "AWAITING_APPROVAL", "dryRun": false, "asOf": "…", "createdAt": "…",
   "rows": { "total": 120000, "valid": 119990, "rejected": 10 },
   "plan": { "creates": 12, "updates": 340, "heals": 3, "advances": 0, "unchanged": 119635, "staleSkipped": 0, "deactivations": 80010 },
   "brake": {
@@ -184,6 +184,8 @@ Unknown columns are ignored with a run-level warning; transport columns (e.g. `p
 ```
 
 ### `GET /reconciliation/runs?status=&page=` · `GET /reconciliation/runs/{runId}/rejections?page=`
+Run responses include read-only `createdAt` from `recon_run.created_at` (upload time), distinct from `asOf` (when the export was taken). Both detail and list items use this shape.
+
 Rejections list `rowNumber`, `employeeId`, `errorCodes` — never values.
 
 ### `POST /reconciliation/runs/{runId}/approve` — OPERATOR

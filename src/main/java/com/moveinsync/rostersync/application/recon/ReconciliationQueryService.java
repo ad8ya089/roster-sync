@@ -22,7 +22,7 @@ public class ReconciliationQueryService {
         var ratio=(BigDecimal)row.get("brake_ratio_used");
         var decision=new SafetyBrake().evaluate(new BrakeInput(active,missing,number(row,"rows_total"),nullable(row,"trailer_row_count"),nullable(row,"expected_row_count")),
                 new BrakeSettings(ratio==null?new BigDecimal("0.300"):ratio,nullable(row,"brake_count_used")));
-        return new RunView(id,(String)row.get("status"),(Boolean)row.get("dry_run"),instant(row,"as_of"),
+        return new RunView(id,(String)row.get("status"),(Boolean)row.get("dry_run"),instant(row,"as_of"),instant(row,"created_at"),
                 new Rows(number(row,"rows_total"),number(row,"rows_valid"),number(row,"rows_rejected")),
                 new Plan(number(row,"planned_creates"),number(row,"planned_updates"),number(row,"planned_heals"),number(row,"planned_advances"),number(row,"unchanged"),number(row,"stale_skipped"),number(row,"planned_deactivations")),
                 new Brake((Boolean)row.get("brake_tripped"),(String)row.get("brake_reason"),decision.reasons(),active,missing,decision.ratio(),ratio,nullable(row,"brake_count_used"),decision.message()),
@@ -47,7 +47,7 @@ public class ReconciliationQueryService {
     private static Long nullable(Map<String,Object> row,String key){return row.get(key)==null?null:number(row,key);}
     private static Instant instant(Map<String,Object> row,String key){return row.get(key)==null?null:((Timestamp)row.get(key)).toInstant();}
     private static Long duration(Map<String,Object> row,String start,String end){return instant(row,start)==null || instant(row,end)==null?null:Duration.between(instant(row,start),instant(row,end)).toMillis();}
-    public record RunView(UUID runId,String status,boolean dryRun,Instant asOf,Rows rows,Plan plan,Brake brake,long applied,long superseded,Timings timings,String failureReason) { }
+    public record RunView(UUID runId,String status,boolean dryRun,Instant asOf,Instant createdAt,Rows rows,Plan plan,Brake brake,long applied,long superseded,Timings timings,String failureReason) { }
     public record Rows(long total,long valid,long rejected) { }
     public record Plan(long creates,long updates,long heals,long advances,long unchanged,long staleSkipped,long deactivations) { }
     public record Brake(boolean tripped,String reason,List<String> reasons,long activeBefore,long missingActive,BigDecimal missingRatio,BigDecimal thresholdRatio,Long thresholdCount,String message) { }

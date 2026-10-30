@@ -19,6 +19,10 @@ class ReconciliationFlowIT extends AbstractReconciliationIntegrationTest {
         removeFixtureEmployees();send(event("R1",1,"CREATE","BLR-1","S1"));
         var run=finished(upload(header()+row("R1",2,"S2")+row("NEW",1,"S1"),false));
         assertThat(run.status()).isEqualTo("COMPLETED");assertThat(run.plan().updates()).isEqualTo(1);assertThat(run.plan().creates()).isEqualTo(1);
+        var uploadedAt=jdbc.queryForObject("SELECT created_at FROM recon_run WHERE tenant_id=? AND id=?",java.sql.Timestamp.class,JwtTestTokens.ACME,run.runId()).toInstant();
+        assertThat(run.createdAt()).isEqualTo(uploadedAt);
+        var response=request("GET","/api/v1/reconciliation/runs/"+run.runId(),jwt(Role.OPERATOR),null);
+        assertThat(Instant.parse(mapper.readTree(response.body()).get("createdAt").asText())).isEqualTo(uploadedAt);
         assertThat(version("R1")).isEqualTo(2);assertThat(count("hr_event_receipt")).isEqualTo(1);
         assertThat(jdbc.queryForObject("SELECT count(*) FROM outbox_event WHERE payload->>'source'='RECON'",Long.class)).isEqualTo(2);
     }
