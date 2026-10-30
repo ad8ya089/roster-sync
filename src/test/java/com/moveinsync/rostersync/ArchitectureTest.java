@@ -29,13 +29,21 @@ class ArchitectureTest {
     @Test
     void tenantRepositoryMethodsRequireAnExplicitTenantId() {
         for (var type : CLASSES) {
-            if (type.isInterface() && type.getSimpleName().endsWith("Repository")) {
+            if (type.isInterface() && type.getPackageName().contains(".infrastructure.persistence")
+                    && (type.getSimpleName().endsWith("Repository") || type.getSimpleName().endsWith("RepositoryWrites"))) {
                 for (var method : type.getMethods()) {
                     if (type.getSimpleName().equals("AppUserRepository") && method.getName().equals("findByUsername")
                             && method.getRawParameterTypes().size() == 1
                             && method.getRawParameterTypes().getFirst().isEquivalentTo(String.class)) continue;
                     assertThat(method.getRawParameterTypes()).as("Tenant parameter on %s", method.getFullName())
                             .anyMatch(parameter -> parameter.isEquivalentTo(UUID.class));
+                    try {
+                        assertThat(java.util.Arrays.stream(method.reflect().getParameters())
+                                .anyMatch(parameter -> parameter.getType() == UUID.class && parameter.getName().equals("tenantId")))
+                                .as("UUID tenantId parameter on %s", method.getFullName()).isTrue();
+                    } catch (IllegalStateException exception) {
+                        throw new AssertionError("Cannot inspect repository method", exception);
+                    }
                 }
             }
         }

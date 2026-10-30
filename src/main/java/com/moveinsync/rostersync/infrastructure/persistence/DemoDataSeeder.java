@@ -92,7 +92,7 @@ public class DemoDataSeeder implements ApplicationRunner {
                 """, tenantId, code, code, active, Timestamp.from(clock.instant()));
     }
 
-    private void seedUser(UUID tenantId, String username, String role, String employeeId, String passwordHash) {
+    void seedUser(UUID tenantId, String username, String role, String employeeId, String passwordHash) {
         if (!com.moveinsync.rostersync.domain.model.Role.valueOf(role).hasRequiredEmployeeId(employeeId)) {
             throw new IllegalArgumentException("EMPLOYEE users require employee_external_id");
         }

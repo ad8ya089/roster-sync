@@ -10,7 +10,7 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.TestPropertySource;
 
-import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.*;
 
 @ActiveProfiles("demo")
 @TestPropertySource(properties = "roster.demo.password=test-demo-password")
@@ -20,6 +20,15 @@ class DemoDataSeederIT extends AbstractIntegrationTest {
     private DemoDataSeeder seeder;
     @Autowired
     private PasswordEncoder passwordEncoder;
+
+    @Test
+    void rejectsEmployeeUsersWithoutAnExternalIdBeforeWriting() {
+        for (String employeeId : new String[]{null, "", " "}) {
+            assertThatThrownBy(() -> seeder.seedUser(ACME, "INVALID", "EMPLOYEE", employeeId, "unused"))
+                    .isInstanceOf(IllegalArgumentException.class).hasMessage("EMPLOYEE users require employee_external_id");
+        }
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM app_user", Integer.class)).isZero();
+    }
 
     @Test
     void seedsTenantFixturesCredentialsAndCrc32Buckets() {
