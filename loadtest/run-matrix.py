@@ -37,7 +37,7 @@ def reload_sync(value):
 def drain():
     # The single publisher deliberately drains more slowly than peak ingestion.
     # Start each case with an empty queue instead of measuring the previous case's load.
-    deadline = time.monotonic() + 900
+    deadline = time.monotonic() + 1800
     while time.monotonic() < deadline:
         pending = int(sql("SELECT count(*) FROM outbox_event WHERE status='PENDING'"))
         if pending == 0:
