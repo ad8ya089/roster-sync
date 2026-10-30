@@ -38,13 +38,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     [queries],
   );
   const request = useCallback(
-    async <T,>(path: string, init: RequestInit = {}) => {
+    async <T,>(
+      path: string,
+      init: RequestInit = {},
+      responseType: "json" | "blob" = "json",
+    ) => {
       const client = createClient(session?.token, () => {
         // A previous tenant's cancelled query must not clear a newer login.
         if (activeToken.current === session?.token)
           clear("Session expired. Sign in again.");
       });
-      return client<T>(path, init);
+      return client<T>(path, init, responseType);
     },
     [session?.token, clear],
   );

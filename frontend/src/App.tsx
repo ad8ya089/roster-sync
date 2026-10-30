@@ -10,7 +10,12 @@ import { RequireRole } from "./auth/RequireRole";
 import { useAuth } from "./auth/AuthContext";
 import { Layout } from "./components/Layout";
 import { LoginPage } from "./pages/LoginPage";
-import { ReviewEntryPage } from "./pages/ReviewEntryPage";
+import { OpsDashboardPage } from "./pages/OpsDashboardPage";
+import { ReconciliationPage } from "./pages/ReconciliationPage";
+import { DemoToolsPage } from "./pages/DemoToolsPage";
+import { EventConsolePage } from "./pages/EventConsolePage";
+import { EmployeesPage } from "./pages/EmployeesPage";
+import { MePage } from "./pages/MePage";
 import { RunDetailPage } from "./pages/RunDetailPage";
 const StyleguidePage =
   import.meta.env.VITE_STYLEGUIDE === "true"
@@ -32,8 +37,65 @@ function Console() {
           <Route
             path="/"
             element={
+              <Navigate
+                to={
+                  session.claims.role === "OPERATOR"
+                    ? "/ops"
+                    : session.claims.role === "HR_SYSTEM"
+                      ? "/events"
+                      : session.claims.role === "EMPLOYEE"
+                        ? "/me"
+                        : "/employees"
+                }
+                replace
+              />
+            }
+          />
+          <Route
+            path="/ops"
+            element={
+              <RequireRole roles={["OPERATOR"]}>
+                <OpsDashboardPage />
+              </RequireRole>
+            }
+          />
+          <Route
+            path="/demo"
+            element={
+              <RequireRole roles={["OPERATOR"]}>
+                <DemoToolsPage />
+              </RequireRole>
+            }
+          />
+          <Route
+            path="/events"
+            element={
+              <RequireRole roles={["HR_SYSTEM"]}>
+                <EventConsolePage />
+              </RequireRole>
+            }
+          />
+          <Route
+            path="/employees/:employeeId?"
+            element={
+              <RequireRole roles={["OPERATOR", "TRANSPORT_ADMIN"]}>
+                <EmployeesPage />
+              </RequireRole>
+            }
+          />
+          <Route
+            path="/me"
+            element={
+              <RequireRole roles={["EMPLOYEE"]}>
+                <MePage />
+              </RequireRole>
+            }
+          />
+          <Route
+            path="/runs"
+            element={
               <RequireRole roles={["OPERATOR", "HR_SYSTEM", "TRANSPORT_ADMIN"]}>
-                <ReviewEntryPage />
+                <ReconciliationPage />
               </RequireRole>
             }
           />

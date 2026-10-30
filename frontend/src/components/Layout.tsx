@@ -1,12 +1,27 @@
 import { useState } from "react";
 import type { ReactNode } from "react";
-import { ClipboardList, LogOut, Menu, Palette, Route, X } from "lucide-react";
+import {
+  Activity,
+  ClipboardList,
+  FlaskConical,
+  LogOut,
+  Menu,
+  Palette,
+  Route,
+  Send,
+  User,
+  Users,
+  X,
+} from "lucide-react";
 import { Link, NavLink } from "react-router-dom";
 import { useAuth } from "../auth/AuthContext";
+import { useApiQuery } from "../api/useApiQuery";
 
 export function Layout({ children }: { children: ReactNode }) {
   const { session, logout } = useAuth();
   const [expanded, setExpanded] = useState(false);
+  const role = session!.claims.role;
+  const demo = useApiQuery<unknown[]>("/dev/faults", role === "OPERATOR");
   const roles = {
     HR_SYSTEM: "HR integration",
     TRANSPORT_ADMIN: "Transport admin",
@@ -39,10 +54,40 @@ export function Layout({ children }: { children: ReactNode }) {
           {expanded ? <X /> : <Menu />}
         </button>
         <nav aria-label="Main navigation" onClick={() => setExpanded(false)}>
-          {session && session.claims.role !== "EMPLOYEE" && (
-            <NavLink to="/" end>
+          {role === "OPERATOR" && (
+            <NavLink to="/ops">
+              <Activity aria-hidden="true" />
+              Operations
+            </NavLink>
+          )}
+          {role === "HR_SYSTEM" && (
+            <NavLink to="/events">
+              <Send aria-hidden="true" />
+              Event console
+            </NavLink>
+          )}
+          {role !== "EMPLOYEE" && (
+            <NavLink to="/runs" end>
               <ClipboardList aria-hidden="true" />
               Runs
+            </NavLink>
+          )}
+          {["OPERATOR", "TRANSPORT_ADMIN"].includes(role) && (
+            <NavLink to="/employees">
+              <Users aria-hidden="true" />
+              Employees
+            </NavLink>
+          )}
+          {role === "EMPLOYEE" && (
+            <NavLink to="/me">
+              <User aria-hidden="true" />
+              My profile
+            </NavLink>
+          )}
+          {role === "OPERATOR" && demo.isSuccess && (
+            <NavLink to="/demo">
+              <FlaskConical aria-hidden="true" />
+              Demo tools
             </NavLink>
           )}
           {import.meta.env.VITE_STYLEGUIDE === "true" && (

@@ -58,7 +58,7 @@ export function RunDetailPage() {
   if (query.error)
     return (
       <>
-        <Link className="breadcrumb" to="/">
+        <Link className="breadcrumb" to="/runs">
           Reconciliation
         </Link>
         <ErrorNotice error={query.error} />
@@ -68,7 +68,7 @@ export function RunDetailPage() {
   const run = query.data;
   return (
     <article className="run-detail">
-      <Link className="breadcrumb" to="/">
+      <Link className="breadcrumb" to="/runs">
         Reconciliation / Run review
       </Link>
       <header className="page-header">

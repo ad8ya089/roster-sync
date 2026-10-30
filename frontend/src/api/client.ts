@@ -46,6 +46,7 @@ export function createClient(token?: string, expired?: () => void) {
   return async function request<T>(
     path: string,
     init: RequestInit = {},
+    responseType: "json" | "blob" = "json",
   ): Promise<T> {
     const headers = new Headers(init.headers);
     if (token) headers.set("Authorization", `Bearer ${token}`);
@@ -69,6 +70,8 @@ export function createClient(token?: string, expired?: () => void) {
       );
     }
     if (response.status === 204) return undefined as T;
+    if (response.ok && responseType === "blob")
+      return (await response.blob()) as T;
     const text = await response.text();
     if (!response.ok) {
       let problem: Partial<ApiError> = {};
