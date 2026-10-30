@@ -11,13 +11,15 @@ class ReplayIdempotencyIT extends AbstractIngestionIntegrationTest {
         var batch=mapper.readTree(Files.readString(Path.of("samples/feed.json")));
         var events=mapper.convertValue(batch.get("events"),List.class);
         var first=send(events);
-        assertThat(first.summary().applied()).isEqualTo(50);
+        assertThat(first.summary().applied()).isEqualTo(44);
+        assertThat(first.summary().stale()).isEqualTo(3);
+        assertThat(first.summary().duplicate()).isEqualTo(3);
         String before=jdbc.queryForObject("SELECT json_agg(row_to_json(employee) ORDER BY external_id)::text FROM employee WHERE tenant_id=?",String.class,JwtTestTokens.ACME);
         String receipts=jdbc.queryForObject("SELECT json_agg(row_to_json(hr_event_receipt) ORDER BY id)::text FROM hr_event_receipt",String.class);
         long outbox=employeeOutbox(); long receiptCount=count("hr_event_receipt");
         var second=send(events);
         assertThat(second.summary().duplicate()).isEqualTo(50);
-        assertThat(second.results()).allSatisfy(result->assertThat(result.originalOutcome()).isEqualTo(IngestOutcome.APPLIED));
+        assertThat(second.results()).allSatisfy(result->assertThat(result.originalOutcome()).isIn(IngestOutcome.APPLIED,IngestOutcome.STALE));
         assertThat(employeeOutbox()).isEqualTo(outbox);
         assertThat(count("hr_event_receipt")).isEqualTo(receiptCount);
         assertThat(jdbc.queryForObject("SELECT json_agg(row_to_json(employee) ORDER BY external_id)::text FROM employee WHERE tenant_id=?",String.class,JwtTestTokens.ACME)).isEqualTo(before);

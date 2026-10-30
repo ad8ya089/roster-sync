@@ -121,42 +121,6 @@
       "status": "ACTIVE"
     },
     {
-      "eventId": "feed-1-2",
-      "type": "UPDATE",
-      "employeeId": "F0001",
-      "version": 2,
-      "name": "Fixture Employee 1",
-      "email": "f0001@example.test",
-      "phone": "+919800000001",
-      "officeCode": "BLR-1",
-      "shiftCode": "S2",
-      "status": "ACTIVE"
-    },
-    {
-      "eventId": "feed-2-2",
-      "type": "UPDATE",
-      "employeeId": "F0002",
-      "version": 2,
-      "name": "Fixture Employee 2",
-      "email": "f0002@example.test",
-      "phone": "+919800000001",
-      "officeCode": "BLR-1",
-      "shiftCode": "S2",
-      "status": "ACTIVE"
-    },
-    {
-      "eventId": "feed-3-2",
-      "type": "UPDATE",
-      "employeeId": "F0003",
-      "version": 2,
-      "name": "Fixture Employee 3",
-      "email": "f0003@example.test",
-      "phone": "+919800000001",
-      "officeCode": "BLR-1",
-      "shiftCode": "S2",
-      "status": "ACTIVE"
-    },
-    {
       "eventId": "feed-4-2",
       "type": "UPDATE",
       "employeeId": "F0004",
@@ -385,42 +349,6 @@
       "status": "ACTIVE"
     },
     {
-      "eventId": "feed-8-4",
-      "type": "UPDATE",
-      "employeeId": "F0008",
-      "version": 4,
-      "name": "Fixture Employee 8",
-      "email": "f0008@example.test",
-      "phone": "+919800000001",
-      "officeCode": "BLR-1",
-      "shiftCode": "S2",
-      "status": "ACTIVE"
-    },
-    {
-      "eventId": "feed-9-4",
-      "type": "UPDATE",
-      "employeeId": "F0009",
-      "version": 4,
-      "name": "Fixture Employee 9",
-      "email": "f0009@example.test",
-      "phone": "+919800000001",
-      "officeCode": "BLR-1",
-      "shiftCode": "S2",
-      "status": "ACTIVE"
-    },
-    {
-      "eventId": "feed-10-4",
-      "type": "UPDATE",
-      "employeeId": "F0010",
-      "version": 4,
-      "name": "Fixture Employee 10",
-      "email": "f0010@example.test",
-      "phone": "+919800000001",
-      "officeCode": "BLR-1",
-      "shiftCode": "S2",
-      "status": "ACTIVE"
-    },
-    {
       "eventId": "feed-1-5",
       "type": "UPDATE",
       "employeeId": "F0001",
@@ -538,6 +466,78 @@
       "phone": "+919800000001",
       "officeCode": "BLR-2",
       "shiftCode": "S3",
+      "status": "ACTIVE"
+    },
+    {
+      "eventId": "feed-1-2",
+      "type": "UPDATE",
+      "employeeId": "F0001",
+      "version": 2,
+      "name": "Fixture Employee 1",
+      "email": "f0001@example.test",
+      "phone": "+919800000001",
+      "officeCode": "BLR-1",
+      "shiftCode": "S2",
+      "status": "ACTIVE"
+    },
+    {
+      "eventId": "feed-2-2",
+      "type": "UPDATE",
+      "employeeId": "F0002",
+      "version": 2,
+      "name": "Fixture Employee 2",
+      "email": "f0002@example.test",
+      "phone": "+919800000001",
+      "officeCode": "BLR-1",
+      "shiftCode": "S2",
+      "status": "ACTIVE"
+    },
+    {
+      "eventId": "feed-3-2",
+      "type": "UPDATE",
+      "employeeId": "F0003",
+      "version": 2,
+      "name": "Fixture Employee 3",
+      "email": "f0003@example.test",
+      "phone": "+919800000001",
+      "officeCode": "BLR-1",
+      "shiftCode": "S2",
+      "status": "ACTIVE"
+    },
+    {
+      "eventId": "feed-1-1",
+      "type": "CREATE",
+      "employeeId": "F0001",
+      "version": 1,
+      "name": "Fixture Employee 1",
+      "email": "f0001@example.test",
+      "phone": "+919800000001",
+      "officeCode": "BLR-1",
+      "shiftCode": "S1",
+      "status": "ACTIVE"
+    },
+    {
+      "eventId": "feed-2-1",
+      "type": "CREATE",
+      "employeeId": "F0002",
+      "version": 1,
+      "name": "Fixture Employee 2",
+      "email": "f0002@example.test",
+      "phone": "+919800000001",
+      "officeCode": "BLR-1",
+      "shiftCode": "S1",
+      "status": "ACTIVE"
+    },
+    {
+      "eventId": "feed-3-1",
+      "type": "CREATE",
+      "employeeId": "F0003",
+      "version": 1,
+      "name": "Fixture Employee 3",
+      "email": "f0003@example.test",
+      "phone": "+919800000001",
+      "officeCode": "BLR-1",
+      "shiftCode": "S1",
       "status": "ACTIVE"
     }
   ]

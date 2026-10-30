@@ -130,3 +130,5 @@ curl -s localhost:8080/actuator/prometheus -H "authorization: Bearer $OPS" | gre
 Close with the README benchmark table and test count (`mvn verify` summary screenshot).
 
 Phase 4 note for step 4: `/ops/summary` arrives in Phase 7. Until then compare outbox counts using `docker compose exec -T db psql -U roster -d rostersync -At -c 'SELECT count(*) FROM outbox_event'` before/after replay. This checks the same invariant without adding a premature ops endpoint. Publishing and booking side effects remain Phase 5 work.
+
+The mixed feed remains 50 events: first send yields 44 APPLIED, 3 STALE (delayed v2 after v5) and 3 in-batch DUPLICATE; replay yields 50 DUPLICATE with originalOutcome APPLIED/STALE. Three v4 events are replaced by duplicates, keeping the fixture at 50 records.
