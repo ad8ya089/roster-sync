@@ -2,10 +2,14 @@
 set -euo pipefail
 shopt -s inherit_errexit 2>/dev/null || true
 cd "$(dirname "$0")/.."
-for tool in curl jq docker; do command -v "$tool" >/dev/null || { echo "Missing command: $tool" >&2; exit 1; }; done
-if [[ -f .env ]]; then set -a; source <(tr -d '\r' < .env); set +a; fi
+for tool in curl jq; do command -v "$tool" >/dev/null || { echo "Missing command: $tool" >&2; exit 1; }; done
+# An explicitly supplied remote credential must win over the local demo .env.
+provided_password=${DEMO_PASSWORD-}
+if [[ -f .env && ${DEMO_ENV_FILE:-.env} != none ]]; then set -a; source <(tr -d '\r' < .env); set +a; fi
+[[ -z "$provided_password" ]] || DEMO_PASSWORD=$provided_password
 : "${DEMO_PASSWORD:?Set DEMO_PASSWORD in .env or the environment}"
 BASE=${BASE_URL:-http://127.0.0.1:8080}; BASE=${BASE%/}; [[ "$BASE" == */api/v1 ]] || BASE+=/api/v1
+management_requested=${MANAGEMENT_URL+yes}
 MANAGEMENT_URL=${MANAGEMENT_URL:-http://127.0.0.1:8081}
 RUN="$(date +%s)_$RANDOM"; EMPLOYEE="DEMO_${RUN}_EMP"; WORK="target/demo-$RUN"; mkdir -p "$WORK"
 die(){ echo "DEMO FAILED: $*" >&2; exit 1; }
@@ -49,7 +53,11 @@ cleanup_runs(){
 }
 
 step '0–1: readiness, tokens and prior-run cleanup'
-curl -fsS "$MANAGEMENT_URL/actuator/health/readiness" | jq -e '.status=="UP"' >/dev/null
+if [[ ${DEMO_LIGHT:-0} == 1 && -z "$management_requested" ]]; then
+  curl -fsS "${BASE%/api/v1}/" >/dev/null
+else
+  curl -fsS "$MANAGEMENT_URL/actuator/health/readiness" | jq -e '.status=="UP"' >/dev/null
+fi
 HR=$(login acme.hr); ADMIN=$(login acme.admin); OPS=$(login acme.operator); EMP=$(login E1001); GLOBEX=$(login globex.admin)
 api DELETE /dev/faults "$OPS" >/dev/null
 cleanup_runs
@@ -86,6 +94,8 @@ jq '.results[0]|{outcome,warnings}' <<<"$result"
 result=$(api GET "/employees/$EMPLOYEE" "$ADMIN");assert_json "$result" '.shiftCode=="S2" and .transport.pickupPoint=="Gate 3"';jq '{shiftCode,transport}' <<<"$result"
 
 step '7: healthy 200k reconciliation'
+HEALTHY=skipped; CUT=skipped
+if [[ ${DEMO_LIGHT:-0} != 1 ]]; then
 api POST '/dev/seed-employees?count=200000' "$OPS" | jq .
 api GET '/dev/export.csv?mutatePercent=1&dropPercent=0.5&seed=20261030' "$OPS" -o "$WORK/full.csv"
 accepted=$(api POST /reconciliation/runs "$HR" -F "file=@$WORK/full.csv" -F "asOf=$(date -u +%Y-%m-%dT%H:%M:%SZ)")
@@ -103,9 +113,17 @@ echo "ACTIVE unchanged: $before -> $after"
 json PUT /settings/reconciliation "$OPS" '{"maxMissingRatio":0.5}' | jq .
 result=$(json POST "/reconciliation/runs/$CUT/reject" "$OPS" '{"note":"truncated export"}');assert_json "$result" '.status=="REJECTED"'
 json PUT /settings/reconciliation "$OPS" '{"maxMissingRatio":0.3}' >/dev/null
+else
+  echo 'DEMO_LIGHT=1: skipping 200k seed/reconciliation steps 7–8 (demonstrated locally)'
+fi
 
 step '9: actual process crash and outbox recovery'
-BASE_URL="$BASE" MANAGEMENT_URL="$MANAGEMENT_URL" ./scripts/demo-crash.sh
+if [[ ${DEMO_SKIP_CRASH:-0} == 1 ]]; then
+  echo 'DEMO_SKIP_CRASH=1: crash/recovery is checked separately over SSM'
+else
+  command -v docker >/dev/null || die 'Missing command: docker'
+  BASE_URL="$BASE" MANAGEMENT_URL="$MANAGEMENT_URL" ./scripts/demo-crash.sh
+fi
 
 step '10: deactivation cancels future bookings, preserves past ones'
 current=$(api GET /employees/E1002 "$ADMIN");version=$(jq '.hrVersion+1' <<<"$current")
@@ -133,6 +151,12 @@ status=$(curl -sS -o "$WORK/denied.json" -w '%{http_code}' "$BASE/employees/$EMP
 api GET /me "$EMP" | jq -e '.employeeId=="E1001"' >/dev/null
 step '12: operational view'
 api GET /ops/summary "$OPS" | jq .
-curl -fsS "$MANAGEMENT_URL/actuator/prometheus" > "$WORK/prometheus.txt"
-grep -E '^(roster_events_total|outbox_pending|recon_brake_tripped_total)' "$WORK/prometheus.txt"
+if [[ ${DEMO_LIGHT:-0} != 1 || -n "$management_requested" ]]; then
+  curl -fsS "$MANAGEMENT_URL/actuator/prometheus" > "$WORK/prometheus.txt"
+  grep -E '^(roster_events_total|outbox_pending|recon_brake_tripped_total)' "$WORK/prometheus.txt"
+else
+  status=$(curl -sS -o /dev/null -w '%{http_code}' "${BASE%/api/v1}/actuator/health/readiness")
+  [[ "$status" == 404 ]] || die "Public management status=$status"
+  echo 'Management remains private; use SSM forwarding for Prometheus/readiness'
+fi
 echo "DEMO PASS run=$RUN healthyRun=$HEALTHY rejectedRun=$CUT evidence=$WORK"
