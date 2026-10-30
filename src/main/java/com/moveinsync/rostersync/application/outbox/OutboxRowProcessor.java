@@ -32,6 +32,12 @@ public class OutboxRowProcessor {
                         row.getObject(3,UUID.class),row.getString(4),row.getObject(5,Long.class),row.getString(6),row.getString(7),row.getInt(8))).optional();
         if(claimed.isEmpty()) return false;
         var event=claimed.get();
+        var previous=MDC.getCopyOfContextMap();
+        try {MDC.put("tenantId",event.tenantId().toString());MDC.put("eventId",event.eventId().toString());
+            MDC.put(event.eventType().startsWith("Reconciliation")?"runId":"employeeId",event.aggregateId());return dispatch(event);
+        }finally{if(previous==null)MDC.clear();else MDC.setContextMap(previous);}
+    }
+    private boolean dispatch(OutboxEventView event) {
         faults.hit(FaultPoint.OUTBOX_BEFORE_DISPATCH);
         try { dispatcher.dispatch(event); }
         catch(RuntimeException failed) {

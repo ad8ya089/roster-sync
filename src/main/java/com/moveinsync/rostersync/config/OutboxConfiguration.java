@@ -8,9 +8,11 @@ import org.springframework.scheduling.concurrent.ThreadPoolTaskScheduler;
 @Configuration(proxyBeanMethods=false) @EnableScheduling
 public class OutboxConfiguration {
     @Bean BackoffPolicy outboxBackoff(RosterProperties properties) { return new BackoffPolicy(properties.outbox().maxAttempts()); }
-    @Bean(destroyMethod="shutdown") ExecutorService sinkExecutor() {
+    @Bean(destroyMethod="shutdown") ExecutorService sinkExecutor(com.moveinsync.rostersync.infrastructure.metrics.MdcTaskDecorator decorator) {
         return new ThreadPoolExecutor(4,4,0L,TimeUnit.MILLISECONDS,new ArrayBlockingQueue<>(100),
-                Thread.ofPlatform().name("outbox-sink-",0).factory(),new ThreadPoolExecutor.AbortPolicy());
+                Thread.ofPlatform().name("outbox-sink-",0).factory(),new ThreadPoolExecutor.AbortPolicy()) {
+            @Override public void execute(Runnable task){super.execute(decorator.decorate(task));}
+        };
     }
     @Bean ThreadPoolTaskScheduler taskScheduler() {
         var scheduler=new ThreadPoolTaskScheduler(); scheduler.setPoolSize(1); scheduler.setThreadNamePrefix("roster-scheduler-");

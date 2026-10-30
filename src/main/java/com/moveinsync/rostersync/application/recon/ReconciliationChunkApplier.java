@@ -23,11 +23,14 @@ public class ReconciliationChunkApplier {
     public int applyNext(UUID tenantId,UUID runId,int size,String mode) {
         var pending=actions.pending(tenantId,runId,size,true);int applied=0,superseded=0;
         for(var action:pending) {
+            String previous=org.slf4j.MDC.get("employeeId");org.slf4j.MDC.put("employeeId",action.employeeId());
+            try {
             String outcome=action.type()==ActionType.DEACTIVATE && "SKIP_DEACTIVATIONS".equals(mode)?"SKIPPED":employees.applySnapshot(tenantId,action);
             actions.complete(tenantId,runId,action.id(),outcome,null);
             metrics.action(action.type().name(),outcome);
             if(outcome.equals("APPLIED"))applied++;if(outcome.equals("SUPERSEDED"))superseded++;
             faults.hit(FaultPoint.RECON_AFTER_N_ACTIONS);
+            }finally{if(previous==null)org.slf4j.MDC.remove("employeeId");else org.slf4j.MDC.put("employeeId",previous);}
         }
         jdbc.sql("UPDATE recon_run SET applied=applied+?,superseded=superseded+?,heartbeat_at=? WHERE tenant_id=? AND id=? AND status='APPLYING'")
                 .params(applied,superseded,Timestamp.from(clock.instant()),tenantId,runId).update();

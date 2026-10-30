@@ -23,6 +23,7 @@ public class SinkDispatcher {
             var previous=MDC.getCopyOfContextMap();
             try {
                 MDC.put("tenantId",event.tenantId().toString()); MDC.put("eventId",event.eventId().toString());
+                MDC.put(event.eventType().startsWith("Reconciliation")?"runId":"employeeId",event.aggregateId());
                 boolean supported=false;
                 for(var sink:sinks) if(sink.supports(event.eventType())) {
                     supported=true;active.set(sink.name());if(event.attempts()>0)metrics.sinkRetry(sink.name(),event.eventType());
