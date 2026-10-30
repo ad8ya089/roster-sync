@@ -15,6 +15,14 @@ public class OutboxWriter {
     private final JsonMapper mapper;
     public OutboxWriter(JdbcClient jdbc, JsonMapper mapper) { this.jdbc = jdbc; this.mapper = mapper; }
 
+    @Transactional(propagation=Propagation.MANDATORY)
+    public void writeReconBrake(UUID tenantId,UUID runId,String message,Instant at) {
+        UUID eventId=UUID.randomUUID();
+        var payload=Map.of("eventId",eventId,"eventType","ReconciliationBrakeTripped","tenantId",tenantId,"runId",runId,"occurredAt",at,"message",message);
+        jdbc.sql("INSERT INTO outbox_event(event_id,tenant_id,aggregate_type,aggregate_id,event_type,payload,next_attempt_at,created_at) VALUES (?,?,'ReconciliationRun',?,'ReconciliationBrakeTripped',CAST(? AS jsonb),?,?)")
+                .params(eventId,tenantId,runId.toString(),mapper.writeValueAsString(payload),Timestamp.from(at),Timestamp.from(at)).update();
+    }
+
     @Transactional(propagation = Propagation.MANDATORY)
     public void write(UUID tenantId, String employeeId, long version, OutboxEventType type, String source,
                       List<EmployeeField> changedFields, HrSnapshot snapshot, Instant at) {

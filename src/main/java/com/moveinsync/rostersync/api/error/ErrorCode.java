@@ -15,6 +15,7 @@ public enum ErrorCode {
     UNSUPPORTED_MEDIA_TYPE(HttpStatus.UNSUPPORTED_MEDIA_TYPE, "Unsupported media type"),
     OFFICE_CODE_EXISTS(HttpStatus.CONFLICT, "Office code already exists"),
     RECON_RUN_ALREADY_ACTIVE(HttpStatus.CONFLICT, "Reconciliation already active"),
+    RECON_EXPORT_STALE(HttpStatus.CONFLICT, "Reconciliation export is stale"),
     INVALID_RUN_STATE(HttpStatus.CONFLICT, "Invalid run state"),
     INVALID_STATE(HttpStatus.CONFLICT, "Invalid state"),
     INVALID_OUTBOX_STATE(HttpStatus.CONFLICT, "Invalid outbox state"),

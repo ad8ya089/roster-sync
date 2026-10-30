@@ -171,7 +171,7 @@ Unknown columns are ignored with a run-level warning; transport columns (e.g. `p
 {
   "runId": "…", "status": "AWAITING_APPROVAL", "dryRun": false, "asOf": "…",
   "rows": { "total": 120000, "valid": 119990, "rejected": 10 },
-  "plan": { "creates": 12, "updates": 340, "heals": 3, "unchanged": 119635, "staleSkipped": 0, "deactivations": 80010 },
+  "plan": { "creates": 12, "updates": 340, "heals": 3, "advances": 0, "unchanged": 119635, "staleSkipped": 0, "deactivations": 80010 },
   "brake": {
     "tripped": true, "reason": "MISSING_RATIO", "reasons": ["MISSING_RATIO"],
     "activeBefore": 200000, "missingActive": 80010, "missingRatio": 0.4001,
@@ -241,3 +241,5 @@ The receipt payload hash includes event type plus normalized, ownership-filtered
 - GET /ops/alerts?acknowledged=false returns at most 200 recent alerts. POST /ops/alerts/{id}/ack returns 204; repeated acknowledgement preserves its original timestamp/user. Both are tenant-scoped and OPERATOR-only.
 - Faults are demo-instance-wide diagnostic controls, all OPERATOR-only; they are absent with prod alone. POST /dev/faults accepts point, mode, optional oneShot (default true), delayMs (0–60000, default 1000). HALT is refused outside demo with 409 INVALID_STATE even if called internally. GET lists armed faults; DELETE disarms all. Arming is in memory, so restart clears it. DELAY_MS pauses the selected fault point; a sink-delay test exercises the separate dispatch timeout.
 - Sink delivery is at least once. Timeout does not stop work; consumers must deduplicate and check current state/version. Only future SCHEDULED bookings are cancelled, and a delayed deactivation skips an employee who is ACTIVE again.
+
+Phase 6 upload ordering: empty uploads and asOf more than five minutes in the future return 400 VALIDATION_FAILED before any run is created. Invalid/duplicate CSV headers return 400 INVALID_CSV_HEADER, delete the saved upload and create no run. An asOf at or before the tenant's latest COMPLETED export returns 409 RECON_EXPORT_STALE. Ordering applies to whole files too. The completed watermark check and upload acceptance serialize on the tenant row; one active run remains enforced by ux_recon_one_active. ADVANCE is exposed separately as plan.advances and changes only the HR version/timestamp.

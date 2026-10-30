@@ -16,7 +16,7 @@ public final class BucketDiffer {
     public BucketDiff diff(Map<String, FileRow> fileRows, List<DbRow> dbRows, Set<String> presentButInvalid, Instant asOf) {
         var actions = new ArrayList<PlannedAction>();
         var seen = new HashSet<String>();
-        long active = 0, missing = 0, creates = 0, updates = 0, heals = 0, unchanged = 0, stale = 0;
+        long active = 0, missing = 0, creates = 0, updates = 0, heals = 0, advances=0, unchanged = 0, stale = 0;
         for (DbRow row : dbRows) {
             seen.add(row.employeeId());
             if (row.status() == EmploymentStatus.ACTIVE) active++;
@@ -32,9 +32,10 @@ public final class BucketDiffer {
             } else if (file.version() == row.hrVersion() && file.hash().equals(hasher.hash(row.snapshot()))) {
                 unchanged++;
             } else {
-                ActionType type = file.version() == row.hrVersion() ? ActionType.HEAL : ActionType.UPDATE;
+                ActionType type = file.version() == row.hrVersion() ? ActionType.HEAL
+                        : file.hash().equals(hasher.hash(row.snapshot())) ? ActionType.ADVANCE : ActionType.UPDATE;
                 actions.add(new PlannedAction(row.employeeId(), type, file.version(), row.hrVersion(), file.snapshot()));
-                if (type == ActionType.HEAL) heals++; else updates++;
+                if (type == ActionType.HEAL) heals++; else if(type==ActionType.ADVANCE) advances++; else updates++;
             }
         }
         for (FileRow file : fileRows.values()) {
@@ -43,6 +44,6 @@ public final class BucketDiffer {
                 creates++;
             }
         }
-        return new BucketDiff(actions, new DiffCounters(active, missing, creates, updates, heals, unchanged, stale));
+        return new BucketDiff(actions, new DiffCounters(active, missing, creates, updates, heals, advances, unchanged, stale));
     }
 }

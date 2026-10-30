@@ -113,3 +113,6 @@ The previous office mode was JPA PESSIMISTIC_READ (PostgreSQL FOR SHARE), includ
 - Retention is looped in 5,000-row REQUIRES_NEW transactions to release locks between batches. One scheduler instance is assumed; use ShedLock or equivalent coordination before multi-instance scheduling. Runtime timestamps come from Clock; SQL defaults remain schema defaults only.
 - Demo faults are instance-wide diagnostics, not tenant data. HALT is enabled only with demo and requires OPERATOR; prod alone has no dev controllers. Outbox/alert access and mutations always scope by the caller's tenant.
 - Bookings/seats remain a deliberately small JDBC-backed transport stub; bulk cancellation/free-seat operations share the consumer transaction. Employee access stays through tenant-explicit JPA repositories and their row locks.
+
+## ADR-016 Ordering applies to whole files too
+A tenant's completed export is a whole-file watermark: reject asOf <= the last COMPLETED asOf with RECON_EXPORT_STALE. Otherwise an older complete file could deactivate people legitimately added by a newer export. Upload acceptance locks the tenant row around this check and run insertion; employee ordering remains independent. Failed, rejected and dry-run exports do not advance this watermark. Future asOf is limited to five minutes of clock allowance.

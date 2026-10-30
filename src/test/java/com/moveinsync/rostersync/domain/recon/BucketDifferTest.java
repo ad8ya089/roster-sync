@@ -56,9 +56,9 @@ class BucketDifferTest {
     void identicalHashesStillScheduleHigherVersionsAndSkipLowerVersions() {
         var result = differ.diff(Map.of("higher", file("higher", 8, "S1"), "equal", file("equal", 7, "S1"), "lower", file("lower", 6, "S1")),
                 List.of(db("higher", 7, snapshot("S1")), db("equal", 7, snapshot("S1")), db("lower", 7, snapshot("S1"))), Set.of(), NOW);
-        assertThat(result.counters()).isEqualTo(new DiffCounters(3, 0, 0, 1, 0, 1, 1));
+        assertThat(result.counters()).isEqualTo(new DiffCounters(3, 0, 0, 0, 0, 1, 1, 1));
         assertThat(result.actions()).singleElement().satisfies(action -> {
-            assertThat(action.action()).isEqualTo(ActionType.UPDATE);
+            assertThat(action.action()).isEqualTo(ActionType.ADVANCE);
             assertThat(action.fileVersion()).isEqualTo(8);
             var decision = new ChangeDecider(FieldOwnershipPolicy.defaults())
                     .decide(state(7, snapshot("S1")), new UpdateEmployee("higher", 8, null, null, action.payload()), DecisionMode.SNAPSHOT);
