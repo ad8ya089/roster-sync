@@ -23,4 +23,5 @@ MSYS_NO_PATHCONV=1 docker run --rm -i "${network_args[@]}" \
   --mount "type=bind,source=$mount,target=/scripts" \
   -e "BASE_URL=$BASE_URL" -e DEMO_PASSWORD -e "LOAD_VUS=${LOAD_VUS:-20}" \
   -e "LOAD_DURATION=${LOAD_DURATION:-60s}" -e "RUN_ID=${RUN_ID:-$(date +%s)-$RANDOM}" \
+  -e "BATCH_SIZE=${BATCH_SIZE:-50}" \
   "${K6_IMAGE:-grafana/k6:2.3.0}" run /scripts/ingest.js
