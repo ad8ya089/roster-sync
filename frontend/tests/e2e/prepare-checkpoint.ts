@@ -38,7 +38,7 @@ export default async function prepare(config: FullConfig) {
   mkdirSync("test-results", { recursive: true });
   if (process.env.ROSTER_TEST_PROJECT) {
     const project = process.env.ROSTER_TEST_PROJECT;
-    if (!/^roster-sync-(phase9|checkpoint)$/.test(project))
+    if (!/^roster-sync-(phase9|checkpoint|video)$/.test(project))
       throw new Error(
         "Ops fixture requires the isolated Phase 9 Compose project",
       );

@@ -10,6 +10,7 @@ import { RequireRole } from "./auth/RequireRole";
 import { useAuth } from "./auth/AuthContext";
 import { Layout } from "./components/Layout";
 import { LoginPage } from "./pages/LoginPage";
+import { AccountAccessPage } from "./pages/AccountAccessPage";
 import { OpsDashboardPage } from "./pages/OpsDashboardPage";
 import { ReconciliationPage } from "./pages/ReconciliationPage";
 import { DemoToolsPage } from "./pages/DemoToolsPage";
@@ -129,6 +130,7 @@ export function App() {
     <HashRouter>
       <Routes>
         <Route path="/login" element={<LoginPage />} />
+        <Route path="/account-access" element={<AccountAccessPage />} />
         <Route path="*" element={<Console />} />
       </Routes>
     </HashRouter>

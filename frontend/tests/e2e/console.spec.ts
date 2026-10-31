@@ -391,10 +391,16 @@ test("operator generates a truncated export, uploads and rejects it", async ({
   await page
     .getByLabel("Decision note", { exact: true })
     .fill("Checkpoint reviewed; testing a fresh export.");
+  const firstRejection = page.waitForResponse(
+    (response) =>
+      response.url().endsWith(`/reconciliation/runs/${runId}/reject`) &&
+      response.request().method() === "POST",
+  );
   await page
     .getByRole("dialog")
     .getByRole("button", { name: "Reject run", exact: true })
     .click();
+  expect((await firstRejection).status()).toBe(200);
   await expect(page.getByText("Run rejected.", { exact: true })).toBeVisible();
   await visit(page, "/demo", "Demo tools");
   const start = Date.now();
@@ -421,9 +427,15 @@ test("operator generates a truncated export, uploads and rejects it", async ({
   await page
     .getByLabel("Decision note", { exact: true })
     .fill("Broken export; HR will resend.");
+  const secondRejection = page.waitForResponse(
+    (response) =>
+      response.url().endsWith("/reject") &&
+      response.request().method() === "POST",
+  );
   await page
     .getByRole("dialog")
     .getByRole("button", { name: "Reject run", exact: true })
     .click();
+  expect((await secondRejection).status()).toBe(200);
   await expect(page.getByText("Run rejected.", { exact: true })).toBeVisible();
 });

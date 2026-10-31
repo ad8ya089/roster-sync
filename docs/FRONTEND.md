@@ -57,7 +57,7 @@ frontend/
 - `401 TOKEN_EXPIRED` or `UNAUTHENTICATED` from any call → clear token, go to login with "Session expired".
 - `403` → inline "You don't have access to this action" (should be rare because actions are hidden).
 - Header shows: tenant code, username, role, Logout.
-- The login page shows the demo usernames (not passwords) in a small help panel only when the demo profile is detected (§8).
+- The sign-in page links to public `/account-access` help. It explains that staff accounts are prepared in advance, lists the same demo usernames as README and can prefill a username. It never creates an account, grants a role or exposes a password. This review-approved help replaces the earlier hidden username-hints panel.
 
 | Screen | HR_SYSTEM | TRANSPORT_ADMIN | OPERATOR | EMPLOYEE |
 |---|---|---|---|---|
@@ -210,7 +210,7 @@ Versions are strings in the UI model. JSON.parse uses the reviver source-text co
 
 ## 8. Demo-profile detection
 
-`GET /api/v1/dev/faults` as OPERATOR: 200 → demo profile active (show Demo tools and the login help panel); 404/403 → hide. Do not add a new endpoint for this. For the login help panel (before login), show it only when the build-time flag `VITE_DEMO_HINTS=true` (set in local compose builds, false for the AWS build) — never show passwords.
+`GET /api/v1/dev/faults` as OPERATOR: 200 → demo profile active (show Demo tools); 404/403 → hide. Do not add a new endpoint for this. Public account help is independent of this authenticated probe. It lists only the usernames already documented in README and explains private credential access. Passwords remain private in every build. The earlier `VITE_DEMO_HINTS` flag is retained for build compatibility but no longer controls access help.
 
 ## 9. Backend integration (the only server changes allowed)
 

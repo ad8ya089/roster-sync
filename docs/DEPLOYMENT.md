@@ -4,7 +4,7 @@
 
 The Dockerfile builds static console files in a pinned Node 24 stage, copies them into the Maven stage, and keeps the runtime Java-only. Maven verification does not invoke Node. Local jar users may run `scripts/build-frontend.sh`; generated static resources are ignored by Git.
 
-Local Compose enables username hints. The opt-in `VITE_STYLEGUIDE=true` build flag is used only for the local design checkpoint. Both flags default to false in the Dockerfile, including the AWS build. The production Caddyfile's former root-path identification response has been removed so `/` reaches Spring and serves the console; the `/actuator` block remains. This is an explicitly approved routing correction, not an infrastructure change. The live application is not redeployed until the design checkpoint has been approved and the rest of Phase 9 is complete.
+The public sign-in screen links to account/access help, which lists the README's prepared usernames without passwords and can prefill a username. It does not register users or assign permissions. The opt-in `VITE_STYLEGUIDE=true` build flag is used only for the local design checkpoint and defaults to false in the Dockerfile, including the AWS build. `VITE_DEMO_HINTS` remains accepted by older build commands but no longer controls the help page. Caddy forwards `/` to Spring and keeps the `/actuator` block. The Phase 9 design checkpoint and deployment were completed before this presentation/access follow-up.
 
 Static HTML uses no-cache and hashed assets use one-year immutable caching. CSP permits self-hosted fonts and scripts only, with the specified inline-style allowance. The API and management-port permissions remain unchanged.
 
@@ -207,8 +207,25 @@ Pause/resume and exact destructive cleanup commands are in [TEARDOWN.md](../depl
 
 ### Console release
 
-The console is deployed on the existing Sydney instance; no new infrastructure is required. Node exists only in the image build stage. Production builds keep VITE_STYLEGUIDE and VITE_DEMO_HINTS false; prod,demo intentionally exposes demo tools to authenticated OPERATOR users. Caddy forwards / to Spring, blocks /actuator and negotiates zstd/gzip for response compression.
+The console is deployed on the existing Sydney instance; no new infrastructure is required. Node exists only in the image build stage. Production builds keep VITE_STYLEGUIDE false; account help is public and reveals no passwords. The prod,demo combination intentionally exposes demo tools to authenticated OPERATOR users. Caddy forwards / to Spring, blocks /actuator and negotiates zstd/gzip for response compression.
 
 Run deploy/aws-ec2/deploy.sh over SSM: it fast-forwards main, optionally checks EXPECTED_COMMIT, verifies swap, builds before up, waits for db/app health, then force-recreates Caddy. Recreation remounts the current Caddyfile inode after Git replaces a bind-mounted file; named certificate volumes remain intact. A reload alone may read the old inode. Keep all database/upload/credential/certificate volumes.
 
 Release checks include live role/default screens, ordering/replay/no-change/ownership, a small truncated-file brake and rejection, HTTP headers/cache/compression, HTTPS/redirect and external port isolation. The full200k proof stays local; run DEMO_AUTO=1 DEMO_LIGHT=1 on the instance for the real crash/redelivery smoke. Management remains on loopback and uses the documented SSM tunnel.
+
+## Browser reputation warning and CSP diagnostics
+
+On 31 October 2026, the public Google Safe Browsing report for rostersync-aditya.duckdns.org returned “Some pages on this site are unsafe” and a social-engineering category. This is a reported reputation classification, not a finding that a particular repository file is malicious. The owner needs to inspect the specific examples in Google Search Console before a cause can be established.
+
+The live sign-in response still serves HTTPS 200 with the intended Content Security Policy. A clean Chromium context loaded it without application JavaScript errors. The policy permits same-origin scripts and intentionally excludes unsafe-eval. A DevTools message about blocked eval is not the Safe Browsing Security issues report; do not weaken CSP or disable browser protection to conceal either diagnostic.
+
+Owner workflow:
+1. Open https://search.google.com/search-console using the site owner's Google account. Select the site's property, or add the exact URL-prefix property if not verified.
+2. Open Security & Manual Actions > Security issues. Record the category and example URLs. Follow a supported ownership-verification method if required; do not publish private credentials as verification material.
+3. Inspect the affected responses and deployment against the intended source, fix any actual injected/deceptive content, and describe the verified changes accurately.
+4. Request review through Security issues when the underlying issue is addressed. Do not claim a false positive without investigating the listed examples.
+5. Recheck https://transparencyreport.google.com/safe-browsing/search?url=rostersync-aditya.duckdns.org and normal Chrome browsing after review. Keep README's access-status note until the report and browser warning clear.
+
+Google's owner guidance: https://support.google.com/webmasters/answer/6347750 . The review requires owner-account access and may take time; a successful curl/TLS check does not replace it.
+
+For a DuckDNS subdomain whose DNS TXT verification is unavailable, use Search Console's URL-prefix property `https://rostersync-aditya.duckdns.org/` and the HTML-tag method. The owner supplies the public google-site-verification meta tag from their own account. Place that exact tag in `frontend/index.html` head, deploy it and confirm it is in the anonymously served HTML before the owner clicks Verify. This proves ownership only; the separate Security issues review is still required. Do not ask for a Google password or DuckDNS API token. Reference: https://support.google.com/webmasters/answer/9008080 .

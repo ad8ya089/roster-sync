@@ -748,13 +748,41 @@ td.empty-cell {
   margin-top: 16px;
 }
 .login-page {
-  max-width: 1000px;
+  width: 100%;
+  max-width: 1080px;
+  min-height: 100svh;
   margin: auto;
-  padding-top: 60px;
+  padding: 28px 32px;
+}
+.access-header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px 24px;
+}
+.login-page a:not(.brand) {
+  text-decoration: underline;
+}
+.access-content {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 390px);
+  gap: 64px;
+  align-items: start;
+  margin: clamp(28px, 8vh, 84px) 0 24px;
+}
+.access-intro p {
+  max-width: 48ch;
+  margin: 16px 0;
+  color: var(--ink-muted);
 }
 .login-form {
-  max-width: 420px;
-  margin: 65px 0 0;
+  min-width: 0;
+  border-left: 1px solid var(--rule);
+  padding-left: 32px;
+}
+.login-form h2 {
+  margin-bottom: 20px;
 }
 .login-form > p {
   margin: 12px 0 24px;
@@ -765,14 +793,71 @@ td.empty-cell {
   margin: 22px 0 16px;
   width: 100%;
 }
-.login-form details {
-  margin-top: 26px;
-  border-top: 1px solid var(--rule);
-  padding-top: 15px;
+.login-form .help {
+  margin: 6px 0 12px;
 }
-.login-form details p {
-  color: var(--ink-muted);
+.signin-error {
+  border-left: 2px solid var(--failed);
+  padding: 8px 12px;
+  margin-top: 12px;
+}
+.signin-error p {
+  color: var(--failed);
+}
+.signin-error details {
   margin-top: 8px;
+}
+.signin-error .code {
+  display: block;
+  margin-top: 8px;
+}
+.account-access {
+  max-width: 720px;
+  margin: 32px auto 0;
+}
+.account-access h1 {
+  margin: 20px 0 12px;
+}
+.account-access > p {
+  color: var(--ink-muted);
+}
+.access-accounts {
+  list-style: none;
+  margin: 24px 0;
+  padding: 0;
+}
+.access-accounts li {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px 24px;
+  border-top: 1px solid var(--rule);
+  padding: 16px 0;
+}
+.access-accounts p {
+  color: var(--ink-muted);
+  margin: 4px 0;
+}
+.access-accounts li > div {
+  min-width: 0;
+  flex: 1 1 360px;
+}
+@media (max-width: 760px) {
+  .access-content {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 28px;
+    max-width: 480px;
+    margin: 28px auto 0;
+  }
+  .login-form {
+    border-left: 0;
+    border-top: 1px solid var(--rule);
+    padding: 20px 0 0;
+  }
+  .login-page {
+    padding: 20px;
+  }
 }
 .review-entry {
   max-width: 560px;
@@ -1075,10 +1160,10 @@ td.empty-cell {
     margin-bottom: 19px;
   }
   .login-page {
-    padding-top: 30px;
+    padding-top: 20px;
   }
   .login-form {
-    margin-top: 45px;
+    margin-top: 0;
   }
 }
 @media (prefers-reduced-motion: reduce) {
