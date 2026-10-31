@@ -130,11 +130,29 @@ The API first checks authentication, role and company scope. For each parsed eve
 
 For a valid record, a transaction reserves the employee-version receipt, locks the employee row, and decides what to change. The employee update, final receipt and outbox insert commit together. Concurrent requests for the same key use PostgreSQL's unique constraint as the arbiter. A transaction that rolls back leaves no partial state or consumed key. Business decisions live in plain Java classes such as `ChangeDecider`; the application service owns the transaction.
 
+<details>
+<summary>Event transaction and asynchronous delivery sequence</summary>
+
+![Per-record validation, transactional employee receipt outbox writes and independent publishing](docs/diagrams/event-sequence.png)
+
+The expanded write branch shows a newer version. Replay, stale and conflict outcomes follow the rules table below and do not change employee business fields or write an Employee event. A dependency outage stops the batch with 503; earlier record commits remain durable. The publisher is independent and can deliver after commit before the HTTP response finishes.
+
+</details>
+
 ### At night: compare a full export before applying a plan
 
 The upload becomes a durable reconciliation run. The service reads the CSV as a stream, validates its records and spills them into 256 buckets by employee ID. It compares one bucket at a time with the matching database rows, rather than building two complete in-memory maps.
 
 The resulting plan includes creates, updates, repairs, version advances and eligible missing-employee deactivations. The safety brake checks row-count integrity and missing employees before apply starts. A safe plan applies in small transactions. A suspicious plan waits for a human decision. Each chunk rechecks versions under employee-row locks, so a real-time update can supersede an older planned action.
+
+<details>
+<summary>Nightly comparison, safety brake and operator decision sequence</summary>
+
+![Streaming buckets, persisted reconciliation plan, safety brake and version-rechecked chunk application](docs/diagrams/nightly-sequence.png)
+
+Invalid rows with valid employee IDs count as present, so a malformed row is not mistaken for a missing employee. Dry runs end PLANNED. A braked non-dry run stays AWAITING_APPROVAL with zero applied actions; the operator can approve, skip deactivations or reject it. Final action counts remain visible for audit.
+
+</details>
 
 ### After commit: deliver changes and recover safely
 

@@ -1,0 +1,30 @@
+sequenceDiagram
+    autonumber
+    participant HR as HR system
+    participant API as Ingestion service
+    participant APPLY as Transactional applier
+    participant DB as PostgreSQL
+    participant PUB as Outbox publisher
+    HR->>API: POST /hr/events (1-1000 records)
+    loop Each record independently
+        API->>API: Ownership filter, normalize, validate
+        alt Invalid record
+            API->>DB: Code-only rejection in separate transaction
+        else Valid record - newer-version write path shown
+            API->>APPLY: apply() through separate bean
+            APPLY->>DB: BEGIN, reserve unique receipt key
+            APPLY->>DB: Lock employee, compare version and hash
+            alt Business fields changed
+                APPLY->>DB: Employee + final receipt + one outbox row
+            else Higher version, identical state
+                APPLY->>DB: Version/timestamp + NO_CHANGE receipt, no outbox
+            end
+            APPLY->>DB: COMMIT
+        end
+    end
+    API-->>HR: HTTP 200 with per-record outcomes
+    Note over API,DB: Connection outage: stop with 503, earlier record commits remain
+    PUB->>DB: Claim due row FOR UPDATE SKIP LOCKED
+    PUB->>PUB: Deliver to sinks with bounded timeout
+    PUB->>DB: Mark PUBLISHED and commit
+    Note over DB,PUB: Independent publisher can run before the HTTP response finishes. Delivery may repeat.

@@ -1,0 +1,31 @@
+sequenceDiagram
+    autonumber
+    participant HR as HR export
+    participant RUN as Reconciliation worker
+    participant DISK as Spill files
+    participant DB as PostgreSQL
+    participant OPS as Operator
+    HR->>RUN: Upload CSV + asOf, optional expected count
+    RUN->>DB: Create UPLOADED run, transition to DIFFING
+    RUN->>DISK: Stream validated rows into 256 CRC32 buckets
+    Note over RUN,DISK: Reject bad rows, valid IDs still count as present
+    loop One bucket at a time
+        RUN->>DISK: Read one bucket
+        RUN->>DB: Read matching employee bucket
+        RUN->>DB: Save CREATE / UPDATE / HEAL / ADVANCE / DEACTIVATE plan
+    end
+    RUN->>RUN: Check row counts and missing-active thresholds
+    alt Brake trips on a non-dry run
+        RUN->>DB: AWAITING_APPROVAL + alert, zero actions applied
+        DB-->>OPS: Plan, missing count and recorded threshold
+        OPS->>RUN: Approve ALL / SKIP_DEACTIVATIONS, or reject
+    end
+    opt Safe or approved non-dry run
+        loop Chunks of 40, one transaction per chunk
+            RUN->>DB: Lock only chunk employees, recheck versions and status
+            RUN->>DB: Batch employee/action/outbox writes, COMMIT
+        end
+        RUN->>DB: COMPLETED
+    end
+    Note over RUN,DB: Dry-run ends PLANNED, rejected plan ends REJECTED
+    RUN->>DISK: Remove spill directory, retain upload for seven-day audit
