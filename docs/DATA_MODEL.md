@@ -268,6 +268,8 @@ roster:
 
 `RecordHasher.hash(HrSnapshot)` = SHA-256 hex of the HR-owned field values in `EmployeeField` declaration order, joined with `\u001F` (unit separator), `\u0000` for null, strings trimmed, email lower-cased, office as its **code** (not DB id). Used for reconciliation and resolved-state decisions. Receipt hashes use SHA-256(eventType + unit separator + the same canonical HR-owned fields), excluding eventId/occurredAt. DEACTIVATE hashes its fixed inactive tombstone intent, not mutable stored HR values. Transport-owned fields are never in the hash, so a transport edit never looks like an HR diff.
 
+Keep this canonical format unchanged for stored-receipt compatibility. It assumes validated input: an unvalidated unit separator can shift a field boundary, and a literal NUL can imitate the null marker. All owned API/CSV string values reject U+0000–U+001F and U+007F before hashing. `RecordHasherTest` documents both ambiguities and freezes the legacy digest; `ReplayIdempotencyIT` proves a stored legacy receipt still returns DUPLICATE without rewriting employee/receipt state. No receipt-hash migration or rehash is performed.
+
 ## Outbox payload (no PII values)
 
 ```json
