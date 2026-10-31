@@ -23,8 +23,10 @@ try {
     if (path.basename(file) !== file) throw new Error("Provide diagram stems only");
     const text = fs.readFileSync(path.join(root, file), "utf8");
     const svg = await page.evaluate(async ({ text, id }) => (await window.mermaid.render(id, text)).svg, { text, id: "roster-" + file.replace(/\W/g, "-") });
-    fs.writeFileSync(path.join(root, file.replace(/\.mmd$/, ".svg")), svg + "\n");
     await page.locator("#mount").evaluate((node, svg) => { node.innerHTML = svg; }, svg);
+    // XML serialization closes HTML elements in foreignObject labels for standalone SVG viewers.
+    const standalone = await page.locator("#mount svg").evaluate((node) => new XMLSerializer().serializeToString(node));
+    fs.writeFileSync(path.join(root, file.replace(/\.mmd$/, ".svg")), standalone + "\n");
     await page.locator("#mount svg").evaluate((node) => {
       const box = node.viewBox.baseVal;
       node.style.maxWidth = "none";

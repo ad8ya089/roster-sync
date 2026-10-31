@@ -18,6 +18,18 @@ Pass one or more stems to render only those files, for example `node docs/diagra
 
 ## Earlier print-design figures
 
+| Figure | Purpose |
+|---|---|
+| `system-context` | Actual single-app/PostgreSQL runtime and publisher boundary |
+| `roster-key-erd` | Readable core employee/receipt/outbox relationship view |
+| `workforce-erd` | Tenant, office, staff account, booking and seat relationships |
+| `sync-erd` | Reconciliation plans, rejection audit, alerts and consumer deduplication |
+| `schema-full` | All 14 application tables, with physical versus logical links distinguished |
+| `event-sequence` | Per-record writes and independent outbox delivery |
+| `nightly-sequence` | Streaming buckets, brake, operator decision and locked application |
+
+ER figures show selected columns, not a replacement for the migrations. `char64` means SQL `CHAR(64)`. Solid lines denote the declared SQL FKs; dotted lines denote logical application associations. Composite unique keys and nullable/tombstone semantics are explained in [the schema guide](../SCHEMA_GUIDE.md). Not every tenant-scoping relation is drawn as a physical FK. The notation is rendered with [Mermaid's ER syntax](https://mermaid.js.org/syntax/entityRelationshipDiagram.html).
+
 ```bash
 python -m pip install -r docs/diagrams/requirements.txt
 python docs/diagrams/render.py

@@ -40,10 +40,12 @@ The nightly example is different: an export contains only **120,000 rows** for a
 
 ## Guide to the repository
 
+- [Demo access](#demo-access) and [DEMO.md](DEMO.md): the four role accounts and a short reviewer walkthrough.
 - [Try the application](#try-the-application): accounts, screens and the two examples from the brief.
 - [How it works](#how-it-works): the two input paths, transaction boundary and crash recovery.
 - [Run locally](#run-locally): one-command setup, scripted proof and monitoring.
 - [Rules behind the results](#rules-behind-the-results): replay, versions, ownership and the safety brake.
+- [Case-study answers](#answers-to-the-case-study-questions): security, OOP, monitoring, caching, recovery and limits.
 - [Performance](#performance): measured workloads, machine specification and scaling limits.
 - [Tests and failure proof](#tests-and-failure-proof): commands, counts and the invariants tested.
 - [Deployment and trade-offs](#deployment-and-trade-offs): the Sydney deployment and deliberate limits.
@@ -279,6 +281,9 @@ Local machine: **Intel Core i5-1240P**, 12 physical / 16 logical cores, **15.69 
 
 Final audit: 2026-10-31. The mixed file contains 199,190 rows after controlled drops/new rows; the exact-size case runs before the mixed samples in the same fork, so their comparison path is warmed. This is a recheck, not a claimed code optimization. The separate k6 measurements below are the 2026-10-30 baseline. The exact 200,000-row final-audit case is reported in [performance evidence](docs/PERFORMANCE.md). Chunk acceptance is p99 <1 s **and** max <2.5 s, including commit and cold work; it passes with chunk 40.
 
+<details>
+<summary>Expand the batch-size-50 load matrix and scaling diagnosis</summary>
+
 Batch-size-50 scaling, with synchronous commit **on**:
 
 | VUs | Events/s | Request p50 / p99 (ms) | Per-event p50 / p99 (ms) | Max Hikari pending | PG commits/s |
@@ -293,6 +298,8 @@ Per-event batch figures are **request duration / 50**, an amortized cost rather 
 1. Scaling bends above 5–10 VUs: doubling 10 to 20 VUs adds 26% throughput while request p99 rises 53%.
 2. A diagnostic `synchronous_commit=off` run reached 492 events/s (+21.5%), showing durable commit I/O contributes; the setting was restored to **on**. This is not the production configuration.
 3. Pool pending remained near zero, so the pool stays at 20. The outbox backlog reached 22,260 rows: 405 events/s is an ingress burst rate, not sustained end-to-end delivery capacity.
+
+</details>
 
 Event application uses O(log M) indexed lookup and O(1) working state. Bucketed comparison is O(N + M) time and expected O((N + M)/256) working heap, plus O(N) spill disk; skew can increase the largest bucket. Mass-change apply is bounded by writes/outbox work, and multiple instances would need leases and shared upload storage. [All samples, before/after profiling and cold-JIT variation](docs/PERFORMANCE.md).
 
@@ -342,6 +349,7 @@ The tested runtime assumes one app instance/poller and one PostgreSQL primary. B
 | Which requirement is proved by which test? | [Requirements coverage](docs/REQUIREMENTS_TRACEABILITY.md) |
 | How are snapshots partitioned, compared and applied? | [Reconciliation](docs/RECONCILIATION.md) |
 | Where do state, receipts and events live? | [Data model](docs/DATA_MODEL.md) |
+| How do I read the tables and their relationships? | [Schema guide and ER diagrams](docs/SCHEMA_GUIDE.md) |
 | Why these trade-offs? | [Decisions](docs/DECISIONS.md) |
 | What are the auth, tenancy and privacy boundaries? | [Security](docs/SECURITY.md) |
 | What can be stale, and for how long? | [Caching](docs/CACHING.md) |
@@ -351,3 +359,9 @@ The tested runtime assumes one app instance/poller and one PostgreSQL primary. B
 | How is the console designed? | [Frontend](docs/FRONTEND.md) |
 
 Code: `api → application → domain`; infrastructure supplies persistence, security, caching and metrics. `domain` has no Spring/Jakarta/SQL/application/API dependency; architecture tests enforce it. The `frontend/` build is embedded in the Java jar. `samples/`, `postman/`, `loadtest/`, `ops/` and `deploy/aws-ec2/` contain the reproducible supporting tools.
+
+## Presentation and recordings
+
+**[Open the presentation and walkthrough recordings in Google Drive](https://drive.google.com/drive/folders/1GwFB-nlu5Poz49dfNfzaiRtHOsfdbwhA?usp=sharing)**
+
+The owner's shared folder is linked for the submission materials. The [presentation is also available here as a PDF](docs/roster-sync-deck.pdf). For hands-on testing, use [DEMO.md](DEMO.md); recordings are linked externally rather than stored in this repository.
