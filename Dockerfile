@@ -1,3 +1,5 @@
+# Docker's predefined proxy build args reach RUN steps in every stage.
+# Compose defaults them to empty. Keep network-specific values outside this file.
 FROM node:24.22.2-alpine AS frontend
 WORKDIR /frontend
 COPY frontend/package.json frontend/package-lock.json ./
