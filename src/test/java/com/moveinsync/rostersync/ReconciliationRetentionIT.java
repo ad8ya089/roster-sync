@@ -59,6 +59,8 @@ class ReconciliationRetentionIT extends AbstractOutboxIntegrationTest {
     @Test void orphanUploadsAndAbandonedSpillsAreCleanedAtStartupAndNightly() throws Exception {
         for(boolean startup:new boolean[]{true,false}) {
             UUID unknown=UUID.randomUUID();Files.createDirectories(root());Path orphan=root().resolve(unknown+".csv");Files.writeString(orphan,"synthetic");
+            // File age must use the same clock as cleanup, not the CI machine's wall clock.
+            Files.setLastModifiedTime(orphan,FileTime.from(clock.instant()));
             Path orphanSpill=spill(unknown);UUID finished=run("COMPLETED");Path oldSpill=spill(finished);
             Path unrelated=root().resolve("do-not-delete.txt");Files.writeString(unrelated,"synthetic");
             Path fresh=root().resolve(UUID.randomUUID()+".csv");Files.writeString(fresh,"synthetic");
