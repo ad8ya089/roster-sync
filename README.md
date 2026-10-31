@@ -86,7 +86,13 @@ The [Postman collection](postman/roster-sync.postman_collection.json) and [envir
 
 ## How it works
 
-![Two input paths, their safeguards, PostgreSQL state and background delivery](docs/diagrams/review-overview.png)
+![HR Roster Sync architecture: two input paths, one Spring Boot app, PostgreSQL and the outbox publisher](docs/diagrams/system-context.png)
+
+[Open the architecture as a vector diagram](docs/diagrams/system-context.svg).
+
+The public deployment runs **one Spring Boot app and one PostgreSQL primary**, with Caddy terminating HTTPS on ports 80/443. The React console is built into the Java image as static files. Node is a build tool, not a production service. API controllers enforce roles and tenant scope; application services own transactions; plain Java classes decide validation, versions, ownership and reconciliation outcomes.
+
+The outbox publisher is a background worker in that same app. It delivers committed changes to the logging and deactivation sinks. No message broker is required. Uploaded files and temporary buckets use private disk storage. Actuator uses port 8081, bound to host loopback in AWS and accessed through SSM; Prometheus/Grafana belong to the optional local monitoring profile.
 
 ### During the day: validate, decide and commit one event
 

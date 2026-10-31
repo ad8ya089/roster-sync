@@ -1,0 +1,25 @@
+{
+  "theme": "base",
+  "deterministicIds": true,
+  "deterministicIDSeed": "hr-roster-sync-review",
+  "themeVariables": {
+    "fontFamily": "Arial, sans-serif",
+    "fontSize": "16px",
+    "primaryColor": "#edf7f6",
+    "primaryTextColor": "#172b3a",
+    "primaryBorderColor": "#26857e",
+    "lineColor": "#596f83",
+    "secondaryColor": "#f2f5fa",
+    "tertiaryColor": "#fff4d9",
+    "clusterBkg": "#f8fafc",
+    "clusterBorder": "#a5b5c3",
+    "background": "#ffffff",
+    "noteBkgColor": "#fff4d9",
+    "noteBorderColor": "#b58a30",
+    "actorBkg": "#edf7f6",
+    "actorBorder": "#26857e"
+  },
+  "flowchart": {"htmlLabels": false, "curve": "linear", "nodeSpacing": 30, "rankSpacing": 36, "wrappingWidth": 240},
+  "sequence": {"useMaxWidth": false, "wrap": true, "actorMargin": 28, "messageMargin": 26, "width": 155},
+  "er": {"useMaxWidth": false, "fontSize": 15, "entityPadding": 12, "minEntityWidth": 160}
+}

@@ -1,0 +1,18 @@
+flowchart LR
+    HR["HR integration<br/>Events / nightly export"]
+    STAFF["Staff browser<br/>React operations console"]
+    subgraph APP["One Spring Boot application - Java 21"]
+        API["Console and REST API<br/>JWT, roles and tenant scope"]
+        INGEST["Real-time events<br/>Validate; version gate"]
+        RECON["Nightly reconciliation<br/>256 disk buckets; plan; brake"]
+        PUBLISH["Outbox publisher<br/>Claim; deliver; mark published"]
+        API --> INGEST
+        API --> RECON
+    end
+    HR --> API
+    STAFF --> API
+    DB[("PostgreSQL 17<br/>Roster / receipts / plans<br/>Outbox / consumer dedupe")]
+    INGEST -->|"one transaction per record"| DB
+    RECON -->|"locked chunks of 40"| DB
+    DB -->|"due rows; SKIP LOCKED"| PUBLISH
+    PUBLISH -->|"dedupe; bookings and seats"| DB
