@@ -8,7 +8,7 @@ Built by **Aditya Prakash** for **MoveInSync Backend Case Study 5, Advanced Trac
 
 **Demo credentials are provided privately.** The application uses prepared staff accounts with company and role permissions. Your personal email address does not automatically create an account. On the sign-in screen, choose **Need an account?** to find the appropriate demo username.
 
-**Browser access status (31 October 2026):** Google Safe Browsing currently flags the demo hostname. HTTPS responds, but that does not clear a reputation warning. Owner review is pending, and the refreshed interface awaits deployment; use the local setup below in the meantime. Do not disable browser protection to review the assignment.
+**Browser access status (31 October 2026):** The refreshed sign-in and account-help screens are deployed, and live functional checks pass. Google Safe Browsing still flags the demo hostname; owner verification and review are pending. HTTPS success does not clear that warning. Use the local setup below until the review is resolved, and keep browser protection enabled.
 
 Java 21 · Spring Boot 4.1 · PostgreSQL 17 · React · Docker Compose
 
@@ -237,6 +237,7 @@ On PowerShell use `.\mvnw.cmd`. Docker/CI use Temurin 21. Maven verification wor
 | Normal backend verification | **292 passed** |
 | Frontend unit | **26 passed** |
 | Real-Compose browser cases | **17 passed**, including **60** axe scans with zero serious/critical findings |
+| Deployed console checks | **6 passed** across roles, themes, desktop/mobile and live event/reconciliation flows; account help, username prefill and failed-sign-in reflow also checked at 1440, 1280 and 390 px |
 | Authenticated Lighthouse accessibility | **100/100** on Runs and Employees, light/dark |
 
 The reviewed production build’s initial JS is about 110.40 kB gzip. Browser checks cover role menus, memory-only login, transport null/no-op behavior, all six event presets, safe errors and the real brake/rejection workflow. [Reproducible commands and complete test catalogue](docs/TESTING.md).
@@ -275,6 +276,6 @@ Code: `api → application → domain`; infrastructure supplies persistence, sec
 
 ## Demo video
 
-**Demo video link: pending recording.** The recording will show ordering/replay, the truncated-file brake, a real crash/recovery and sample API calls. The [presentation deck](docs/roster-sync-deck.pdf) accompanies those flows. The live assignment and automated demonstrations are ready.
+**Demo video link: pending recording.** The recording will show ordering/replay, the truncated-file brake, a real crash/recovery and sample API calls. The [presentation deck](docs/roster-sync-deck.pdf) accompanies those flows. The local automated demonstrations are ready; the public browser warning remains pending owner review.
 
 <!-- DEMO_VIDEO_URL: add the final recording link here. -->
