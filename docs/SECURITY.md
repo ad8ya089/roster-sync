@@ -81,6 +81,12 @@ api/error/
 
 Event batch ≤ 1000 and body ≤ 2 MB; CSV ≤ 100 MB (`spring.servlet.multipart.max-file-size`); string fields length-capped by validation; page size ≤ 200; `statement_timeout=30s`, `lock_timeout=5s` on the DB connection.
 
+Owned string fields and event IDs reject C0 controls before trimming can hide them; CSV and API validation share this boundary. Unexpected per-record data failures become code-only UNPROCESSABLE_RECORD rejections, while a connection outage stops ingestion with 503 and preserves earlier record commits. Unknown-field warnings are limited to 10 entries plus a total count, and only names matching `[A-Za-z][A-Za-z0-9_]{0,39}` may be reflected; other names become `(unrecognised)`. Warning names and values are never logged. Hikari broken-connection and transaction-interceptor exception diagnostics are disabled because their attached driver exceptions can disclose values; application logs retain safe IDs/codes/classes.
+
+### PII retention in reconciliation storage
+
+Reconciliation action payloads and generated uploaded CSV copies can contain PII. Nightly retention deletes actions in 5,000-row transactions and upload copies in bounded batches, by default strictly more than seven days after a COMPLETED/REJECTED/FAILED/PLANNED run's finished_at. Configure `roster.retention.recon-actions` and `roster.retention.uploads`; the run row remains for audit and its file_path becomes `deleted`. Worker finally blocks remove spill directories; startup and nightly cleanup remove abandoned terminal/orphan spill directories and upload orphans older than one day. Active and awaiting-approval run files are always protected. Cleanup accepts only generated UUID paths beneath the configured root, does not follow links, and leaves source inbox files/unrelated files alone.
+
 ## 8. Runtime profiles
 
 - `prod` alone has no demo seeder, dev endpoints, or active fault injection.

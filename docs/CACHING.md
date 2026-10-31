@@ -24,10 +24,12 @@ Implementation: Spring Cache abstraction + Caffeine (`spring-boot-starter-cache`
 |---|---|---|---|
 | Newly created office | all instances | no negative-cache delay | Unknown codes are never cached. The next lookup queries the DB and sees the committed office. |
 | Deactivated office still accepted | other instances | 10 min | The FK guarantees the office still **exists**. The applier re-reads `office.active` inside its transaction before writing, so a deactivated office is rejected `INACTIVE_OFFICE` even if the cache says active. |
-| Employee profile shows old office/shift | other instances | 30 s | TTL; on the writing instance eviction happens in `TransactionSynchronization.afterCommit`, so a read right after the write is fresh. |
+| Employee profile shows old office/shift | other instances | 30 s | TTL; the writing instance evicts in `TransactionSynchronization.afterCommit`, subject to the in-flight refill race below. |
 | Employee profile cached **before** a concurrent write commits | writing instance | until next eviction or 30 s | eviction runs after commit, so the race window is "read started before commit, finished after" → bounded by the 30 s TTL. |
 
 Why evict *after commit* and not inside the transaction: evicting inside the transaction lets a concurrent reader re-populate the cache with the old row before the commit — the classic cache-aside race. After-commit eviction narrows it to the window above.
+
+Precisely: a cache-miss read can load the old row before the writer commits, pause, then put that old DTO into the cache after the writer's afterCommit eviction has already completed. Later reads can then see that DTO for up to 30 seconds from the cache insertion. After-commit eviction does not make reads linearizable. All write/version/ownership/reconciliation decisions bypass employeeView and read PostgreSQL; this race affects the displayed profile only. No stronger consistency guarantee is implemented or claimed.
 
 `spring.cache.cache-names=offices,employeeView` declares both caches at startup. Each Caffeine cache records statistics and uses its own configured TTL/maximum. Keys are OfficeKey/EmployeeKey records; OfficeRef and EmployeeView are immutable DTO records, never attached JPA entities. Misses are not cached. An in-transaction office read always bypasses the cache and uses a plain READ COMMITTED read.
 

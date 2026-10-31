@@ -288,8 +288,12 @@ Non-PII values are included so consumers (routing, rostering) can act without a 
 |---|---|---|
 | `hr_event_receipt` | 30 days (`roster.retention.receipts`) | nightly delete. Older duplicates still become no-ops via the version check; they are just reported as `STALE` instead of `DUPLICATE`. |
 | `outbox_event` (PUBLISHED) | 7 days | nightly delete |
-| `recon_action` | 7 days after run finishes | nightly delete (contains PII payloads) |
-| uploaded files + spill files | deleted when run reaches a terminal state (file kept 7 days for audit) | run cleanup |
+| `recon_action` | 7 days after terminal `finished_at` (`roster.retention.recon-actions`) | nightly delete in separate transactions of at most 5,000 rows; only COMPLETED/REJECTED/FAILED/PLANNED runs |
+| uploaded CSV copies | 7 days after terminal `finished_at` (`roster.retention.uploads`) | bounded nightly cleanup; unlink the generated copy, set `file_path='deleted'`, keep the run row/counters for audit |
+| spill directories | normally removed in the worker's finally block | startup and nightly cleanup also remove abandoned terminal/orphan directories older than 1 day |
+| orphan upload copies without a run row | 1 day | startup and nightly cleanup; generated UUID CSV names only |
+
+The seven-day cutoffs are strict (`finished_at < now - retention`), using the injected Clock. All non-terminal and AWAITING_APPROVAL runs retain their actions and files, regardless of age. Only files below the configured generated `data-dir/recon` namespace are eligible; source inbox files and unrelated names are untouched. Recursive cleanup never follows symbolic links. A crash between unlink and marking the upload is safe to retry. Global maintenance inventories are internal, with tenant-scoped run updates. Single-instance scheduling remains the assumption.
 
 Receipt reservation uses provisional PROCESSING inside the record transaction. Final stored outcomes are APPLIED, STALE, NO_CHANGE or DUPLICATE; conflicts roll back the reservation and write VERSION_CONFLICT through an independent rejection transaction. V1 has no receipt-outcome CHECK constraint; the writer enforces this final-outcome vocabulary without rewriting V1.
 

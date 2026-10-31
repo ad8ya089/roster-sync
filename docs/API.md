@@ -65,7 +65,7 @@ Disabled users also receive the same 401. Login performs one BCrypt match even f
 ## HR events (real time)
 
 ### `POST /hr/events` — role `HR_SYSTEM`
-Batch of 1–1000 events. Each event is processed in **its own transaction**; one bad record never fails the batch. Always HTTP 200 if the envelope is valid.
+Batch of 1–1000 events. Each event is processed in **its own transaction**. Record failures return HTTP 200 with per-record results, so a rejected record does not stop later records. A database connection outage is the exception: processing stops with HTTP 503 `DEPENDENCY_UNAVAILABLE`. Earlier records remain committed; the current record rolls back and later records are not attempted. No batch result is returned with that 503. Resend the batch after recovery; receipts and version checks make already committed records safe to replay. If a connection is lost while commit is being acknowledged, the client cannot know whether that record committed; replay resolves that uncertainty safely.
 
 ```json
 {
@@ -93,6 +93,9 @@ Batch of 1–1000 events. Each event is processed in **its own transaction**; on
 - `Apply` always has non-empty `changedFields` and exactly one Employee outbox event. `VersionAdvanced` is a distinct decision, never an empty-field Apply. Its receipt outcome is `NO_CHANGE`, response summary counter is `noChange`, and metrics tag is `no_change`. Phase 4 implements the transactional database effects.
 - DEACTIVATE ignores all carried HR/transport fields with `UNKNOWN_FIELD_IGNORED` warnings. Equal-version identical content remains `DUPLICATE`; lower versions remain `STALE`, including against tombstones.
 - Email is trimmed and lower-cased before validation and hashing. Phone validation uses the original string: spaces and dashes are invalid. CREATE requires name/email/officeCode; UPDATE additionally requires status. Errors are sorted by field name, then code, with no values.
+- Every supplied owned string rejects all C0 controls (U+0000–U+001F) with `INVALID_FORMAT`, including controls that trimming would otherwise hide. HR field maximum lengths match the employee columns; eventId is capped at 100. CSV rows use the same validation. Ignored non-owned or DEACTIVATE-carried values are not validated or persisted.
+- Unexpected non-transient record processing/data errors roll back that record, return `REJECTED` with `record:UNPROCESSABLE_RECORD`, and audit codes only in a separate transaction. Lock failures retain the bounded retry policy and `RETRYABLE_ERROR`; connection failures fail closed as described above.
+- Per-record `warnings` contains at most 10 distinct entries, sorted by field/code. `warningCount` is the total before bounding/deduplication. `UNKNOWN_FIELD_IGNORED` reflects a property name only if it matches `^[A-Za-z][A-Za-z0-9_]{0,39}$`; otherwise its field is `(unrecognised)`. Values and warning names are never logged. CSV header warnings follow the same name rule, limit and count in the internal read summary; no raw column names enter operational logs.
 - Snapshot decisions use the same version comparison, with equal-version differing content represented as `Apply(heal=true)`. Replacing a tombstone with ACTIVE state emits EmployeeCreated; reactivating an existing inactive full record emits EmployeeReactivated.
 
 Response:

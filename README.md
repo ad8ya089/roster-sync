@@ -232,9 +232,9 @@ On PowerShell use `.\mvnw.cmd`. Docker/CI use Temurin 21. Maven verification wor
 
 | Evidence | Latest verified count |
 |---|---:|
-| Backend unit/web/property/architecture guards | 145 (including two fixed-seed properties with 1,000 tries each) |
-| PostgreSQL integration | 147 |
-| Normal backend verification | **292 passed** |
+| Backend unit/web/property/architecture guards | 156 (including two fixed-seed properties with 1,000 tries each) |
+| PostgreSQL integration | 161 |
+| Normal backend verification | **317 passed** |
 | Frontend unit | **26 passed** |
 | Real-Compose browser cases | **17 passed**, including **60** axe scans with zero serious/critical findings |
 | Deployed console checks | **6 passed** across roles, themes, desktop/mobile and live event/reconciliation flows; account help, username prefill and failed-sign-in reflow also checked at 1440, 1280 and 390 px |
