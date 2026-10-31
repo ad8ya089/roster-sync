@@ -1,42 +1,77 @@
-# Roster Sync
+# HR Roster Sync
 
-**Idempotent HR events. Ordered employee state. Safe nightly reconciliation.**
+### Keeping employee records correct when HR changes arrive late, twice, or not at all
 
-MoveInSync Case Study 5, Advanced Track. HR feeds can arrive twice, arrive late, contain bad records or stop halfway through. This service keeps the employee roster correct, preserves transport-owned fields and requires a human decision before an unsafe mass deactivation.
+Built by **Aditya Prakash** for **MoveInSync Backend Case Study 5, Advanced Track**.
 
-**[Open the live console](https://rostersync-aditya.duckdns.org)** | Credentials provided privately | [Demo video](#demo-video)
+[Open the live console](https://rostersync-aditya.duckdns.org) · [View the presentation](docs/roster-sync-deck.pdf) · [Demo video](#demo-video)
+
+**Demo credentials are provided privately.** The application uses prepared staff accounts with company and role permissions. Your personal email address does not automatically create an account. On the sign-in screen, choose **Need an account?** to find the appropriate demo username.
+
+**Browser access status (31 October 2026):** Google Safe Browsing currently flags the demo hostname. HTTPS responds, but that does not clear a reputation warning. Owner review is pending, and the refreshed interface awaits deployment; use the local setup below in the meantime. Do not disable browser protection to review the assignment.
 
 Java 21 · Spring Boot 4.1 · PostgreSQL 17 · React · Docker Compose
 
-## Start your review here
+## The problem this project solves
 
-| What to inspect | Where to go |
-|---|---|
-| Try the two examples from the brief | [Two-minute walkthrough](#two-minute-walkthrough) |
-| Understand the design and its failure boundary | [Architecture](#architecture) and [two-page design note](docs/DESIGN.pdf) |
-| Follow the presentation or review the interview evidence | [Presentation deck (PDF)](docs/roster-sync-deck.pdf) |
-| Check each requirement against code and a test | [Requirements coverage](docs/REQUIREMENTS_TRACEABILITY.md) |
-| Run the assignment on your machine | [Local setup](#local-setup) |
-| Inspect measured results and their limits | [Performance](#performance) |
-| Review security, operations and trade-offs | [Documentation map](#documentation-map) |
+A transport roster depends on employee information from HR: who is active, which office they work in, and which shift they follow. Real feeds are imperfect. A request may be delivered twice after a timeout. An older update may arrive after a newer one. A nightly export may stop halfway through. Treating arrival time as the source of truth can leave an employee at the wrong office, repeat a side effect, or deactivate thousands of people because a file was incomplete.
 
-## Two-minute walkthrough
+HR also does not own every field. The transport team maintains pickup points and special-assistance details. A later HR import must preserve those values, even if its payload includes them.
 
-Open the live console and sign in with the password supplied privately. Each role has a different starting screen; server-side authorization enforces the same permissions.
+HR Roster Sync handles these problems through two paths. During the day, it validates and applies versioned employee events independently. At night, it compares a full HR export with the stored roster, repairs differences, and pauses suspicious plans for an operator. Both paths use the same ownership and version rules, and changes reach downstream consumers through a durable outbox.
 
-| Demo user | Starting screen | Try this |
+### A concrete example
+
+An employee is created at **version 5**. A **version 7** event transfers them to a new office. Then **version 6** arrives with an older shift change. The service reports the last event as `STALE` and keeps the complete version-7 state. Sending version 7 again with the same content returns `DUPLICATE`, without changing the employee or adding another outbox event.
+
+The nightly example is different: an export contains only **120,000 rows** for a store of roughly **200,000 active employees**. The missing share crosses the default **30%** threshold. The service records the plan and an alert, applies **zero** changes, and waits for an operator to approve or reject it.
+
+## Guide to the repository
+
+- [Try the application](#try-the-application): accounts, screens and the two examples from the brief.
+- [How it works](#how-it-works): the two input paths, transaction boundary and crash recovery.
+- [Run locally](#run-locally): one-command setup, scripted proof and monitoring.
+- [Rules behind the results](#rules-behind-the-results): replay, versions, ownership and the safety brake.
+- [Performance](#performance): measured workloads, machine specification and scaling limits.
+- [Tests and failure proof](#tests-and-failure-proof): commands, counts and the invariants tested.
+- [Deployment and trade-offs](#deployment-and-trade-offs): the Sydney deployment and deliberate limits.
+- [Documentation map](#documentation-map): contracts, design decisions and requirement coverage.
+
+## Try the application
+
+Open **[rostersync-aditya.duckdns.org](https://rostersync-aditya.duckdns.org)** and use the demo password supplied privately. This is a staff application, so accounts are prepared with a company and a role. Public self-registration is not enabled. The access-help page explains the available roles and can fill in a username; it cannot grant permissions or bypass the password.
+
+| Username | Role | What to try |
 |---|---|---|
-| `acme.hr` | Event console | Click **Out-of-order**: v5 applies, v7 applies, v6 is stale. Replay is a duplicate. |
-| `acme.operator` | Operations | Inspect tenant counts, delivery failures and runs awaiting a decision. Open Runs to review a plan. |
-| `acme.admin` | Employees | Find `E1001`; inspect HR/transport ownership, receipt history and bookings. Clear sends null; no-op Save is disabled. |
-| `E1001` | My profile | View only this employee's profile and bookings. |
+| `acme.hr` | HR integration | Open Event console and run **Out-of-order (brief example)**. Inspect the three results, then replay the last batch. |
+| `acme.admin` | Transport admin | Find `E1001` in Employees. Inspect the HR fields, edit transport details and review bookings. |
+| `acme.operator` | Operator | Open Operations for current state and delivery problems. Use Runs to inspect a reconciliation plan and its decision. |
+| `E1001` | Employee | Open My profile. This role can view its own information and bookings. |
 
-Reloading deliberately signs out: tokens exist only in memory. The interview deployment enables `prod,demo`; demo endpoints remain OPERATOR-only. The public image hides username hints and the development styleguide.
+Role checks happen on the server as well as in the navigation. An operator cannot edit transport fields, an employee cannot read another employee, and a permitted role from another tenant receives 404 for the first tenant's resources. Tokens stay in the current tab's memory, so reloading deliberately signs out.
 
-For the brief's **200k → 120k** example, use the local stack: operator → Demo tools → seed 200,000 once → generate a 120,000-row export → upload. The brake shows the actual missing count, applies nothing and waits for approval or rejection. The small AWS instance runs the light demonstration; the full dataset proof is local.
+### What the console shows
+
+**Staff access.** Sign-in explains the prepared accounts and links to a role guide. The form keeps the action visible after an unsuccessful attempt, with a support reference available when needed.
+
+![Staff sign-in with account guidance and a compact layout](docs/images/console-sign-in.png)
+
+**Event decisions.** The event console sends real API requests and displays the result for each record. The version route line follows arrival order, so the late version 6 appears after version 7 rather than looking as though it arrived earlier. A replay shows its original outcome as well as `DUPLICATE`.
+
+![Event console showing applied, stale and duplicate outcomes](docs/images/console-events.png)
+
+**A decision before deactivation.** Run review separates the file's export time from upload time, shows the missing share and recorded threshold, and presents the operator's choices before anything from a suspicious plan is applied. The screenshot below is a synthetic rehearsal, not a fixed count every new run must reproduce.
+
+![Nightly reconciliation review with the safety brake and operator decision](docs/images/console-run-review.png)
+
+The [operations board](docs/images/console-ops.png) connects durable tenant counts with delivery problems and alerts. The [employee view](docs/images/console-employee-detail.png) separates HR-owned fields from transport-owned fields. The [runs list](docs/images/console-runs.png) keeps the history of uploaded files and decisions.
+
+The full 200k demonstration runs locally. In Demo tools, seed 200,000 once, generate a truncated 120,000-row export, then upload it. The small AWS instance is for the light interview demonstration. Its `prod,demo` profile is an intentional exception: demo tools still require OPERATOR authorization. No demo password appears in the application, repository or screenshots.
 
 <details>
-<summary>Verify the live API with five shell lines (Bash, curl and jq)</summary>
+<summary>Verify the live API in two minutes with Bash, curl and jq</summary>
+
+These five lines check the public page, sign in without printing the token, read offices, and confirm that the same endpoint requires authentication. Enter the private demo password at the hidden prompt. Do not turn on shell tracing.
 
 ```bash
 BASE=https://rostersync-aditya.duckdns.org; curl -sS -o /dev/null -w 'Console: %{http_code}\n' "$BASE/"
@@ -46,94 +81,111 @@ curl -fsS "$BASE/api/v1/offices" -H "Authorization: Bearer $TOKEN" | jq
 curl -sS -o /dev/null -w 'Without a token: %{http_code} (expected 401)\n' "$BASE/api/v1/offices"; unset DEMO_PASSWORD TOKEN
 ```
 
-The [Postman collection](postman/roster-sync.postman_collection.json) and [environment template](postman/roster-sync.postman_environment.json) provide the same API flows. Fill the private password locally.
+The [Postman collection](postman/roster-sync.postman_collection.json) and [environment template](postman/roster-sync.postman_environment.json) provide the same API flows. Fill the private password locally. Login responses contain a JWT, so do not display them in a public recording.
 
 </details>
 
-## Guarantees and proof
+## How it works
 
-| Requirement | Implemented behavior | Automated evidence |
-|---|---|---|
-| Per-record validation | Malformed phone / unknown office rejects that row; the remaining batch continues | `BatchIsolationIT`, `RecordValidatorTest` |
-| Ordering and replay | Employee versions never move backward; a second feed changes no employee, receipt or outbox state | `OutOfOrderIT`, `ReplayIdempotencyIT`, `ConcurrentEventsIT` |
-| Field ownership | HR input cannot overwrite pickup point or special assistance | `FieldOwnershipIT`, `TransportFieldsIT` |
-| Bounded nightly comparison | Stream and spill into 256 buckets; compare one bucket at a time | `ReconciliationBenchmarkIT` with `-Xmx256m` |
-| Safety brake | Missing ratio **>= 30%** stops all apply, records an alert and waits for an operator | `SafetyBrakeTest`, `ReconciliationFlowIT.truncatedFileBriefExample` |
-| Durable change events | Employee write and outbox insert commit together; publication can restart | `OutboxCrashRecoveryIT`, `OutboxRetryIT` |
-| Deactivation effects | Cancel future scheduled bookings and free seats; delayed deactivation cannot cancel a rehire's bookings | `DeactivationIT` |
-| Tenant and personal-data boundaries | Role check before resource lookup; tenant-scoped data; no PII in logs or errors | `AuthorizationIT`, `TenantIsolationIT`, `PiiLeakIT` |
+![Two input paths, their safeguards, PostgreSQL state and background delivery](docs/diagrams/review-overview.png)
 
-Every requirement, including caching, metrics, OOP, concurrency and failure tests, is mapped in [the coverage matrix](docs/REQUIREMENTS_TRACEABILITY.md). **The demo video is the remaining submission artifact.**
+### During the day: validate, decide and commit one event
 
-## Architecture
+The API first checks authentication, role and company scope. For each parsed event, the application filters fields by ownership, normalises the allowed values and returns all validation errors in a deterministic order. An invalid record is rejected independently, so its valid neighbours can still apply.
 
-![Original Roster Sync architecture: two input paths converge on atomic employee and outbox writes, with an approval brake on nightly changes](docs/diagrams/architecture.png)
+For a valid record, a transaction reserves the employee-version receipt, locks the employee row, and decides what to change. The employee update, final receipt and outbox insert commit together. Concurrent requests for the same key use PostgreSQL's unique constraint as the arbiter. A transaction that rolls back leaves no partial state or consumed key. Business decisions live in plain Java classes such as `ChangeDecider`; the application service owns the transaction.
 
-The React console and REST API share one origin. A Java-only runtime serves the static build. The pure Java domain owns validation, ownership, version decisions, hashing and diff/brake logic; controllers remain thin. PostgreSQL stores both employee state and the durable outbox, so no broker is needed for this assignment.
+### At night: compare a full export before applying a plan
 
-The difficult failure is a consumer committing its work just before the publisher crashes. Delivery is **at least once**, so consumers deduplicate event IDs and check current employee state. [See the original recovery sequence and failure table](docs/DESIGN.md#hardest-flow-crash-after-delivery).
+The upload becomes a durable reconciliation run. The service reads the CSV as a stream, validates its records and spills them into 256 buckets by employee ID. It compares one bucket at a time with the matching database rows, rather than building two complete in-memory maps.
 
-Diagram sources and SVG versions are in [docs/diagrams](docs/diagrams/); `render.py` uses Matplotlib. They describe this repository's implementation.
+The resulting plan includes creates, updates, repairs, version advances and eligible missing-employee deactivations. The safety brake checks row-count integrity and missing employees before apply starts. A safe plan applies in small transactions. A suspicious plan waits for a human decision. Each chunk rechecks versions under employee-row locks, so a real-time update can supersede an older planned action.
 
-### See the console
+### After commit: deliver changes and recover safely
 
-These are real screens with synthetic demonstration data. The event console shows the server's decisions. Run review shows the safety brake before an operator decides whether to proceed.
+An outbox row is a pending delivery record stored with the employee change. The publisher claims one due row in a short transaction, calls the sinks with a timeout, and marks publication. Failures get backoff and eventually a DEAD state with one operator alert. Retrying rows do not block later due rows.
 
-| Send events and inspect each result | Review the nightly plan and safety brake |
-|---|---|
-| [![Event console with ordering and replay presets](docs/images/console-events.png)](docs/images/console-events.png) | [![Nightly run review with missing counts and approval controls](docs/images/console-run-review.png)](docs/images/console-run-review.png) |
+Delivery is **at least once**. A sink may finish before the publisher crashes, or may finish after its timeout. Consumers therefore remember processed event IDs and check current employee state. The deactivation handler cancels only future scheduled bookings and frees seats. Its employee lock prevents a delayed old deactivation from cancelling a rehire's newer bookings.
 
-Open either image for the full-size view. Also see the [operations board](docs/images/console-ops.png), [employee ownership drawer](docs/images/console-employee-detail.png) and [runs list](docs/images/console-runs.png).
+See the [detailed architecture](docs/DESIGN.md), [two-page design note](docs/DESIGN.pdf) and [crash-after-delivery sequence](docs/diagrams/outbox-recovery.png). The diagrams are original to this repository and have editable SVG/source files in [docs/diagrams](docs/diagrams/).
 
-## Local setup
+## Run locally
 
-**Required:** Docker Engine/Desktop with Compose. Host Java, Maven and Node are unnecessary for the container run.
+**Required:** Docker Engine or Docker Desktop with Compose. The container build includes the frontend and Java build, so host Node, Maven and Java are not required to run the application.
 
 ```bash
 cp .env.example .env
 docker compose up --build
 ```
 
-Open [localhost:8080](http://localhost:8080/). Local credentials come from your `.env`; public demo credentials are supplied privately. PostgreSQL starts first and Flyway applies migrations. No manual database setup is required.
+Open [localhost:8080](http://localhost:8080/). Set the local demo password in `.env` and use one of the staff usernames above. PostgreSQL starts first and Flyway applies the schema automatically. Keep `.env` private. On PowerShell, use `Copy-Item .env.example .env` and `curl.exe`; the demonstration scripts run in Git Bash on Windows or Bash on Linux with curl and jq installed.
 
-| Local service | Address | Exposure |
+| Service | Address | Access |
 |---|---|---|
-| Console + API | `http://localhost:8080` | API requires bearer authentication |
-| Readiness / metrics | `http://127.0.0.1:8081/actuator/health/readiness` | Host loopback only |
+| Console and API | `http://localhost:8080` | Sign-in is public; staff API calls require a bearer token |
+| Readiness and metrics | `http://127.0.0.1:8081/actuator/health/readiness` | Published to host loopback only |
 | PostgreSQL | Compose network | No published host port |
 
-PowerShell: use `Copy-Item .env.example .env` and `curl.exe`. Shell scripts support Git Bash on Windows and Linux; install curl + jq for the scripted demos.
+<details>
+<summary>Building on a network that requires an HTTP proxy</summary>
+
+Set HTTP_PROXY and HTTPS_PROXY in your shell, with NO_PROXY for local addresses, then run the same Compose build. Optional build arguments default to empty and cover both uppercase and lowercase names because tools handle them differently. Keep actual proxy addresses and credentials out of the repository. Docker Desktop's registry access has its own proxy settings; build arguments configure the build steps, not the image-registry connection. Do not disable certificate verification to work around a proxy.
+
+</details>
+
+### Reproduce the live flows
 
 ```bash
-DEMO_AUTO=1 ./scripts/demo.sh          # complete local proof, including the 200k flows
-./scripts/demo-crash.sh               # real HALT, restart and published event ID
+DEMO_AUTO=1 ./scripts/demo.sh
 ```
 
-Both scripts use unique IDs and the main demo handles prior active runs. Never use destructive volume cleanup on a dataset you want to retain. The [demo guide](docs/DEMO_SCRIPT.md) gives each expected result.
+This runs the mixed-feed replay, ordering, invalid-record and ownership checks, 200k reconciliation, truncated-file brake, real process crash and booking effects. It uses unique IDs and waits for prior active runs, rejecting leftover awaiting plans. Unexpected outcomes make automated mode fail. Allow the async run/delivery waits to finish. The [demo guide](docs/DEMO_SCRIPT.md) lists the expected result at each step.
 
-Optional local monitoring: set `GRAFANA_ADMIN_PASSWORD` in `.env`, then `docker compose --profile monitoring up -d`. Prometheus is on loopback port 9090; Grafana is on loopback port 3000 with the provisioned Roster Sync Operations dashboard. Default Compose starts only app + db. Monitoring services are not installed on the AWS instance.
+For the isolated crash proof, run `./scripts/demo-crash.sh`. It retains the exit-137/restart evidence and requires publication of the exact event ID after recovery. Avoid destructive volume cleanup on a dataset you want to retain.
 
-## Event contract and assumptions
+### Add local monitoring
 
-**Idempotency key:** `(tenantId, employeeId, version)`. `eventId` is informational. For an accepted receipt, compare SHA-256 of event type plus canonical, ownership-filtered HR fields; exclude `eventId` and `occurredAt`. Reusing its key with different type/content is `CONFLICT`; matching content is `DUPLICATE` with `originalOutcome`. Conflicts are audited without consuming a new receipt.
+Set `GRAFANA_ADMIN_PASSWORD` privately in `.env`, then run:
 
-When no receipt matches, compare the incoming source version with the employee's current version:
+```bash
+docker compose --profile monitoring up -d
+```
 
-| Incoming state | Outcome | Employee / outbox effect |
+Prometheus is at `http://127.0.0.1:9090`, Grafana at `http://127.0.0.1:3000`. The provisioned dashboard shows event outcomes, queue depth, retry/failure rates, reconciliation decisions and apply percentiles. Database-backed gauges refresh in the background; a scrape does not query PostgreSQL. Default Compose starts only app and db, and the AWS deployment does not run these monitoring services.
+
+## Rules behind the results
+
+### Replay uses an employee-version key and canonical content
+
+The idempotency key is **(tenantId, employeeId, version)**. An eventId is informational. For an accepted key, the service compares a SHA-256 hash of event type plus canonical HR-owned fields after ownership filtering and normalisation. The hash excludes eventId and occurredAt, so changing only those delivery attributes does not create another business change.
+
+Matching accepted content returns `DUPLICATE` with its `originalOutcome`. Different type or content for that accepted key returns `CONFLICT`, leaves its receipt unchanged and writes safe rejection audit. Rejected input does not consume a receipt, so a corrected resend can use the same key.
+
+### Source versions decide which state wins
+
+When no accepted receipt matches, the incoming version is compared with the employee's current HR version:
+
+| Incoming state | Outcome | Effect |
 |---|---|---|
-| Newer, HR-owned values changed | `APPLIED` | Update state and version; exactly one Employee outbox row |
-| Newer, identical resolved HR state | `NO_CHANGE` | Advance version/timestamp; no business event |
-| Older | `STALE` | Keep employee state and version |
-| Equal, identical state | `DUPLICATE` | No employee change |
-| Equal, different state | `CONFLICT` | No employee/outbox write; safe rejection audit |
+| Newer, HR-owned values changed | `APPLIED` | Update employee/version and write exactly one Employee outbox event |
+| Newer, identical resolved state | `NO_CHANGE` | Advance version and timestamp without a business event |
+| Older | `STALE` | Keep the current employee state and version |
+| Equal, identical state | `DUPLICATE` | Keep the current employee state |
+| Equal, different state | `CONFLICT` | No employee/outbox write; record safe rejection audit |
 
-CREATE and UPDATE are **full HR snapshots**, not patches. Timestamp-only sources must send an increasing epoch-millisecond version. This is why v7 remains correct even if v6 arrives afterward. An unknown DEACTIVATE creates an inactive tombstone; later lower versions cannot resurrect it.
+CREATE and UPDATE carry **full HR snapshots**, not partial patches. That is why version 7 contains enough information to remain correct when version 6 arrives later. Timestamp-only sources must supply an increasing epoch-millisecond version. DEACTIVATE needs only employeeId and version; an unknown employee becomes an inactive tombstone. A higher-version no-op still advances the watermark, preventing intermediate stale CREATE events from resurrecting that employee.
 
-**Ownership conflict rule:** HR owns name, email, phone, manager, office, shift and status. Transport owns pickup point and special assistance. HR input for transport fields is ignored with `FIELD_NOT_OWNED_BY_SOURCE`; transport PATCH rejects HR keys. Explicit null clears a transport field; an absent key leaves it unchanged. All validation errors are field/code pairs, not rejected values.
+### Ownership is explicit, even when the sources disagree
 
-The configurable brake trips at **ratio >= threshold**, on the optional missing-count guard, or on trailer/expected row-count mismatch. Zero active employees skip ratio/count checks only. A tripped run applies **nothing** until an OPERATOR approves all, approves without deactivations, or rejects it. Snapshot comparison also heals equal-version drift and advances higher identical versions. [Full API contract](docs/API.md).
+HR owns name, email, phone, manager, office, shift and status. Transport owns pickupPoint and specialAssistance. HR input for transport fields is ignored with `FIELD_NOT_OWNED_BY_SOURCE`. A transport PATCH rejects HR-owned keys. In that PATCH, null means clear and an absent key means unchanged. Ownership is never resolved by choosing whichever payload arrived last.
 
-Assumptions: one application instance/poller, one PostgreSQL primary, full-state HR events, and 256 fixed hash buckets. Settings apply to the next run. Caffeine caches are per JVM: offices 10 minutes, employee reads 30 seconds, bounded size and after-commit eviction; in-transaction office validation bypasses cache. See [cache bounds](docs/CACHING.md).
+Email is trimmed and lowercased before validation and hashing. Phone must already be E.164; spaces and dashes are rejected. Diagnostics return field/code pairs without echoing rejected input values.
+
+### The brake stops the whole suspicious plan
+
+The default missing-ratio rule trips at **missing share >= 30%**, including the exact boundary. Optional missing-count and trailer/expected-row-count checks can also stop a run. With zero active employees, ratio/count checks are skipped, but row-count integrity checks still apply.
+
+A tripped plan changes nothing until an OPERATOR chooses to approve all changes, approve without deactivations, or reject it. Saving a new threshold affects the **next** run; an existing plan retains its recorded setting. A snapshot can also heal equal-version drift and advance higher identical versions. See [reconciliation rules](docs/RECONCILIATION.md) and the [complete API contract](docs/API.md).
 
 ## Performance
 
@@ -184,20 +236,22 @@ On PowerShell use `.\mvnw.cmd`. Docker/CI use Temurin 21. Maven verification wor
 | PostgreSQL integration | 147 |
 | Normal backend verification | **292 passed** |
 | Frontend unit | **26 passed** |
-| Real-Compose browser cases | **15 passed**, including **48** axe scans with zero serious/critical findings |
+| Real-Compose browser cases | **17 passed**, including **60** axe scans with zero serious/critical findings |
 | Authenticated Lighthouse accessibility | **100/100** on Runs and Employees, light/dark |
 
-The production initial JS is 109.46 kB gzip. Browser checks cover role menus, memory-only login, transport null/no-op behavior, all six event presets, safe errors and the real brake/rejection workflow. [Reproducible commands and complete test catalogue](docs/TESTING.md).
+The reviewed production build’s initial JS is about 110.40 kB gzip. Browser checks cover role menus, memory-only login, transport null/no-op behavior, all six event presets, safe errors and the real brake/rejection workflow. [Reproducible commands and complete test catalogue](docs/TESTING.md).
 
 The crash tests cover failure before commit, after commit before publication, and after a consumer commit before publication acknowledgement. Outbox delivery is at least once: a timeout does not stop a sink, so consumers deduplicate and re-check employee status. Lock retries occur outside record transactions; failed reconciliation chunks roll back before fallback. [Failure table and recovery sequence](docs/DESIGN.md#hardest-flow-crash-after-delivery).
 
 ## Deployment and trade-offs
 
-The live console runs on an existing **t4g.small in Sydney (`ap-southeast-2`)** with app + PostgreSQL + Caddy. About 150 ms added latency from India is accepted. Only 80/443 are public; HTTPS redirects are enforced. Management 8081 binds to instance loopback and is available through SSM; 22, 5432, 8080 and 8081 are closed externally. No demo password is committed, logged or printed here.
+The live application runs on one **t4g.small in Sydney (ap-southeast-2)** with app, PostgreSQL and Caddy. Caddy terminates HTTPS and redirects HTTP. Only ports 80 and 443 are public. Management port 8081 binds to instance loopback and is reached through SSM port forwarding; ports 22, 5432, 8080 and 8081 remain closed to the internet. The chosen region accepts about 150 ms added latency from India, so local benchmark numbers are not live-network latency guarantees.
 
-The deployment uses a 2 GB swap file, JVM `-Xmx768m`, PostgreSQL `shared_buffers=256MB`, Docker log rotation and encrypted S3 backups. [Deployment, private credential retrieval and management access](docs/DEPLOYMENT.md) · [Stop/start and teardown](deploy/aws-ec2/TEARDOWN.md).
+The host has a 2 GB swap file, JVM `-Xmx768m`, PostgreSQL `shared_buffers=256MB`, Docker log rotation and encrypted S3 backups. Secrets live in SSM SecureString and are retrieved privately. The deployment guide includes credential retrieval, management forwarding, backup/reboot checks and [stop/start/teardown commands](deploy/aws-ec2/TEARDOWN.md). See [DEPLOYMENT.md](docs/DEPLOYMENT.md) for the exact setup.
 
-Trade-offs: PostgreSQL consistency over accepting writes during a DB outage; per-record transactions over maximum batch throughput; at-least-once delivery with consumer dedupe over a false exactly-once execution claim; local Caffeine over an extra Redis dependency. Deliberately omitted: a broker, Kubernetes, multi-instance worker leases, a full transport product and in-flight run cancellation. Existing JWTs remain valid until expiry after account disablement; an IdP/revocation mechanism is a production extension. [Decision records](docs/DECISIONS.md).
+The service fails closed if PostgreSQL is unavailable because it cannot safely claim an ordered durable write without its authority. Per-record transactions isolate bad records but increase large-batch response time. Consumer deduplication makes repeated delivery safe without claiming exactly-once sink execution. Local Caffeine caches keep read latency low, with bounded TTLs and after-commit eviction; in-transaction office validation stays uncached.
+
+The tested runtime assumes one app instance/poller and one PostgreSQL primary. Before adding instances, reconciliation needs durable worker ownership and shared upload storage, and caches need a cross-instance invalidation strategy or accepted TTL staleness. A broker, Kubernetes, a full identity provider and in-flight run cancellation are deliberate omissions. Disabling an account prevents new logins, but existing JWTs stay valid until expiry; revocation or an IdP would be a production extension. These boundaries are recorded in [DECISIONS.md](docs/DECISIONS.md).
 
 ## Documentation map
 
