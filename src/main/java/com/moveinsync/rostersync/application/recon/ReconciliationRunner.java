@@ -36,13 +36,7 @@ public class ReconciliationRunner {
             if(!run.status().equals("UPLOADED")) return;
             runs.transition(tenantId,runId,"UPLOADED","DIFFING");
             var brakeSettings=settings.get(tenantId).brake();runs.settings(tenantId,runId,brakeSettings);
-            var header=csv.header(run.file());
-            long ignoredColumns=header.stream().filter(column->!RosterCsvReader.COLUMNS.contains(column)
-                    && Arrays.stream(com.moveinsync.rostersync.domain.model.EmployeeField.values()).noneMatch(field->field.csvName().equals(column))).count();
-            if(ignoredColumns>0) LOG.warn("recon.file.warning runId={} code=UNKNOWN_FIELD_IGNORED ignoredColumns={}",runId,ignoredColumns);
-            long ignoredOwned=Arrays.stream(com.moveinsync.rostersync.domain.model.EmployeeField.values()).filter(field->header.contains(field.csvName())
-                    && ownership.ownerOf(field)==com.moveinsync.rostersync.domain.model.FieldOwner.TRANSPORT).count();
-            if(ignoredOwned>0) LOG.warn("recon.file.warning runId={} code=FIELD_NOT_OWNED_BY_SOURCE ignoredColumns={}",runId,ignoredOwned);
+            csv.header(run.file()); // Header names and warning details must never enter logs.
             // This small per-run office catalogue avoids 200k point queries. Apply rechecks activity.
             Map<String,OfficeLookup.Status> offices=new HashMap<>();
             jdbc.sql("SELECT code,active FROM office WHERE tenant_id=?").param(tenantId).query((row,n)->{

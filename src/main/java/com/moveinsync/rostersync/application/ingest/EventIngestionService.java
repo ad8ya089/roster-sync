@@ -119,6 +119,6 @@ public class EventIngestionService {
         return result(index, parsed, ApplyResult.outcome(IngestOutcome.RETRYABLE_ERROR), List.of(new FieldError("record", "RETRYABLE_ERROR")));
     }
     private static IngestResult.RecordResult result(int index, HrEventInputParser.ParsedEvent parsed, ApplyResult applied, List<FieldError> errors) {
-        return new IngestResult.RecordResult(index, parsed.employeeId(), parsed.version(), applied.outcome(), applied.currentVersion(), applied.originalOutcome(), parsed.validation().warnings(), errors);
+        return new IngestResult.RecordResult(index, parsed.employeeId(), parsed.version(), applied.outcome(), applied.currentVersion(), applied.originalOutcome(), parsed.validation().warnings(), parsed.validation().warningCount(), errors);
     }
 }

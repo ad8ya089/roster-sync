@@ -34,7 +34,7 @@ public class HrEventInputParser {
             String key = String.valueOf(entry.getKey());
             if (METADATA.contains(key)) continue;
             var field = Arrays.stream(EmployeeField.values()).filter(value -> value.jsonName().equals(key)).findFirst();
-            if (field.isEmpty()) unknown.add(key.matches("[A-Za-z][A-Za-z0-9_]{0,63}") ? key : "unknownField");
+            if (field.isEmpty()) unknown.add(key);
             else fields.put(field.get(), "DEACTIVATE".equals(type) || policy.ownerOf(field.get()) != FieldOwner.HR
                     ? null : string(raw, key, errors));
         }
@@ -42,7 +42,7 @@ public class HrEventInputParser {
         if (fields.containsKey(EmployeeField.EMAIL)) fields.put(EmployeeField.EMAIL, EmployeeField.EMAIL.canonicalValue(fields.get(EmployeeField.EMAIL)));
         var checked = validator.validateEvent(tenantId, employeeId, version, type, fields, unknown);
         errors.addAll(checked.errors());
-        var validation = new ValidationResult(errors, checked.warnings());
+        var validation = new ValidationResult(errors, checked.warnings(),checked.warningCount());
         String safeId = employeeId != null && employeeId.matches("[A-Za-z0-9_-]{1,64}") ? employeeId : null;
         if (!validation.valid()) return new ParsedEvent(null, safeId, version,
                 Set.of("CREATE","UPDATE","DEACTIVATE").contains(type == null ? "" : type) ? type : "UNKNOWN", validation);

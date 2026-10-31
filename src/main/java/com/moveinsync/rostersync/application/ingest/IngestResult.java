@@ -9,5 +9,5 @@ public record IngestResult(Summary summary, List<RecordResult> results) {
     public record RecordResult(int index, String employeeId, long version, IngestOutcome outcome,
                                @JsonInclude(JsonInclude.Include.NON_NULL) Long currentVersion,
                                @JsonInclude(JsonInclude.Include.NON_NULL) IngestOutcome originalOutcome,
-                               List<FieldError> warnings, @JsonInclude(JsonInclude.Include.NON_EMPTY) List<FieldError> errors) { }
+                               List<FieldError> warnings, int warningCount, @JsonInclude(JsonInclude.Include.NON_EMPTY) List<FieldError> errors) { }
 }

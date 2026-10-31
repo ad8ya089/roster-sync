@@ -14,8 +14,6 @@ import org.springframework.stereotype.Component;
 @Component
 public class RosterCsvReader {
     public static final List<String> COLUMNS=List.of("employee_id","version","name","email","phone","manager_id","office_code","shift_code","status");
-    private static final Map<String,EmployeeField> FIELDS=Map.of("name",EmployeeField.NAME,"email",EmployeeField.EMAIL,"phone",EmployeeField.PHONE,
-            "manager_id",EmployeeField.MANAGER_ID,"office_code",EmployeeField.OFFICE_CODE,"shift_code",EmployeeField.SHIFT_CODE,"status",EmployeeField.STATUS);
     public List<String> header(Path path) throws IOException {
         try(var input=reader(path)) {
             var line=new StringBuilder();int character;
@@ -33,6 +31,12 @@ public class RosterCsvReader {
         var validator=new RecordValidator(ownership,offices);long count=0,valid=0;Long trailer=null;
         try(var input=reader(path);var parser=CSVFormat.DEFAULT.builder().setHeader().setSkipHeaderRecord(true)
                 .setDuplicateHeaderMode(DuplicateHeaderMode.DISALLOW).setIgnoreEmptyLines(false).get().parse(input)) {
+            var unknown=new HashSet<>(parser.getHeaderNames());unknown.removeAll(COLUMNS);
+            var presentFields=new EnumMap<EmployeeField,String>(EmployeeField.class);
+            for(var field:EmployeeField.values()) if(parser.getHeaderNames().contains(field.csvName())) {
+                unknown.remove(field.csvName());presentFields.put(field,null);
+            }
+            var headerWarnings=validator.validateFileRow(tenantId,"HEADER",1,presentFields,unknown);
             var records=parser.iterator();
             while(records.hasNext()) {
                 var record=records.next();long number=record.getRecordNumber();
@@ -43,8 +47,8 @@ public class RosterCsvReader {
                 count++;String id=value(record,"employee_id");long version=0;
                 try {version=Long.parseLong(Objects.toString(value(record,"version"),""));}catch(NumberFormatException ignored) { }
                 var fields=new EnumMap<EmployeeField,String>(EmployeeField.class);
-                FIELDS.forEach((column,field)->fields.put(field,field==EmployeeField.PHONE?value(record,column):field.canonicalValue(value(record,column))));
-                var checked=validator.validateFileRow(tenantId,id,version,fields,Set.of());
+                for(var field:presentFields.keySet()) fields.put(field,field==EmployeeField.PHONE?value(record,field.csvName()):field.canonicalValue(value(record,field.csvName())));
+                var checked=validator.validateFileRow(tenantId,id,version,fields,unknown);
                 var errors=new ArrayList<>(checked.errors());
                 if(record.size()!=parser.getHeaderNames().size()) errors.add(new FieldError("record","INVALID_FORMAT"));
                 String safeId=id!=null && id.matches("[A-Za-z0-9_-]{1,64}")?id:null;
@@ -54,9 +58,9 @@ public class RosterCsvReader {
                 if(errors.isEmpty()) valid++;
                 consumer.accept(new Row(number,safeId,version,errors.isEmpty()?snapshot:null,List.copyOf(errors)));
             }
+            return new ReadSummary(count,valid,trailer,headerWarnings.warnings(),headerWarnings.warningCount());
         } catch(UncheckedIOException malformed) {throw new MalformedCsv(count+1);}
         catch(IllegalArgumentException malformed) {throw new MalformedCsv(count+1);}
-        return new ReadSummary(count,valid,trailer);
     }
     private static String value(CSVRecord row,String key) {if(!row.isMapped(key) || !row.isSet(key)) return null;String value=row.get(key);return value.isEmpty()?null:value;}
     private static BufferedReader reader(Path path) throws IOException {
@@ -65,7 +69,7 @@ public class RosterCsvReader {
     public record Row(long number,String employeeId,long version,HrSnapshot snapshot,List<FieldError> errors) {
         @Override public String toString() {return "CsvRow[number="+number+"]";}
     }
-    public record ReadSummary(long total,long valid,Long trailerCount) { }
+    public record ReadSummary(long total,long valid,Long trailerCount,List<FieldError> warnings,int warningCount) { }
     public static final class InvalidHeader extends IOException {public InvalidHeader(){super("INVALID_CSV_HEADER");}}
     public static final class MalformedCsv extends IOException {
         private final long number;
