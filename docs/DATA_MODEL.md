@@ -1,5 +1,7 @@
 # Data Model
 
+For the visual overview, see the [schema guide with focused ER diagrams](SCHEMA_GUIDE.md) and the [full 14-table relationship map](diagrams/schema-full.svg). The diagrams distinguish the six declared SQL foreign keys from logical application references; definitions and constraints below remain authoritative.
+
 Phase 7 migration `V4__operational_summary_indexes.sql` adds indexes on `hr_event_receipt(tenant_id, received_at)`, `record_rejection(tenant_id, created_at)` and `outbox_event(tenant_id, status)`. The operational summary reads durable state from these tables; no minute-rollup table or per-tenant counter row is introduced.
 
 PostgreSQL 17. All tables are created by Flyway (`src/main/resources/db/migration`). Every business table carries `tenant_id` and every query filters by it.

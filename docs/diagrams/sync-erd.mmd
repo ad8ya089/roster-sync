@@ -1,0 +1,59 @@
+erDiagram
+    direction TB
+    recon_run ||--o{ recon_action : "run_id FK"
+    recon_run |o..o{ record_rejection : "run_id; FILE only; logical"
+    recon_run |o..o{ ops_alert : "reference_id; logical"
+    outbox_event |o..o{ processed_event : "event_id per sink; logical"
+    hr_event_receipt {
+        bigint id PK
+        uuid tenant_id
+        varchar external_id
+        bigint version
+        char64 payload_hash
+        varchar outcome
+    }
+    recon_run {
+        uuid id PK
+        uuid tenant_id
+        varchar status
+        timestamptz as_of
+        numeric brake_ratio_used
+        timestamptz finished_at
+    }
+    recon_action {
+        bigint id PK
+        uuid run_id FK
+        uuid tenant_id
+        varchar external_id
+        varchar action
+        bigint expected_db_version
+        jsonb payload
+        varchar status
+    }
+    record_rejection {
+        bigint id PK
+        uuid tenant_id
+        uuid run_id
+        varchar external_id
+        varchar error_codes
+    }
+    ops_alert {
+        bigint id PK
+        uuid tenant_id
+        varchar alert_type
+        varchar reference_id
+    }
+    outbox_event {
+        bigint id PK
+        uuid event_id UK
+        uuid tenant_id
+        varchar aggregate_id
+        bigint aggregate_version
+        jsonb payload
+        varchar status
+    }
+    processed_event {
+        varchar sink PK
+        uuid event_id PK
+        timestamptz processed_at
+    }

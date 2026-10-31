@@ -1,0 +1,115 @@
+erDiagram
+    direction TB
+    tenant ||--o{ office : "tenant_id FK"
+    tenant ||--o{ app_user : "tenant_id FK"
+    tenant ||--o{ employee : "tenant_id FK"
+    office |o--o{ employee : "office_id FK"
+    employee |o..o{ cab_booking : "tenant + external ID; logical"
+    employee |o..o{ route_seat : "tenant + external ID; logical"
+    tenant {
+        uuid id PK
+        varchar code UK
+    }
+    office {
+        bigint id PK
+        uuid tenant_id FK
+        varchar code
+        boolean active
+    }
+    app_user {
+        bigint id PK
+        uuid tenant_id FK
+        varchar username UK
+        varchar role
+        varchar employee_external_id
+    }
+    employee {
+        bigint id PK
+        uuid tenant_id FK
+        varchar external_id
+        bigint office_id FK
+        varchar status
+        bigint hr_version
+        integer transport_version
+    }
+    cab_booking {
+        bigint id PK
+        uuid tenant_id
+        varchar employee_external_id
+        timestamptz pickup_at
+        varchar status
+    }
+    route_seat {
+        bigint id PK
+        uuid tenant_id
+        varchar route_code
+        integer seat_no
+        varchar employee_external_id
+    }
+    recon_run ||--o{ recon_action : "run_id FK"
+    recon_run |o..o{ record_rejection : "run_id; FILE only; logical"
+    recon_run |o..o{ ops_alert : "reference_id; logical"
+    outbox_event |o..o{ processed_event : "event_id per sink; logical"
+    hr_event_receipt {
+        bigint id PK
+        uuid tenant_id
+        varchar external_id
+        bigint version
+        char64 payload_hash
+        varchar outcome
+    }
+    recon_run {
+        uuid id PK
+        uuid tenant_id
+        varchar status
+        timestamptz as_of
+        numeric brake_ratio_used
+        timestamptz finished_at
+    }
+    recon_action {
+        bigint id PK
+        uuid run_id FK
+        uuid tenant_id
+        varchar external_id
+        varchar action
+        bigint expected_db_version
+        jsonb payload
+        varchar status
+    }
+    record_rejection {
+        bigint id PK
+        uuid tenant_id
+        uuid run_id
+        varchar external_id
+        varchar error_codes
+    }
+    ops_alert {
+        bigint id PK
+        uuid tenant_id
+        varchar alert_type
+        varchar reference_id
+    }
+    outbox_event {
+        bigint id PK
+        uuid event_id UK
+        uuid tenant_id
+        varchar aggregate_id
+        bigint aggregate_version
+        jsonb payload
+        varchar status
+    }
+    processed_event {
+        varchar sink PK
+        uuid event_id PK
+        timestamptz processed_at
+    }
+    tenant ||--o| tenant_settings : "tenant_id PK and FK"
+    employee |o..o{ app_user : "EMPLOYEE mapping; logical"
+    employee |o..o{ hr_event_receipt : "tenant + external ID; logical"
+    employee |o..o{ outbox_event : "Employee aggregate; logical"
+    recon_run |o..o{ outbox_event : "Run aggregate; logical"
+    tenant_settings {
+        uuid tenant_id PK,FK
+        numeric brake_max_missing_ratio
+        integer brake_max_missing_count
+    }

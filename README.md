@@ -113,6 +113,17 @@ Office codes are unique on `(tenant_id, code)`; employees on `(tenant_id, extern
 
 [Core ER as SVG](docs/diagrams/roster-key-erd.svg) · [Workforce ER as SVG](docs/diagrams/workforce-erd.svg) · [Full column definitions](docs/DATA_MODEL.md)
 
+<details>
+<summary>Expand the reconciliation, audit and delivery ER diagram</summary>
+
+![Reconciliation runs and actions, rejection audit, alerts, accepted receipts and consumer deduplication](docs/diagrams/sync-erd.png)
+
+`recon_run` records the uploaded snapshot and operator decision; `recon_action` records the durable plan. `record_rejection` stores safe codes rather than rejected values. `processed_event` remembers delivery per sink. The accepted receipt ledger, nightly plan and consumer ledger answer different questions, so they are separate tables.
+
+</details>
+
+The [schema guide](docs/SCHEMA_GUIDE.md) explains each relationship and key. The [full 14-table ER map](docs/diagrams/schema-full.svg) includes settings and the logical links between both views. Its dotted links do not imply extra SQL foreign keys or automatic cascading deletes.
+
 ### During the day: validate, decide and commit one event
 
 The API first checks authentication, role and company scope. For each parsed event, the application filters fields by ownership, normalises the allowed values and returns all validation errors in a deterministic order. An invalid record is rejected independently, so its valid neighbours can still apply.
