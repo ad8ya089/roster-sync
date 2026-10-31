@@ -7,6 +7,19 @@ import static org.assertj.core.api.Assertions.*;
 
 @Timeout(30)
 class ReplayIdempotencyIT extends AbstractIngestionIntegrationTest {
+    @Test void storedLegacyHashReplaysAsDuplicateWithoutRewritingStateOrReceipt() throws Exception {
+        var original=event("LEGACY_HASH",7,"CREATE","BLR-1","S1");send(original);
+        jdbc.update("UPDATE hr_event_receipt SET payload_hash=? WHERE tenant_id=? AND external_id='LEGACY_HASH'",
+                "74c43cf3b98dcca7d5c41e751df8eb102ad611e1bea196718893fa9a2ec9cc48",JwtTestTokens.ACME);
+        String employee=employeeBytes("LEGACY_HASH");
+        String receipt=jdbc.queryForObject("SELECT row_to_json(hr_event_receipt)::text FROM hr_event_receipt",String.class);
+        var replay=new LinkedHashMap<>(original);replay.put("eventId","new-delivery");replay.put("email"," FIXTURE@EXAMPLE.TEST ");
+        var result=send(replay).results().getFirst();
+        assertThat(result.outcome()).isEqualTo(IngestOutcome.DUPLICATE);assertThat(result.originalOutcome()).isEqualTo(IngestOutcome.APPLIED);
+        assertThat(employeeBytes("LEGACY_HASH")).isEqualTo(employee);
+        assertThat(jdbc.queryForObject("SELECT row_to_json(hr_event_receipt)::text FROM hr_event_receipt",String.class)).isEqualTo(receipt);
+        assertThat(count("hr_event_receipt")).isEqualTo(1);assertThat(employeeOutbox()).isEqualTo(1);
+    }
     @Test void replayTheSameFeedTwiceChangesNothing() throws Exception {
         var batch=mapper.readTree(Files.readString(Path.of("samples/feed.json")));
         var events=mapper.convertValue(batch.get("events"),List.class);

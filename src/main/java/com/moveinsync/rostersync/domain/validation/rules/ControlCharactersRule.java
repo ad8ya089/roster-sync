@@ -5,10 +5,10 @@ import com.moveinsync.rostersync.domain.validation.*;
 import java.util.ArrayList;
 import java.util.List;
 
-/** Reject before trimming: PostgreSQL text cannot represent NUL; no C0 is valid roster data. */
+/** Reject before trimming: C0/DEL are invalid roster data, including hash separators/null markers. */
 public final class ControlCharactersRule implements ValidationRule<ValidationInput> {
     public static boolean containsControl(String value) {
-        return value!=null && value.chars().anyMatch(character->character<32);
+        return value!=null && value.chars().anyMatch(character->character<32 || character==127);
     }
     @Override public List<FieldError> validate(ValidationInput input) {
         var errors=new ArrayList<FieldError>();

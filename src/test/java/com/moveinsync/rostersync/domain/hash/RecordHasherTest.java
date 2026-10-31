@@ -9,6 +9,31 @@ import static com.moveinsync.rostersync.domain.DomainFixtures.*;
 import static org.assertj.core.api.Assertions.*;
 
 class RecordHasherTest {
+    @Test void legacyReceiptEventHashRemainsByteCompatible() {
+        // Frozen independently with the deployed UTF-8/type + US-separated fields + NUL-null format.
+        var snapshot=new HrSnapshot("Fixture Person","fixture@example.test","+919800000001",null,"BLR-1","S1","ACTIVE");
+        var create=new com.moveinsync.rostersync.domain.command.CreateEmployee("E1",7,"legacy",java.time.Instant.EPOCH,snapshot);
+        assertThat(hasher.hashEvent(create)).isEqualTo("74c43cf3b98dcca7d5c41e751df8eb102ad611e1bea196718893fa9a2ec9cc48");
+    }
+    @Test void controlFreeValidationProtectsTheUnchangedDelimiterAndNullEncoding() {
+        var policy=new FieldOwnershipPolicy(Set.of());
+        var allFields=new RecordHasher(policy);
+        var validator=new com.moveinsync.rostersync.domain.validation.RecordValidator(policy,(tenant,code)->com.moveinsync.rostersync.domain.validation.OfficeLookup.Status.ACTIVE);
+        var first=new HrSnapshot("Test Person","test@example.test",null,null,"BLR-1","S1","ACTIVE","Gate\u001fAssistance","Wheelchair");
+        var second=new HrSnapshot("Test Person","test@example.test",null,null,"BLR-1","S1","ACTIVE","Gate","Assistance\u001fWheelchair");
+        // These are different snapshots but identical unescaped field streams. Do not change
+        // the format: validate before hashing so stored receipt hashes remain replay-compatible.
+        assertThat(first).isNotEqualTo(second);
+        assertThat(allFields.hash(first)).isEqualTo(allFields.hash(second));
+        var nulName=new HrSnapshot("\u0000",null,null,null,null,null,"INACTIVE");
+        assertThat(hasher.hash(nulName)).isEqualTo(hasher.hash(HrSnapshot.tombstone()));
+        for(var snapshot:java.util.List.of(first,second,nulName)) {
+            var fields=new java.util.EnumMap<EmployeeField,String>(EmployeeField.class);
+            for(var field:EmployeeField.values()) fields.put(field,snapshot.get(field));
+            assertThat(validator.validateFileRow(java.util.UUID.randomUUID(),"E1",1,fields,Set.of()).errors())
+                    .anyMatch(error->error.code().equals("INVALID_FORMAT"));
+        }
+    }
     @org.junit.jupiter.api.Test
     void receiptHashesIncludeTypeButExcludeInformationalMetadata() {
         var hasher = new RecordHasher(com.moveinsync.rostersync.domain.ownership.FieldOwnershipPolicy.defaults());

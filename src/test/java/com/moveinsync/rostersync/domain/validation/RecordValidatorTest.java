@@ -13,6 +13,16 @@ import org.junit.jupiter.params.provider.ValueSource;
 import static org.assertj.core.api.Assertions.*;
 
 class RecordValidatorTest {
+    @Test void rejectsDelInEveryOwnedStringForApiAndCsv() {
+        var allHr=new RecordValidator(new FieldOwnershipPolicy(Set.of()),offices);
+        for(var field:EmployeeField.values()) {
+            var fields=validFields();fields.put(field,"A\u007fB");
+            assertThat(allHr.validateEvent(TENANT,"E1",1,"UPDATE",fields,Set.of()).errors())
+                    .as("API DEL in %s",field).contains(new FieldError(field.jsonName(),"INVALID_FORMAT"));
+            assertThat(allHr.validateFileRow(TENANT,"E1",1,fields,Set.of()).errors())
+                    .as("CSV DEL in %s",field).contains(new FieldError(field.jsonName(),"INVALID_FORMAT"));
+        }
+    }
     @Test void controlCharactersInOfficeCodesAreRejectedBeforeAnyDatabaseLookup() {
         var lookup=org.mockito.Mockito.mock(OfficeLookup.class);
         var checked=new RecordValidator(FieldOwnershipPolicy.defaults(),lookup);

@@ -3,6 +3,7 @@ import com.moveinsync.rostersync.domain.command.*;
 import com.moveinsync.rostersync.domain.model.*;
 import com.moveinsync.rostersync.domain.ownership.FieldOwnershipPolicy;
 import com.moveinsync.rostersync.domain.validation.*;
+import com.moveinsync.rostersync.domain.validation.rules.ControlCharactersRule;
 import java.math.BigInteger;
 import java.time.Instant;
 import java.util.*;
@@ -23,7 +24,6 @@ public class HrEventInputParser {
         String type = string(raw, "type", errors);
         String eventId = string(raw, "eventId", errors);
         if (eventId != null && eventId.length() > 100) errors.add(new FieldError("eventId", "TOO_LONG"));
-        if (com.moveinsync.rostersync.domain.validation.rules.ControlCharactersRule.containsControl(eventId)) errors.add(new FieldError("eventId","INVALID_FORMAT"));
         long version = version(raw.get("version"));
         Instant occurredAt = null;
         String occurred = string(raw, "occurredAt", errors);
@@ -62,7 +62,10 @@ public class HrEventInputParser {
     private static String string(Map<?, ?> raw, String key, List<FieldError> errors) {
         Object value = raw.get(key);
         if (value == null) return null;
-        if (value instanceof String text) return text;
+        if (value instanceof String text) {
+            if(ControlCharactersRule.containsControl(text)) errors.add(new FieldError(key,"INVALID_FORMAT"));
+            return text;
+        }
         errors.add(new FieldError(key, "INVALID_FORMAT")); return null;
     }
     private static long version(Object value) {

@@ -7,6 +7,18 @@ import org.junit.jupiter.api.Test;
 import static org.assertj.core.api.Assertions.*;
 
 class HrEventInputParserTest {
+    @Test void controlsInAllStringMetadataReportInvalidFormat() {
+        for(var key:List.of("employeeId","type","eventId","occurredAt")) for(int control:new int[]{0,31,127}) {
+            var input=new LinkedHashMap<String,Object>(Map.of("type","DEACTIVATE","employeeId","E1","version",1));
+            input.put(key,"X"+(char)control+"Y");
+            assertThat(parser.parse(UUID.randomUUID(),input).validation().errors())
+                    .as("%s control %s",key,control).contains(new FieldError(key,"INVALID_FORMAT"));
+        }
+    }
+    @Test void metadataEventIdsAlsoRejectDel() {
+        var parsed=parser.parse(UUID.randomUUID(),Map.of("type","DEACTIVATE","employeeId","E1","version",1,"eventId","HR\u007f1"));
+        assertThat(parsed.validation().errors()).contains(new FieldError("eventId","INVALID_FORMAT"));
+    }
     @Test void eventIdsRejectControlsAndDatabaseColumnOverflow() {
         for(int control=0;control<32;control++) {
             var parsed=parser.parse(UUID.randomUUID(),Map.of("type","DEACTIVATE","employeeId","E1","version",1,"eventId","HR"+(char)control));

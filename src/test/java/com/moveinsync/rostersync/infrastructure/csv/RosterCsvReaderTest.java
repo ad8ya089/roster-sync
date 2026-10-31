@@ -10,6 +10,15 @@ import org.junit.jupiter.api.io.TempDir;
 import static org.assertj.core.api.Assertions.*;
 
 class RosterCsvReaderTest {
+    @Test void delInAFileNameFieldIsRejectedWithoutLosingTheNextRow() throws Exception {
+        var file=directory.resolve("del.csv");
+        Files.writeString(file,HEADER+"E1,1,Fixture\u007fPerson,f@example.test,+919800000001,,BLR-1,S1,ACTIVE\nE2,1,Fixture,f@example.test,+919800000001,,BLR-1,S1,ACTIVE\n");
+        var rows=new ArrayList<RosterCsvReader.Row>();
+        var result=reader.read(file,UUID.randomUUID(),FieldOwnershipPolicy.defaults(),(tenant,code)->OfficeLookup.Status.ACTIVE,rows::add);
+        assertThat(result.valid()).isEqualTo(1);
+        assertThat(rows.getFirst().errors()).contains(new com.moveinsync.rostersync.domain.validation.FieldError("name","INVALID_FORMAT"));
+        assertThat(rows.getLast().snapshot()).isNotNull();
+    }
     @TempDir Path directory;
     private final RosterCsvReader reader=new RosterCsvReader();
     private static final String HEADER=String.join(",",RosterCsvReader.COLUMNS)+"\n";
