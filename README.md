@@ -14,6 +14,7 @@ Java 21 · Spring Boot 4.1 · PostgreSQL 17 · React · Docker Compose
 |---|---|
 | Try the two examples from the brief | [Two-minute walkthrough](#two-minute-walkthrough) |
 | Understand the design and its failure boundary | [Architecture](#architecture) and [two-page design note](docs/DESIGN.pdf) |
+| Follow the presentation or review the interview evidence | [Presentation deck (PDF)](docs/roster-sync-deck.pdf) |
 | Check each requirement against code and a test | [Requirements coverage](docs/REQUIREMENTS_TRACEABILITY.md) |
 | Run the assignment on your machine | [Local setup](#local-setup) |
 | Inspect measured results and their limits | [Performance](#performance) |
@@ -74,16 +75,15 @@ The difficult failure is a consumer committing its work just before the publishe
 
 Diagram sources and SVG versions are in [docs/diagrams](docs/diagrams/); `render.py` uses Matplotlib. They describe this repository's implementation.
 
-<details>
-<summary>Console screenshots (synthetic demonstration data)</summary>
+### See the console
 
-| Operations | Run review |
+These are real screens with synthetic demonstration data. The event console shows the server's decisions. Run review shows the safety brake before an operator decides whether to proceed.
+
+| Send events and inspect each result | Review the nightly plan and safety brake |
 |---|---|
-| ![Operations board](docs/images/console-ops.png) | ![Run review](docs/images/console-run-review.png) |
+| [![Event console with ordering and replay presets](docs/images/console-events.png)](docs/images/console-events.png) | [![Nightly run review with missing counts and approval controls](docs/images/console-run-review.png)](docs/images/console-run-review.png) |
 
-[Event console](docs/images/console-events.png) · [Employee ownership drawer](docs/images/console-employee-detail.png) · [Runs list](docs/images/console-runs.png)
-
-</details>
+Open either image for the full-size view. Also see the [operations board](docs/images/console-ops.png), [employee ownership drawer](docs/images/console-employee-detail.png) and [runs list](docs/images/console-runs.png).
 
 ## Local setup
 
@@ -204,6 +204,7 @@ Trade-offs: PostgreSQL consistency over accepting writes during a DB outage; per
 | Question | Document |
 |---|---|
 | How does the system work, and recover? | [Two-page PDF](docs/DESIGN.pdf) and [Markdown](docs/DESIGN.md) |
+| How can I follow the demo and inspect the design decisions? | [Presentation deck, slides only](docs/roster-sync-deck.pdf) |
 | What does each endpoint accept and return? | [API](docs/API.md) |
 | Which requirement is proved by which test? | [Requirements coverage](docs/REQUIREMENTS_TRACEABILITY.md) |
 | How are snapshots partitioned, compared and applied? | [Reconciliation](docs/RECONCILIATION.md) |
@@ -220,6 +221,6 @@ Code: `api → application → domain`; infrastructure supplies persistence, sec
 
 ## Demo video
 
-**Recording pending.** The next deliverable is a short video showing ordering/replay, the truncated-file brake, a real crash/recovery and sample API calls. The live assignment and automated demonstrations are ready; the video link will be added here after recording.
+**Demo video link: pending recording.** The recording will show ordering/replay, the truncated-file brake, a real crash/recovery and sample API calls. The [presentation deck](docs/roster-sync-deck.pdf) accompanies those flows. The live assignment and automated demonstrations are ready.
 
 <!-- DEMO_VIDEO_URL: add the final recording link here. -->
