@@ -4,11 +4,10 @@
 
 Built by **Aditya Prakash** for **MoveInSync Backend Case Study 5, Advanced Track**.
 
-[Open the live console](https://rostersync-aditya.duckdns.org) · [View the presentation](docs/roster-sync-deck.pdf) · [Demo video](#demo-video)
+**Live application: [rostersync-aditya.duckdns.org](https://rostersync-aditya.duckdns.org)**
 
 **Demo credentials are provided privately.** The application uses prepared staff accounts with company and role permissions. Your personal email address does not automatically create an account. On the sign-in screen, choose **Need an account?** to find the appropriate demo username.
 
-**Browser access status (31 October 2026):** The refreshed sign-in and account-help screens are deployed, and live functional checks pass. Google Safe Browsing still flags the demo hostname; owner verification and review are pending. HTTPS success does not clear that warning. Use the local setup below until the review is resolved, and keep browser protection enabled.
 
 Java 21 · Spring Boot 4.1 · PostgreSQL 17 · React · Docker Compose
 
@@ -273,9 +272,3 @@ The tested runtime assumes one app instance/poller and one PostgreSQL primary. B
 | How is the console designed? | [Frontend](docs/FRONTEND.md) |
 
 Code: `api → application → domain`; infrastructure supplies persistence, security, caching and metrics. `domain` has no Spring/Jakarta/SQL/application/API dependency; architecture tests enforce it. The `frontend/` build is embedded in the Java jar. `samples/`, `postman/`, `loadtest/`, `ops/` and `deploy/aws-ec2/` contain the reproducible supporting tools.
-
-## Demo video
-
-**Demo video link: pending recording.** The recording will show ordering/replay, the truncated-file brake, a real crash/recovery and sample API calls. The [presentation deck](docs/roster-sync-deck.pdf) accompanies those flows. The local automated demonstrations are ready; the public browser warning remains pending owner review.
-
-<!-- DEMO_VIDEO_URL: add the final recording link here. -->
