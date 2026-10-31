@@ -75,6 +75,9 @@ logging:
     # Driver diagnostics can contain rejected values; the API logs only safe error metadata.
     org.hibernate.engine.jdbc.spi.SqlExceptionHelper: OFF
     org.hibernate.orm.jdbc.error: OFF
+    # Broken-connection/rollback diagnostics also attach raw driver exceptions and values.
+    com.zaxxer.hikari.pool.ProxyConnection: OFF
+    org.springframework.transaction.interceptor.TransactionInterceptor: OFF
 
 roster:
   ownership:

@@ -16,7 +16,7 @@ public final class RecordValidator {
 
     public RecordValidator(FieldOwnershipPolicy ownership, OfficeLookup offices) {
         this.ownership = ownership;
-        rules = List.of(new RequiredFieldsRule(ownership), new IdentityAndStatusRule(), new PhoneRule(),
+        rules = List.of(new RequiredFieldsRule(ownership), new ControlCharactersRule(), new IdentityAndStatusRule(), new PhoneRule(),
                 new EmailRule(), new LengthRule(), new OfficeRule(offices));
     }
 

@@ -29,7 +29,9 @@ public enum EmployeeField {
 
     public String canonicalValue(String value) {
         if (value == null) return null;
+        // Keep C0 characters until validation can reject them, including at the edges.
         String trimmed = value.trim();
+        if(value.chars().anyMatch(character->character<32)) trimmed=value;
         return this == EMAIL ? trimmed.toLowerCase(Locale.ROOT) : trimmed;
     }
 }

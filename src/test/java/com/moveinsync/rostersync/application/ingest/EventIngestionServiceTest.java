@@ -11,6 +11,30 @@ import static org.assertj.core.api.Assertions.*;
 import static org.mockito.Mockito.*;
 
 class EventIngestionServiceTest {
+    @Test void validationDatabaseErrorsAreAlsoIsolatedPerRecord() {
+        prepare();when(parser.parse(eq(tenant),any())).thenThrow(new DataIntegrityViolationException("CANARY"))
+                .thenReturn(new HrEventInputParser.ParsedEvent(command,"E1",2,"UPDATE",new ValidationResult(List.of(),List.of())));
+        when(applier.apply(eq(tenant),eq(command),anyList())).thenReturn(ApplyResult.outcome(IngestOutcome.APPLIED));
+        var result=service.ingest(tenant,List.of(Map.of(),Map.of()));
+        assertThat(result.summary().rejected()).isEqualTo(1);assertThat(result.summary().applied()).isEqualTo(1);
+    }
+    @Test void unexpectedRecordFailuresAreAuditedAndLaterRecordsContinue() {
+        prepare();when(applier.apply(eq(tenant),eq(command),anyList()))
+                .thenReturn(ApplyResult.outcome(IngestOutcome.APPLIED),ApplyResult.outcome(IngestOutcome.APPLIED))
+                .thenThrow(new DataIntegrityViolationException("CANARY_VALUE"))
+                .thenReturn(ApplyResult.outcome(IngestOutcome.APPLIED),ApplyResult.outcome(IngestOutcome.APPLIED));
+        var result=service.ingest(tenant,Collections.nCopies(5,Map.of()));
+        assertThat(result.summary().applied()).isEqualTo(4);assertThat(result.summary().rejected()).isEqualTo(1);
+        verify(audit).write(eq(tenant),eq("E1"),eq(2L),argThat(errors->errors.getFirst().code().equals("UNPROCESSABLE_RECORD")));
+    }
+    @Test void lostConnectionStopsTheBatchWithoutMisclassifyingItAsARecordRejection() {
+        prepare();when(applier.apply(eq(tenant),eq(command),anyList()))
+                .thenReturn(ApplyResult.outcome(IngestOutcome.APPLIED),ApplyResult.outcome(IngestOutcome.APPLIED))
+                .thenThrow(new org.springframework.transaction.CannotCreateTransactionException("safe",new java.sql.SQLException("CANARY","08006")));
+        assertThatThrownBy(()->service.ingest(tenant,Collections.nCopies(5,Map.of())))
+                .isInstanceOf(DataAccessResourceFailureException.class);
+        verify(applier,times(3)).apply(eq(tenant),eq(command),anyList());verifyNoInteractions(audit);
+    }
     private final UUID tenant=UUID.randomUUID();
     private final HrEventInputParser parser=mock(HrEventInputParser.class);
     private final EmployeeChangeApplier applier=mock(EmployeeChangeApplier.class);

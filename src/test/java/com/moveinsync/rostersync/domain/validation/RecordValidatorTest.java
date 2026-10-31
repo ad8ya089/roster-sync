@@ -13,6 +13,25 @@ import org.junit.jupiter.params.provider.ValueSource;
 import static org.assertj.core.api.Assertions.*;
 
 class RecordValidatorTest {
+    @Test void controlCharactersInOfficeCodesAreRejectedBeforeAnyDatabaseLookup() {
+        var lookup=org.mockito.Mockito.mock(OfficeLookup.class);
+        var checked=new RecordValidator(FieldOwnershipPolicy.defaults(),lookup);
+        var fields=validFields();fields.put(EmployeeField.OFFICE_CODE,"BLR\u0000-1");
+        assertThat(checked.validateEvent(TENANT,"E1",1,"UPDATE",fields,Set.of()).errors()).contains(new FieldError("officeCode","INVALID_FORMAT"));
+        org.mockito.Mockito.verifyNoInteractions(lookup);
+    }
+    @Test void rejectsEveryC0ControlBeforeNormalisationForEventsAndFiles() {
+        var allHr=new RecordValidator(new FieldOwnershipPolicy(Set.of()),offices);
+        for(var field:EmployeeField.values()) for(int code=0;code<32;code++) {
+            var fields=validFields();fields.put(field,"A"+(char)code+"B");
+            assertThat(allHr.validateEvent(TENANT,"E1",1,"UPDATE",fields,Set.of()).errors())
+                    .as("event %s control %s",field,code).contains(new FieldError(field.jsonName(),"INVALID_FORMAT"));
+            assertThat(allHr.validateFileRow(TENANT,"E1",1,fields,Set.of()).errors())
+                    .as("file %s control %s",field,code).contains(new FieldError(field.jsonName(),"INVALID_FORMAT"));
+        }
+        var fields=validFields();fields.put(EmployeeField.EMAIL,"\u0000test@example.test\u0000");
+        assertThat(event("UPDATE",fields).errors()).contains(new FieldError("email","INVALID_FORMAT"));
+    }
     @org.junit.jupiter.api.Test
     void transportPatchValidatesOnlySuppliedValuesAndDoesNotRequireHrSnapshotFields() {
         var validator = new RecordValidator(com.moveinsync.rostersync.domain.ownership.FieldOwnershipPolicy.defaults(), (tenant,code) -> OfficeLookup.Status.ACTIVE);

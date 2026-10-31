@@ -23,6 +23,7 @@ public class HrEventInputParser {
         String type = string(raw, "type", errors);
         String eventId = string(raw, "eventId", errors);
         if (eventId != null && eventId.length() > 100) errors.add(new FieldError("eventId", "TOO_LONG"));
+        if (com.moveinsync.rostersync.domain.validation.rules.ControlCharactersRule.containsControl(eventId)) errors.add(new FieldError("eventId","INVALID_FORMAT"));
         long version = version(raw.get("version"));
         Instant occurredAt = null;
         String occurred = string(raw, "occurredAt", errors);

@@ -7,6 +7,14 @@ import org.junit.jupiter.api.Test;
 import static org.assertj.core.api.Assertions.*;
 
 class HrEventInputParserTest {
+    @Test void eventIdsRejectControlsAndDatabaseColumnOverflow() {
+        for(int control=0;control<32;control++) {
+            var parsed=parser.parse(UUID.randomUUID(),Map.of("type","DEACTIVATE","employeeId","E1","version",1,"eventId","HR"+(char)control));
+            assertThat(parsed.validation().errors()).contains(new FieldError("eventId","INVALID_FORMAT"));
+        }
+        var parsed=parser.parse(UUID.randomUUID(),Map.of("type","DEACTIVATE","employeeId","E1","version",1,"eventId","x".repeat(101)));
+        assertThat(parsed.validation().errors()).contains(new FieldError("eventId","TOO_LONG"));
+    }
     private final FieldOwnershipPolicy ownership=FieldOwnershipPolicy.defaults();
     private final HrEventInputParser parser=new HrEventInputParser(ownership,new RecordValidator(ownership,(tenant,code)->OfficeLookup.Status.ACTIVE));
     @Test void filtersNonOwnedValuesBeforeAttemptingToValidateTheirJsonTypes() {

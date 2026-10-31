@@ -10,6 +10,7 @@ public final class OfficeRule implements ValidationRule<ValidationInput> {
     @Override public List<FieldError> validate(ValidationInput input) {
         String code = input.get(EmployeeField.OFFICE_CODE);
         if (code == null || code.isBlank()) return List.of();
+        if(ControlCharactersRule.containsControl(code)) return List.of(new FieldError("officeCode","INVALID_FORMAT"));
         return switch (offices.lookup(input.tenantId(), code)) {
             case ACTIVE -> List.of();
             case INACTIVE -> List.of(new FieldError("officeCode", "INACTIVE_OFFICE"));

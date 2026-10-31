@@ -37,6 +37,7 @@ public enum ErrorCode {
     DUPLICATE_ROW_IN_FILE(HttpStatus.BAD_REQUEST, "Duplicate file row"),
     VERSION_CONFLICT(HttpStatus.CONFLICT, "Version conflict"),
     RETRYABLE_ERROR(HttpStatus.SERVICE_UNAVAILABLE, "Retry required"),
+    UNPROCESSABLE_RECORD(HttpStatus.BAD_REQUEST, "Record could not be processed"),
     FIELD_NOT_OWNED_BY_SOURCE(HttpStatus.BAD_REQUEST, "Field not owned by source"),
     UNKNOWN_FIELD_IGNORED(HttpStatus.BAD_REQUEST, "Unknown field ignored");
 
