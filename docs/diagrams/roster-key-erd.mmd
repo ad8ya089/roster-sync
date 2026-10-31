@@ -1,0 +1,34 @@
+erDiagram
+    direction TB
+    office |o--o{ employee : "office_id FK"
+    employee |o..o{ hr_event_receipt : "accepted version; logical"
+    employee |o..o{ outbox_event : "Employee aggregate; logical"
+    office {
+        bigint id PK
+        uuid tenant_id FK
+        varchar code
+    }
+    employee {
+        bigint id PK
+        uuid tenant_id FK
+        varchar external_id
+        bigint office_id FK
+        bigint hr_version
+        integer transport_version
+    }
+    hr_event_receipt {
+        bigint id PK
+        uuid tenant_id
+        varchar external_id
+        bigint version
+        char64 payload_hash
+        varchar outcome
+    }
+    outbox_event {
+        bigint id PK
+        uuid event_id UK
+        uuid tenant_id
+        varchar aggregate_id
+        bigint aggregate_version
+        varchar status
+    }

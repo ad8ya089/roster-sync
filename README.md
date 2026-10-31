@@ -94,6 +94,25 @@ The public deployment runs **one Spring Boot app and one PostgreSQL primary**, w
 
 The outbox publisher is a background worker in that same app. It delivers committed changes to the logging and deactivation sinks. No message broker is required. Uploaded files and temporary buckets use private disk storage. Actuator uses port 8081, bound to host loopback in AWS and accessed through SSM; Prometheus/Grafana belong to the optional local monitoring profile.
 
+### Data model: current state, accepted versions and pending delivery
+
+![Core ER diagram showing employee state, office, accepted-version receipts and outbox events](docs/diagrams/roster-key-erd.png)
+
+This is the core of the model, with selected columns. **Solid lines are declared SQL foreign keys; dotted lines are application-level associations.** Employee IDs are unique within a tenant, not globally. A tombstone may have no office. Receipts identify accepted content by `(tenant_id, external_id, version)`, while outbox rows identify downstream deliveries by `event_id`.
+
+The employee has separate `hr_version` and `transport_version` values because the two sources own different fields. Replaying an event checks its receipt; it does not create another employee change or delivery. The employee update, accepted receipt and new outbox row commit together when business fields change.
+
+<details>
+<summary>Expand the tenant, staff-account, booking and seat relationships</summary>
+
+![Tenant and employee ER diagram with office, staff account, booking and route seat](docs/diagrams/workforce-erd.png)
+
+Office codes are unique on `(tenant_id, code)`; employees on `(tenant_id, external_id)`; route seats on `(tenant_id, route_code, seat_no)`. Staff usernames are globally unique. Booking/seat employee references and the EMPLOYEE account mapping are resolved by the application using tenant plus external ID; they are not employee foreign keys.
+
+</details>
+
+[Core ER as SVG](docs/diagrams/roster-key-erd.svg) · [Workforce ER as SVG](docs/diagrams/workforce-erd.svg) · [Full column definitions](docs/DATA_MODEL.md)
+
 ### During the day: validate, decide and commit one event
 
 The API first checks authentication, role and company scope. For each parsed event, the application filters fields by ownership, normalises the allowed values and returns all validation errors in a deterministic order. An invalid record is rejected independently, so its valid neighbours can still apply.
