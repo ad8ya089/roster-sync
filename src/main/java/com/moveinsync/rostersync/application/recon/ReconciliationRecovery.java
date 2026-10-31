@@ -12,9 +12,10 @@ import org.springframework.stereotype.Component;
 public class ReconciliationRecovery {
     private static final Logger LOG=LoggerFactory.getLogger(ReconciliationRecovery.class);
     private final ReconRunDao runs;private final ReconWorkQueue queue;private final ReconciliationRunner runner;private final Clock clock;
-    public ReconciliationRecovery(ReconRunDao runs,ReconWorkQueue queue,ReconciliationRunner runner,Clock clock){this.runs=runs;this.queue=queue;this.runner=runner;this.clock=clock;}
+    private final com.moveinsync.rostersync.application.ops.ReconciliationFileCleanup files;
+    public ReconciliationRecovery(ReconRunDao runs,ReconWorkQueue queue,ReconciliationRunner runner,Clock clock,com.moveinsync.rostersync.application.ops.ReconciliationFileCleanup files){this.runs=runs;this.queue=queue;this.runner=runner;this.clock=clock;this.files=files;}
     @EventListener(ApplicationReadyEvent.class)
-    public void startup(){recover(true);}
+    public void startup(){recover(true);files.abandoned();}
     @Scheduled(fixedDelayString="${roster.reconciliation.recovery-interval}",initialDelayString="${roster.reconciliation.recovery-interval}")
     public void watchdog(){recover(false);}
     private void recover(boolean startup) {

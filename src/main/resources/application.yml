@@ -105,7 +105,7 @@ roster:
     outbox: ${RETENTION_OUTBOX:7d}
     recon-actions: ${RETENTION_RECON_ACTIONS:7d}
     processed-events: ${RETENTION_PROCESSED_EVENTS:7d}
-    uploaded-files: ${RETENTION_UPLOADED_FILES:7d}
+    uploads: ${RETENTION_UPLOADS:7d}
     cron: ${RETENTION_CRON:0 0 3 * * *}
   security:
     jwt-secret: ${JWT_SECRET}

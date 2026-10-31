@@ -79,12 +79,12 @@ public record RosterProperties(
             @NotNull @DefaultValue("7d") Duration outbox,
             @NotNull @DefaultValue("7d") Duration reconActions,
             @NotNull @DefaultValue("7d") Duration processedEvents,
-            @NotNull @DefaultValue("7d") Duration uploadedFiles,
+            @NotNull @DefaultValue("7d") Duration uploads,
             @NotBlank @DefaultValue("0 0 3 * * *") String cron) {
         @AssertTrue(message = "retention durations must be positive")
         public boolean isDurationPositive() {
             return positive(receipts) && positive(outbox) && positive(reconActions)
-                    && positive(processedEvents) && positive(uploadedFiles);
+                    && positive(processedEvents) && positive(uploads);
         }
     }
 

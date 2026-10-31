@@ -14,6 +14,14 @@ import org.springframework.context.annotation.Configuration;
 import static org.assertj.core.api.Assertions.assertThat;
 
 class RosterPropertiesTest {
+    @Test void reconciliationRetentionDurationsAreConfigurable() {
+        context.withPropertyValues("roster.retention.recon-actions=2d","roster.retention.uploads=3d").run(application->{
+            assertThat(application).hasNotFailed();
+            var retention=application.getBean(RosterProperties.class).retention();
+            assertThat(retention.reconActions()).isEqualTo(Duration.ofDays(2));
+            assertThat(retention.uploads()).isEqualTo(Duration.ofDays(3));
+        });
+    }
     private final ApplicationContextRunner context = new ApplicationContextRunner()
             .withUserConfiguration(PropertiesConfiguration.class)
             .withPropertyValues("roster.security.jwt-secret=test-secret-with-more-than-32-utf8-bytes");
@@ -76,7 +84,7 @@ class RosterPropertiesTest {
             "roster.reconciliation.brake.max-missing-ratio=1.01", "roster.reconciliation.brake.max-missing-count=0",
             "roster.reconciliation.buckets=0", "roster.outbox.batch-size=0",
             "roster.outbox.poll-interval=0s", "roster.security.token-ttl=-1s",
-            "roster.security.jwt-secret=short"})
+            "roster.security.jwt-secret=short", "roster.retention.uploads=0d", "roster.retention.recon-actions=-1d"})
     void rejectsUnsafeConfiguration(String property) {
         context.withPropertyValues(property).run(application -> assertThat(application).hasFailed());
     }
