@@ -6,10 +6,23 @@ Built by **Aditya Prakash** for **MoveInSync Backend Case Study 5, Advanced Trac
 
 **Live application: [rostersync-aditya.duckdns.org](https://rostersync-aditya.duckdns.org)**
 
-**Demo credentials are provided privately.** The application uses prepared staff accounts with company and role permissions. Your personal email address does not automatically create an account. On the sign-in screen, choose **Need an account?** to find the appropriate demo username.
+**Demo sign-in:** use a role below with the shared demo password `H7JeHBkccUAjsafk2ONyOZeAutqm-HOu`. These accounts belong to the synthetic interview dataset. A personal email is not a login; **Need an account?** explains access.
 
 
 Java 21 · Spring Boot 4.1 · PostgreSQL 17 · React · Docker Compose
+
+## Demo access
+
+All four accounts use the same demo password shown above.
+
+| Username | Role | What to try |
+|---|---|---|
+| `acme.hr` | HR integration | Open Event console and run **Out-of-order (brief example)**. Inspect the three results, then replay the last batch. |
+| `acme.admin` | Transport admin | Find `E1001` in Employees. Inspect the HR fields, edit transport details and review bookings. |
+| `acme.operator` | Operator | Open Operations for current state and delivery problems. Use Runs to inspect a reconciliation plan and its decision. |
+| `E1001` | Employee | Open My profile. This role can view its own information and bookings. |
+
+Start with `acme.hr` for events, `acme.admin` for employee/transport details, and `acme.operator` for runs and operations. See [DEMO.md](DEMO.md) for exact steps and expected results.
 
 ## The problem this project solves
 
@@ -38,14 +51,9 @@ The nightly example is different: an export contains only **120,000 rows** for a
 
 ## Try the application
 
-Open **[rostersync-aditya.duckdns.org](https://rostersync-aditya.duckdns.org)** and use the demo password supplied privately. This is a staff application, so accounts are prepared with a company and a role. Public self-registration is not enabled. The access-help page explains the available roles and can fill in a username; it cannot grant permissions or bypass the password.
+Open **[rostersync-aditya.duckdns.org](https://rostersync-aditya.duckdns.org)** and use the shared demo password above. This is a staff application, so accounts are prepared with a company and a role. Public self-registration is not enabled. The access-help page explains the available roles and can fill in a username; it cannot grant permissions or bypass the password.
 
-| Username | Role | What to try |
-|---|---|---|
-| `acme.hr` | HR integration | Open Event console and run **Out-of-order (brief example)**. Inspect the three results, then replay the last batch. |
-| `acme.admin` | Transport admin | Find `E1001` in Employees. Inspect the HR fields, edit transport details and review bookings. |
-| `acme.operator` | Operator | Open Operations for current state and delivery problems. Use Runs to inspect a reconciliation plan and its decision. |
-| `E1001` | Employee | Open My profile. This role can view its own information and bookings. |
+
 
 Role checks happen on the server as well as in the navigation. An operator cannot edit transport fields, an employee cannot read another employee, and a permitted role from another tenant receives 404 for the first tenant's resources. Tokens stay in the current tab's memory, so reloading deliberately signs out.
 
@@ -65,22 +73,22 @@ Role checks happen on the server as well as in the navigation. An operator canno
 
 The [operations board](docs/images/console-ops.png) connects durable tenant counts with delivery problems and alerts. The [employee view](docs/images/console-employee-detail.png) separates HR-owned fields from transport-owned fields. The [runs list](docs/images/console-runs.png) keeps the history of uploaded files and decisions.
 
-The full 200k demonstration runs locally. In Demo tools, seed 200,000 once, generate a truncated 120,000-row export, then upload it. The small AWS instance is for the light interview demonstration. Its `prod,demo` profile is an intentional exception: demo tools still require OPERATOR authorization. No demo password appears in the application, repository or screenshots.
+The full 200k demonstration runs locally. In Demo tools, seed 200,000 once, generate a truncated 120,000-row export, then upload it. The small AWS instance is for the light interview demonstration. Its `prod,demo` profile is an intentional exception: demo tools still require OPERATOR authorization. The demo password is intentionally published here for reviewers; AWS, database and JWT secrets are not. Anyone with it can use the operator demo controls and change the shared synthetic data.
 
 <details>
 <summary>Verify the live API in two minutes with Bash, curl and jq</summary>
 
-These five lines check the public page, sign in without printing the token, read offices, and confirm that the same endpoint requires authentication. Enter the private demo password at the hidden prompt. Do not turn on shell tracing.
+These five lines check the public page, sign in without printing the token, read offices, and confirm that the same endpoint requires authentication. Enter the demo password at the hidden prompt. Do not turn on shell tracing.
 
 ```bash
 BASE=https://rostersync-aditya.duckdns.org; curl -sS -o /dev/null -w 'Console: %{http_code}\n' "$BASE/"
-read -rsp 'Private demo password: ' DEMO_PASSWORD; echo
+read -rsp 'Demo password: ' DEMO_PASSWORD; echo
 TOKEN=$(jq -n --arg password "$DEMO_PASSWORD" '{username:"acme.admin",password:$password}' | curl -fsS "$BASE/api/v1/auth/token" -H 'Content-Type: application/json' --data-binary @- | jq -er .accessToken)
 curl -fsS "$BASE/api/v1/offices" -H "Authorization: Bearer $TOKEN" | jq
 curl -sS -o /dev/null -w 'Without a token: %{http_code} (expected 401)\n' "$BASE/api/v1/offices"; unset DEMO_PASSWORD TOKEN
 ```
 
-The [Postman collection](postman/roster-sync.postman_collection.json) and [environment template](postman/roster-sync.postman_environment.json) provide the same API flows. Fill the private password locally. Login responses contain a JWT, so do not display them in a public recording.
+The [Postman collection](postman/roster-sync.postman_collection.json) and [environment template](postman/roster-sync.postman_environment.json) provide the same API flows. Use the demo password from the access section. Login responses contain a JWT, so do not display them in a public recording.
 
 </details>
 
@@ -239,6 +247,23 @@ Email is trimmed and lowercased before validation and hashing. Phone must alread
 The default missing-ratio rule trips at **missing share >= 30%**, including the exact boundary. Optional missing-count and trailer/expected-row-count checks can also stop a run. With zero active employees, ratio/count checks are skipped, but row-count integrity checks still apply.
 
 A tripped plan changes nothing until an OPERATOR chooses to approve all changes, approve without deactivations, or reject it. Saving a new threshold affects the **next** run; an existing plan retains its recorded setting. A snapshot can also heal equal-version drift and advance higher identical versions. See [reconciliation rules](docs/RECONCILIATION.md) and the [complete API contract](docs/API.md).
+
+## Answers to the case-study questions
+
+The brief's four core requirements are demonstrated by the two flows above: per-record ingestion, ordered/idempotent ownership-aware updates, bounded-memory reconciliation with a human brake, and reliable downstream effects. The [requirement-to-test matrix](docs/REQUIREMENTS_TRACEABILITY.md) maps every rule to its implementation and proof. These are the additional engineering answers a reviewer may want:
+
+| Question | Implementation and evidence |
+|---|---|
+| How are company data and roles separated? | JWTs contain the company and role. Controllers check the role first, then queries include tenantId; cross-tenant resources return404. EMPLOYEE access is restricted to its own ID. AuthorizationIT, TenantIsolationIT and endpoint/repository guards exercise those boundaries. |
+| What happens to bad input or an unavailable database? | Validation returns every field/code error in deterministic order. Owned API/CSV strings reject C0/DEL controls, and unknown warnings are bounded. An unexpected data error rolls back only that record and audits safe codes. A connection outage stops with503; earlier commits survive and can be replayed safely. |
+| What proves idempotency and ordering? | The receipt key is tenant + employee + version, with a canonical owned-state/type hash. ReplayIdempotencyIT checks unchanged employee/receipt bytes and outbox counts; concurrency/property tests assert the final version is the maximum seen. A higher identical version advances the watermark with NO_CHANGE, preventing later resurrection by an intermediate event. |
+| Why does a truncated file not deactivate everyone? | Missing-share, count and trailer integrity checks run before application. At or above the configured30% boundary, a non-dry run waits with zero applied actions and an alert. The operator's decision and threshold are durable. ReconciliationFlowIT covers200k stored employees and a120k cut file. |
+| What happens after a crash or a sink timeout? | Employee changes and their outbox records commit together. Delivery can repeat after a crash or timeout, so consumers deduplicate by eventId and check current employee status before acting. Crash/retry tests and the real halt/restart demonstration prove recovery; this is not a claim of exactly-once sink execution. |
+| Which OOP features are doing real work? | EmployeeEntity encapsulates HR/transport mutations and versions. TenantScopedEntity/AuditedTenantEntity share tenancy/audit state. Sealed HrCommand subclasses resolve different event intents, ApplyDecision makes outcomes explicit, and EventSink/ValidationRule implementations provide polymorphism. Controllers call services; the plain Java domain has no Spring/SQL dependency, enforced by ArchUnit. |
+| What would an operator inspect at3AM? | The operations board separates tenant-scoped SQL state from instance-wide sinceRestart counters. Lag, rejections, retries, pending/dead outbox depth, alerts and held runs reveal distinct failures. Gauges refresh into memory so metric scrapes do not query the database; Prometheus/Grafana are optional locally. |
+| What can the cache get wrong? | Employee views can be stale for30seconds from insertion; an in-flight pre-commit read can refill old data after eviction. Offices have a10-minute TTL, but the applier rechecks activity from PostgreSQL. Write/version/brake decisions do not use employeeView. CachingIT covers eviction, rollback and tenant/self checks. |
+| Where does it stop scaling, and why? | The measurements below distinguish comparison, application and HTTP workloads. Largest-bucket skew bounds comparison heap; writes and durable commits bound application/ingress. The single-instance worker model needs leases/shared files before horizontal scaling. Adding pool connections was not justified by the measured pending count. |
+| What trade-offs and omissions are deliberate? | PostgreSQL availability is required for authoritative writes; per-record commits cost latency but isolate bad records. A broker, Kubernetes, IdP/revocation and in-flight reconciliation cancellation are left out. JWTs last until expiry after a user is disabled. [DECISIONS.md](docs/DECISIONS.md) explains the consistency, availability and latency choices. |
 
 ## Performance
 

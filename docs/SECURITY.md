@@ -75,6 +75,8 @@ api/error/
 
 ## 6. Secrets & config
 
+Reviewer-demo exception: at the owner's explicit request, the shared synthetic-demo account password is published in README. This includes the OPERATOR account, whose authorised demo tools can change data and trigger fault injection. Treat that environment as a public, disposable interview dataset. This is not a normal production credential policy; AWS credentials, database credentials and JWT signing secrets remain private and are never published. The public demo password must not be reused elsewhere.
+
 `.env` (git-ignored) with `.env.example` committed: `POSTGRES_PASSWORD`, `JWT_SECRET`, `DEMO_PASSWORD`, `BRAKE_MAX_MISSING_RATIO`, `SPRING_PROFILES_ACTIVE`. In AWS, the same variables come from SSM Parameter Store / Secrets Manager (see `DEPLOYMENT.md`).
 
 ## 7. Input limits (cheap DoS hygiene)

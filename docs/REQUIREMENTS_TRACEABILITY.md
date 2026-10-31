@@ -107,7 +107,7 @@ Coverage of the two-page Case Study 5 brief, audited against the supplied PDF. E
 | N5 | Unit tests for core logic + concurrency, failure, benchmark tests; normal inputs AND edge cases | `TESTING.md` | done — unit/property/architecture, real PostgreSQL concurrency/recovery and bounded-heap benchmark tests |
 | N6 | README: how to run, assumptions, benchmark results, trade-offs note | `README.md` | done — run instructions, precise rules, measured results, test counts and trade-offs linked |
 | N7 | Public GitHub repo; meaningful commit history, not one giant commit | Conventional Commits, small verified commits | done — public ad8ya089/roster-sync main has small implementation/test/docs commits; full-history Gitleaks has no findings |
-| N8 | Demo video: main flows, one failure scenario live, sample API calls (Postman/curl) | `docs/DEMO_SCRIPT.md`, `scripts/demo.sh`, `postman/` collection | partial — automated curl demo, crash proof and Postman collection ready; video recording pending |
+| N8 | Demo video: main flows, one failure scenario live, sample API calls (Postman/curl) | README presentation/recording folder, `DEMO.md`, `docs/DEMO_SCRIPT.md`, `scripts/demo.sh`, `postman/` collection | owner-provided recordings linked; main/failure/API flows independently tested, but this documentation pass does not re-audit every scene or sharing permission |
 
 
 ## Phase 9 console
@@ -119,4 +119,4 @@ Coverage of the two-page Case Study 5 brief, audited against the supplied PDF. E
 | Static delivery, cache/security headers, version precision, CI | Spring static resources; multi-stage Docker build; native source-text reviver; frontend CI job | done — sole API addition remains read-only createdAt |
 | Live console over HTTPS | Existing EC2/Caddy deployment; production build disables styleguide/hints | done — deployed app/db/Caddy healthy; live roles, ordering and small-file brake/rejection verified |
 
-The PDF demo-video requirement remains partial as recorded above.
+The owner supplied the recording folder. Recordings stay outside Git and Docker uploads; README links the owner's Drive folder rather than hosting the large media in the repository.
